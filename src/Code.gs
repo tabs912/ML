@@ -5716,6 +5716,14 @@ function applyMasterListTemplateFormatting_(sheet) {
 
 
 
+function writeMasterListTitleDateBlock_(masterSheet, monthParts) {
+  masterSheet.getRange("A1:D2").setValues([
+    ["Master List", "", "", ""],
+    ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
+  ]);
+}
+
+
 function initializeMasterListTitleRows_(masterSheet, monthParts) {
   masterSheet.clearContents();
 
@@ -5725,10 +5733,7 @@ function initializeMasterListTitleRows_(masterSheet, monthParts) {
   }
 
 
-  masterSheet.getRange("A1:D2").setValues([
-    ["Master List", "", "", ""],
-    ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
-  ]);
+  writeMasterListTitleDateBlock_(masterSheet, monthParts);
 
 
   clearSheetRuntimeCachesForSheet_(masterSheet);
@@ -5747,10 +5752,7 @@ function copyDemoPHeaderRowsToMasterList_(demoSheet, masterSheet, monthParts) {
   clearHeaderCacheForSheet_(masterSheet);
 
 
-  masterSheet.getRange("A1:D2").setValues([
-    ["Master List", "", "", ""],
-    ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
-  ]);
+  writeMasterListTitleDateBlock_(masterSheet, monthParts);
 
 
   try {
@@ -12188,21 +12190,37 @@ function removeSystemSheetHideTriggers() {
 
 
 
+function runDashboardQualityPerformanceSummary() {
+  return runDashboardQualityPerformanceSummary_();
+}
+
+
+function refreshFrameworkTimingReport() {
+  writeConsolidatedTimingSummaryReport_();
+}
+
+
+function writeFrameworkTimingPerformanceRecommendations() {
+  writeFrameworkPerformanceRecommendationsSheet_();
+}
+
+
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
-  const qualityMenu = ui.createMenu("Quality")
-    .addItem("Dashboard Quality Format", "runDashboardQualityQuick")
-    .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
+  const frameworkSetupMenu = ui.createMenu("Framework Setup")
+    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
+    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
+    .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
 
-  const rebuildMenu = ui.createMenu("Rebuild")
-    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_");
+  const dashboardQualityMenu = ui.createMenu("Dashboard Quality")
+    .addItem("Run Dashboard Quality - Format", "runDashboardQualityQuick")
+    .addItem("Run Dashboard Quality - Workflow", "runDashboardQualityFull")
+    .addItem("Update Performance Summary", "runDashboardQualityPerformanceSummary");
 
-  const dashboardSystemMenu = ui.createMenu("Dashboard/System Tools")
-    .addItem("Start up/Verify Framework Configuration", "verifyFrameworkConfiguration")
-    .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
-    .addSubMenu(qualityMenu)
-    .addSubMenu(rebuildMenu);
+  const frameworkTimingMenu = ui.createMenu("Framework Timing")
+    .addItem("Refresh Framework Timing Report", "refreshFrameworkTimingReport")
+    .addItem("Write Performance Recommendations", "writeFrameworkTimingPerformanceRecommendations");
 
   const workflowFormatMenu = ui.createMenu("Format")
     .addItem("Format Banner Report", "formatBannerReport")
@@ -12237,8 +12255,10 @@ function onOpen() {
     .addSubMenu(systemSheetMenu);
 
   ui.createMenu("Master List Tools")
-    .addSubMenu(dashboardSystemMenu)
+    .addSubMenu(frameworkSetupMenu)
     .addSubMenu(workflowMenu)
+    .addSubMenu(dashboardQualityMenu)
+    .addSubMenu(frameworkTimingMenu)
     .addSubMenu(sheetManagementMenu)
     .addToUi();
 }
@@ -12674,6 +12694,17 @@ const RFF_SECTION_SHEETS = "SECTION B - SHEET DEFINITIONS";
 const RFF_SECTION_HEADERS = "SECTION C - SHEET HEADERS";
 const RFF_SECTION_COLUMNS = "SECTION D - COLUMN DEFINITIONS";
 const RFF_SECTION_BEHAVIORS = "SECTION E - SHEET BEHAVIORS";
+
+
+function getFormatDashboardSectionNames_() {
+  return [
+    RFF_SECTION_GLOBAL,
+    RFF_SECTION_SHEETS,
+    RFF_SECTION_HEADERS,
+    RFF_SECTION_COLUMNS,
+    RFF_SECTION_BEHAVIORS
+  ];
+}
 
 
 
@@ -13536,13 +13567,7 @@ function getDashboardSectionBounds_(sheet, sectionName) {
   if (sectionRow === -1) return null;
 
 
-  const sectionNames = [
-    RFF_SECTION_GLOBAL,
-    RFF_SECTION_SHEETS,
-    RFF_SECTION_HEADERS,
-    RFF_SECTION_COLUMNS,
-    RFF_SECTION_BEHAVIORS
-  ].map(function(name) {
+  const sectionNames = getFormatDashboardSectionNames_().map(function(name) {
     return normalizeDashboardSectionTitle_(name);
   });
 
@@ -17330,7 +17355,7 @@ function auditDashboardConfiguration_(dashboard) {
 
 
   try {
-    [RFF_SECTION_GLOBAL, RFF_SECTION_SHEETS, RFF_SECTION_HEADERS, RFF_SECTION_COLUMNS, RFF_SECTION_BEHAVIORS].forEach(function(sectionName) {
+    getFormatDashboardSectionNames_().forEach(function(sectionName) {
       readDashboardSectionRows_(sheet, sectionName);
       add("Required Section", sectionName, "PASS", "Present");
     });
@@ -18512,24 +18537,31 @@ function replaceDashboardQualitySectionRows_(sheet, sectionTitle, rows) {
     return normalizeSectionRowForWidth_(row || [], width);
   });
 
-  const titleRow = findDashboardQualitySectionRow_(sheet, sectionTitle);
-  if (!titleRow) {
+  const titleRow = getDashboardQualityFixedSectionStartRow_(sectionTitle);
+  if (!findDashboardQualitySectionRow_(sheet, sectionTitle)) {
     throw new Error("Dashboard Quality section not found: " + sectionTitle);
   }
 
-  const nextRow = findNextDashboardQualitySectionRow_(sheet, titleRow + 1);
-  const existingBlockRows = nextRow ? nextRow - titleRow : Math.max(1, sheet.getLastRow() - titleRow + 1);
-  const desiredBlockRows = Math.max(4, normalized.length);
-
-  if (existingBlockRows < desiredBlockRows) {
-    const insertAt = nextRow || (titleRow + existingBlockRows);
-    sheet.insertRowsBefore(insertAt, desiredBlockRows - existingBlockRows);
-  } else if (existingBlockRows > desiredBlockRows && nextRow) {
-    sheet.deleteRows(titleRow + desiredBlockRows, existingBlockRows - desiredBlockRows);
+  const blockRows = RFF_DASHBOARD_QUALITY_SECTION_BLOCK_ROWS;
+  if (sheet.getMaxRows() < titleRow + blockRows - 1) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), titleRow + blockRows - 1 - sheet.getMaxRows());
   }
 
-  sheet.getRange(titleRow, 1, desiredBlockRows, width).clearContent();
-  sheet.getRange(titleRow, 1, normalized.length, width).setValues(normalized);
+  const output = normalized.slice(0, blockRows);
+  if (normalized.length > blockRows) {
+    output[blockRows - 1] = normalizeSectionRowForWidth_([
+      "TRUNCATED",
+      "",
+      "",
+      "",
+      "WARNING",
+      "",
+      "Section output exceeded fixed Dashboard Quality block size of " + blockRows + " rows."
+    ], width);
+  }
+
+  sheet.getRange(titleRow, 1, blockRows, width).clearContent();
+  sheet.getRange(titleRow, 1, output.length, width).setValues(output);
 
   try {
     sheet.getRange(titleRow + 1, 2).setNumberFormat("mm/dd/yyyy hh:mm:ss");

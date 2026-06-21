@@ -1596,7 +1596,8 @@ const RFF_DASHBOARD_QUALITY_SECTIONS = [
   { key: RFF_PERFORMANCE_SUMMARY_KEY, title: "SECTION O - PERFORMANCE SUMMARY" },
   { key: RFF_MASTER_LIST_HEALTH_KEY, title: "SECTION P - MASTER LIST HEALTH CHECK" },
   { key: RFF_CP_SYNC_DIAGNOSTICS_KEY, title: "SECTION Q - CARE PLAN SYNC DIAGNOSTICS" },
-  { key: RFF_WORKFLOW_SYNC_VERIFICATION_KEY, title: "SECTION R - WORKFLOW & SYNCHRONIZATION VERIFICATION" }
+  { key: RFF_WORKFLOW_SYNC_VERIFICATION_KEY, title: "SECTION R - WORKFLOW & SYNCHRONIZATION VERIFICATION" },
+  { key: RFF_SYSTEM_SHEET_VERIFICATION_KEY, title: "SECTION S - SYSTEM SHEET VERIFICATION" }
 ];
 
 const RFF_DASHBOARD_QUALITY_SECTION_BLOCK_ROWS = 420;
@@ -2942,6 +2943,7 @@ function buildFrameworkSummaryRows_() {
   const cpDiagnostics = getStoredSectionStatusAndNotes_(RFF_CP_SYNC_DIAGNOSTICS_KEY, 2);
   const workflowVerification = getStoredSectionStatusAndNotes_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, 2);
   const systemSheets = getStoredSectionStatusAndNotes_(RFF_SYSTEM_SHEET_VERIFICATION_KEY, 2);
+  const performance = getStoredSectionStatusAndNotes_(RFF_PERFORMANCE_SUMMARY_KEY, 5);
 
   rows.push(["Dashboard Global Inputs", dashboardGlobal.status, dashboardGlobal.notes, "Dashboard Quality Report Section A"]);
   rows.push(["Dashboard Sheet Definitions", dashboardSheets.status, dashboardSheets.notes, "Dashboard Quality Report Section B"]);
@@ -2955,10 +2957,11 @@ function buildFrameworkSummaryRows_() {
   rows.push(["Test 9 - Monthly Change Subheaders", getReportOverallStatus_(RFF_TEST9_SUBHEADER_SHEET, 3), getReportFailureNotes_(RFF_TEST9_SUBHEADER_SHEET, 3), "Dashboard Quality Report Section J"]);
   rows.push(["Test 10 - Dashboard Audit", dashboardAudit.status, dashboardAudit.notes, "Dashboard Quality Report Section K"]);
   rows.push(["Framework Health Check", frameworkHealth.status, frameworkHealth.notes, "Dashboard Quality Report Section L"]);
-  rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes, "Dashboard Quality Report Section O"]);
-  rows.push(["Care Plan Sync Diagnostics", cpDiagnostics.status, cpDiagnostics.notes, "Dashboard Quality Report Section P"]);
-  rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes, "Dashboard Quality Report Section Q"]);
-  rows.push(["System Sheet Verification", systemSheets.status, systemSheets.notes, "Dashboard Quality Report Section R"]);
+  rows.push(["Performance Summary", performance.status, performance.notes, "Dashboard Quality Report Section O"]);
+  rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes, "Dashboard Quality Report Section P"]);
+  rows.push(["Care Plan Sync Diagnostics", cpDiagnostics.status, cpDiagnostics.notes, "Dashboard Quality Report Section Q"]);
+  rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes, "Dashboard Quality Report Section R"]);
+  rows.push(["System Sheet Verification", systemSheets.status, systemSheets.notes, "Dashboard Quality Report Section S"]);
 
   const anyFail = rows.some(function(r) { return r[1] === "FAIL" || r[1] === "MISSING"; });
   rows.unshift(["OVERALL FRAMEWORK STATUS", anyFail ? "ACTION REQUIRED" : "READY", anyFail ? "Resolve failing or missing Dashboard Quality sections" : "All automated framework checks pass", "Calculated"]);

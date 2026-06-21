@@ -1206,27 +1206,35 @@ function enforceDashboardSheetDefinitionGovernance_(sheet) {
 
 
   let changed = false;
-  for (let r = sectionRow + 2; r < nextSectionRow; r++) {
-    const sheetType = normalizeHeader_(values[r][0]);
-    if (sheetType === RFF_SHEET_TYPES.MONTHLY_CHANGE || sheetType === RFF_SHEET_TYPES.DISENROLLED || sheetType === RFF_SHEET_TYPES.MASTER_LIST_CHANGE_LOG) {
-      // Columns are 1-based in the sheet: Template Row Count H, Minimum Rows J, Buffer K, Test Rows L, Use Test Rows M.
-      if (sheetType === RFF_SHEET_TYPES.DISENROLLED && Number(values[r][7]) !== 1000) {
-        sheet.getRange(r + 1, 8).setValue(1000);
-        changed = true;
-      }
-      if (Number(values[r][11]) !== 1000) {
-        sheet.getRange(r + 1, 12).setValue(1000);
-        changed = true;
-      }
-      if (String(values[r][12] || "").toUpperCase() !== "FALSE") {
-        sheet.getRange(r + 1, 13).setValue("FALSE");
-        changed = true;
+  const firstDataRow = sectionRow + 2;
+  const rowCount = Math.max(nextSectionRow - firstDataRow, 0);
+  if (rowCount > 0) {
+    const governanceValues = sheet.getRange(firstDataRow + 1, 1, rowCount, 13).getValues();
+    for (let r = 0; r < governanceValues.length; r++) {
+      const sheetType = normalizeHeader_(governanceValues[r][0]);
+      if (sheetType === RFF_SHEET_TYPES.MONTHLY_CHANGE || sheetType === RFF_SHEET_TYPES.DISENROLLED || sheetType === RFF_SHEET_TYPES.MASTER_LIST_CHANGE_LOG) {
+        // Columns are 1-based in the sheet: Template Row Count H, Minimum Rows J, Buffer K, Test Rows L, Use Test Rows M.
+        if (sheetType === RFF_SHEET_TYPES.DISENROLLED && Number(governanceValues[r][7]) !== 1000) {
+          governanceValues[r][7] = 1000;
+          changed = true;
+        }
+        if (Number(governanceValues[r][11]) !== 1000) {
+          governanceValues[r][11] = 1000;
+          changed = true;
+        }
+        if (String(governanceValues[r][12] || "").toUpperCase() !== "FALSE") {
+          governanceValues[r][12] = "FALSE";
+          changed = true;
+        }
       }
     }
+
+
+    if (changed) {
+      sheet.getRange(firstDataRow + 1, 1, governanceValues.length, 13).setValues(governanceValues);
+      clearDashboardConfigCache_();
+    }
   }
-
-
-  if (changed) clearDashboardConfigCache_();
   return changed;
 }
 
@@ -1441,21 +1449,32 @@ function compactDashboardSectionDataRows_(sheet, sectionName, timing, label) {
 
 
 
+function normalizeDashboardSectionTitle_(value) {
+  return normalizeText_(value).toUpperCase()
+    .replace(/\bCOLUMN DEFINITIONS\b/g, "COLUMN DEFINITION")
+    .replace(/\bSHEET DEFINITIONS\b/g, "SHEET DEFINITION")
+    .replace(/\bSHEET HEADERS\b/g, "SHEET HEADER")
+    .replace(/\bSHEET BEHAVIORS\b/g, "SHEET BEHAVIOR")
+    .replace(/\bGLOBAL SETTINGS\b/g, "GLOBAL SETTING")
+    .replace(/[\s\-:]+$/g, "");
+}
+
+
 function getDashboardSectionBounds_(sheet, sectionName) {
   const lastRow = Math.max(sheet.getLastRow(), 1);
   const maxRows = Math.max(sheet.getMaxRows(), lastRow);
   const values = sheet.getRange(1, 1, lastRow, 1).getValues().map(function(row) {
-    return normalizeText_(row[0]);
+    return normalizeDashboardSectionTitle_(row[0]);
   });
 
 
-  const target = normalizeText_(sectionName);
+  const target = normalizeDashboardSectionTitle_(sectionName);
   let sectionRow = -1;
 
 
   for (let i = 0; i < values.length; i++) {
     if (values[i] === target) {
-      sectionRow = i + 1;
+      sectionRow = i;
       break;
     }
   }
@@ -1471,7 +1490,7 @@ function getDashboardSectionBounds_(sheet, sectionName) {
     RFF_SECTION_COLUMNS,
     RFF_SECTION_BEHAVIORS
   ].map(function(name) {
-    return normalizeText_(name);
+    return normalizeDashboardSectionTitle_(name);
   });
 
 
@@ -2658,10 +2677,11 @@ function readDashboardSectionRows_(sheet, sectionName) {
   const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
 
 
+  const targetSection = normalizeDashboardSectionTitle_(sectionName);
   let sectionRow = -1;
   for (let i = 0; i < values.length; i++) {
-    if (String(values[i][0] || "").trim() === sectionName) {
-      sectionRow = i + 1;
+    if (normalizeDashboardSectionTitle_(values[i][0]) === targetSection) {
+      sectionRow = i;
       break;
     }
   }
@@ -2672,26 +2692,27 @@ function readDashboardSectionRows_(sheet, sectionName) {
   }
 
 
-  const headerRow = sectionRow + 1;
   const output = [];
 
 
-  for (let r = headerRow + 1; r <= lastRow; r++) {
-    const firstCell = String(sheet.getRange(r, 1).getValue() || "").trim();
+  for (let r = sectionRow + 2; r < values.length; r++) {
+    const firstCell = String(values[r][0] || "").trim();
+    const firstCellSection = normalizeDashboardSectionTitle_(firstCell);
 
 
-    if (firstCell.indexOf("SECTION ") === 0) break;
+    if (firstCellSection.indexOf("SECTION ") === 0) break;
 
 
-    const rowValues = sheet.getRange(r, 1, 1, lastCol).getValues()[0];
+    const rowValues = values[r];
     const hasAnyValue = rowValues.some(function(value) {
       return String(value === null || value === undefined ? "" : value).trim() !== "";
     });
 
 
     if (!hasAnyValue) {
-      const nextFirst = r < lastRow ? String(sheet.getRange(r + 1, 1).getValue() || "").trim() : "";
-      if (nextFirst.indexOf("SECTION ") === 0 || nextFirst === "") break;
+      const nextFirst = r + 1 < values.length ? String(values[r + 1][0] || "").trim() : "";
+      const nextFirstSection = normalizeDashboardSectionTitle_(nextFirst);
+      if (nextFirstSection.indexOf("SECTION ") === 0 || nextFirst === "") break;
       continue;
     }
 
@@ -3985,4 +4006,3 @@ function parseReportMonthInput_(value) {
   if (!isNaN(numeric) && numeric >= 1 && numeric <= 12) {
     return Math.floor(numeric);
   }
-

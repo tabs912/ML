@@ -3550,7 +3550,7 @@ function getFrameworkTimingSectionRegistry_() {
     {
       id: "C",
       title: "SECTION C - DETAILED TIMING LOG",
-      headers: ["Sheet Type", "Header Name", "Expected Value", "Actual Value", "Status", "Severity"]
+      headers: ["Timestamp", "Process", "Step", "Step Seconds", "Severity", "Details"]
     },
     {
       id: "D",
@@ -3782,6 +3782,17 @@ function styleFrameworkTimingReport_(sheet) {
         .setBackgrounds([headerValues.map(function(value) {
           return String(value || "").trim() === "" ? RFF_SYSTEM_SHEET_UNUSED_COLOR : RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
         })]);
+
+      const nextSectionRow = findNextFrameworkTimingSectionRow_(sheet, row + 1);
+      const dataStartRow = row + 3;
+      const dataEndRow = nextSectionRow ? nextSectionRow - 1 : lastRow;
+      const dataRowCount = Math.max(0, dataEndRow - dataStartRow + 1);
+      if (dataRowCount > 0) {
+        sheet.getRange(dataStartRow, 1, dataRowCount, width)
+          .setFontWeight("normal")
+          .setFontStyle("normal")
+          .setBackground("#FFFFFF");
+      }
     });
 
     sheet.setFrozenRows(1);

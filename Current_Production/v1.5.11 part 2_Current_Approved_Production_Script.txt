@@ -1726,11 +1726,10 @@ function initializeMasterListTitleRows_(masterSheet, monthParts) {
   }
 
 
-  masterSheet.getRange("A1").setValue("Master List");
-  masterSheet.getRange("A2").setValue("Date:");
-  masterSheet.getRange("B2").setValue(monthParts.firstDay);
-  masterSheet.getRange("C2").setValue("to");
-  masterSheet.getRange("D2").setValue(monthParts.lastDay);
+  masterSheet.getRange("A1:D2").setValues([
+    ["Master List", "", "", ""],
+    ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
+  ]);
 
 
   clearSheetRuntimeCachesForSheet_(masterSheet);
@@ -1749,22 +1748,20 @@ function copyDemoPHeaderRowsToMasterList_(demoSheet, masterSheet, monthParts) {
   clearHeaderCacheForSheet_(masterSheet);
 
 
-  masterSheet.getRange("A1").setValue("Master List");
-  masterSheet.getRange("A2").setValue("Date:");
-  masterSheet.getRange("B2").setValue(monthParts.firstDay);
-  masterSheet.getRange("C2").setValue("to");
-  masterSheet.getRange("D2").setValue(monthParts.lastDay);
+  masterSheet.getRange("A1:D2").setValues([
+    ["Master List", "", "", ""],
+    ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
+  ]);
 
 
-  for (let col = 1; col <= demoLastCol; col++) {
-    try {
-      if (col > masterSheet.getMaxColumns()) {
-        masterSheet.insertColumnsAfter(masterSheet.getMaxColumns(), col - masterSheet.getMaxColumns());
-      }
-// v1.1.0 removed orphaned legacy formatting statement.
-    } catch (err) {
-      Logger.log("Column width copy skipped for column " + col + ": " + err.message);
+  try {
+    const missingColumns = demoLastCol - masterSheet.getMaxColumns();
+    if (missingColumns > 0) {
+      masterSheet.insertColumnsAfter(masterSheet.getMaxColumns(), missingColumns);
     }
+// v1.1.0 removed orphaned legacy formatting statement.
+  } catch (err) {
+    Logger.log("Column growth skipped while copying Demo P headers: " + err.message);
   }
 }
 
