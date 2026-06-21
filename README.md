@@ -18,5 +18,4 @@ Reviewers must:
 - Identify performance bottlenecks
 - Identify governance violations
 
-Do not rewrite code during review.
-Produce findings and recommendations only.
+All AI agents must read AGENTS.md before performing analysis, reviews, modifications, or rebuilds.
