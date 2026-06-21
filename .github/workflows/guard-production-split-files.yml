@@ -1,0 +1,25 @@
+name: Guard Production Split Files
+
+on:
+  pull_request:
+
+jobs:
+  guard-current-production:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changed files
+        run: |
+          git fetch origin main
+          CHANGED_FILES="$(git diff --name-only origin/main...HEAD)"
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep '^Current_Production/'; then
+            echo "Do not modify Current_Production split files in this PR."
+            exit 1
+          fi
