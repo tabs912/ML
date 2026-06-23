@@ -1,0 +1,28 @@
+name: Validate Apps Script
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate-code-gs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Verify src/Code.gs exists
+        run: test -f src/Code.gs
+
+      - name: Copy Apps Script to temporary JS file
+        run: cp src/Code.gs /tmp/Code.js
+
+      - name: Syntax check consolidated Apps Script
+        run: node --check /tmp/Code.js
+
+      - name: List spec files
+        run: find spec -maxdepth 2 -type f | sort
