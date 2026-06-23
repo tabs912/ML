@@ -1,300 +1,310 @@
 # AGENTS.md
 
-# Master List Framework - Codex Operating Instructions
-
 ## Purpose
 
-This repository contains the production source code, specifications, governance documents, and supporting artifacts for the Master List Framework.
+This document defines mandatory operating instructions for AI agents working on the Master List Framework.
 
-The objective is to evolve the current production framework while preserving approved business logic, governance decisions, architecture standards, and workflow behavior.
+Applies to:
+
+* Codex
+* ChatGPT
+* Claude
+* Gemini
+* Cursor
+* Copilot
+* Any AI-assisted framework engineering workflow
 
 ---
 
 # Governing Authority
 
-When conflicts exist, use the following hierarchy:
+Review in this order:
 
-1. Framework Specification (highest authority)
-2. Current Approved Production Script
-3. Production Baseline
-4. Governance Decisions
-5. Validation Reports
-6. Timing Reports
-7. Architecture Reports
-8. README.md
+1. Master List Framework Specification v1.9
+2. Daily Framework Review Protocol v1.9
+3. Current Approved Production Script
+4. Production Baseline v1.4.23
+5. Current Framework Update Log
+6. Dashboard Quality Specifications
+7. Timing Specifications
+8. Mapping Documents
+9. Knowledge Base Index
+10. Current Conversation Context
 
-Never override Framework Specification requirements without explicit instruction.
-
----
-
-# Required Startup Procedure
-
-Before performing any work:
-
-1. Determine repository root.
-2. Read README.md.
-3. Read all files in /spec.
-4. Read all files in /review.
-5. Identify Current Approved Production Script.
-6. Identify Framework Specification version.
-7. Summarize findings.
-8. Report missing files.
-9. Stop and wait for instructions if required artifacts are missing.
-
-Do not assume missing files exist.
+Framework Specification is authoritative.
 
 ---
 
-# Development Rules
+# Daily Framework Review Requirement
 
-## Rule 1 - No Patch Style Fixes
+At the first framework interaction of a work session:
 
-Do not layer fixes on top of existing logic.
+Review:
 
-When updating a function:
+* Current Governing Specification
+* Production Baseline
+* Current Approved Production Script
+* Dashboard Quality Reports
+* Timing Reports
+* Validation Reports
+* Mapping Documents
+* Current Framework Update Log
+* Knowledge Base Index
 
-* Review the entire function.
-* Replace obsolete logic.
-* Remove deprecated logic.
-* Remove duplicate logic.
-* Remove orphaned logic.
+Perform a Framework Delta Review.
 
-Avoid accumulation of technical debt.
+If no framework governance changes are identified, state:
 
----
-
-## Rule 2 - Preserve Working Functionality
-
-Do not modify:
-
-* working business logic
-* working workflow logic
-* approved governance behavior
-
-unless specifically requested.
+```text
+No framework governance changes identified since the last framework update.
+```
 
 ---
 
-## Rule 3 - Remove Orphaned Code
+# Production Script Access Rule
 
-Identify and remove:
+Before code-level recommendations:
 
-* unused functions
-* duplicate functions
-* obsolete helpers
-* abandoned validation logic
-* dead code
+Verify availability of:
 
-No orphaned code should remain after a rebuild.
+* Current Approved Production Script
+* Uploaded Source Files
+* Approved Script Archives
 
----
+If unavailable, state:
 
-## Rule 4 - Full Dependency Review
+```text
+Current Approved Production Script is not fully available for code-level review.
+```
 
-Before modifying a function:
-
-Identify:
-
-* callers
-* downstream dependencies
-* helper dependencies
-* workflow dependencies
-
-Do not break dependency chains.
+Do not reconstruct missing code from memory.
 
 ---
 
-# Architecture Standards
+# Framework Continuity Rule
 
-Approved architecture:
+Treat the newest approved artifact as the baseline.
 
-* Template First Architecture
-* Dashboard Driven Governance
+Before recommending changes:
+
+* Compare against current baseline.
+* Identify framework deltas.
+* Preserve approved architecture.
+* Preserve governance decisions.
+* Preserve synchronization standards.
+* Preserve protected standards.
+
+Do not reintroduce retired architecture.
+
+---
+
+# Architecture Rules
+
+Maintain:
+
+* Single File Architecture
+* Dashboard Driven Framework
 * Dashboard Controlled Templates
-* Single File Production Architecture (until approved otherwise)
+* Template First Formatting
+* Primary PMR Architecture
 * One Pass Processing
-* Full Replacement Updates
-* Primary PMR Row Architecture
-* Batch Processing Architecture
+* Dashboard Quality Architecture
+* Timing Framework
+* Validation Framework
 
-Do not introduce conflicting architectures.
-
----
-
-# Performance Standards
-
-Always prefer:
-
-* Batch reads
-* Batch writes
-* Array processing
-* In-memory transformations
-* Maps
-* Sets
-* Single-pass processing
-
-Avoid:
-
-* getValue() inside loops
-* setValue() inside loops
-* getRange() inside loops
-* repeated sheet lookups
-* excessive SpreadsheetApp.flush()
+Do not recommend modular architecture until production stabilization is complete.
 
 ---
 
-# Master List Framework Standards
+# Appendix Governance
 
-## Header Standards
+When changes affect:
 
-All production sheets:
+* Columns
+* Headers
+* Templates
+* Sheet Definitions
+* Data Source Mappings
+* Synchronization Logic
 
-* Title Rows: 1-4
-* Header Row: 4
-* Data Row Start: 5
+Verify alignment against:
 
-Freeze:
+* Appendix A – Column Configuration Tables
+* Appendix B – Sheet Definitions
+* Appendix C – Data Source Mapping Tables
 
-* Rows 1-4
-* Columns A-B
-
----
-
-## Processing Order
-
-Current approved workflow:
-
-1. Format Banner Report
-2. Format Care Plan Due Date Report
-3. Format Unlocked Care Plan Report
-4. Format Raw Data
-5. Create Disenrollment Exclusion List
-6. Process Demo P
-7. Create Master List
-8. Monthly Change Report
-9. Master List Change Log
-10. Dashboard Quality Review
+Appendix C is the authoritative mapping source.
 
 ---
 
-## Primary PMR Row Governance
+# Dashboard Governance
 
-Primary PMR Row is authoritative.
+Dashboard owns:
 
-Requirements:
+* Sheet Definitions
+* Header Definitions
+* Column Definitions
+* Sheet Behavior Definitions
+* Template Definitions
+* Dashboard Quality Definitions
+* Timing Definitions
 
-* Primary PMR assignment occurs in Demo P.
-* Downstream processing uses Primary PMR Row.
-* Non-primary rows may be hidden or removed according to approved workflow.
+Processing logic does not own formatting.
 
----
-
-## Disenrollment Governance
-
-Disenrollment operates at PMR level.
-
-If any row for a PMR is disenrolled:
-
-* Entire PMR is excluded from Master List.
-* Entire PMR is excluded from Monthly Change Report.
-* PMR is added to Disenrollment Exclusion List.
+Formatting ownership belongs to the Dashboard.
 
 ---
 
-## Banner Synchronization
+# Dashboard Quality Governance
 
-Banner information synchronizes during Demo P processing.
+Dashboard Quality Report is the authoritative QA artifact.
 
-Preserve approved synchronization behavior.
-
-Do not remove synchronization logic without explicit approval.
-
----
-
-## Care Plan Synchronization
-
-Care Plan Due Date and Unlocked Care Plan reports synchronize from Master List using approved matching logic.
-
-Maintain synchronization integrity.
-
----
-
-# Code Review Requirements
-
-When performing reviews:
-
-Audit:
-
-* Runtime errors
-* Architecture
-* Dependencies
-* Performance
-* Workflow integrity
-* Governance compliance
-
-Identify:
-
-* orphaned functions
-* duplicate logic
-* performance bottlenecks
-* governance violations
-* workflow regressions
-
----
-
-# Rebuild Requirements
-
-Before any rebuild:
-
-1. Review current production script.
-2. Review specification.
-3. Review governance decisions.
-4. Review dependency chains.
-5. Review validation reports.
-
-Rebuild only after complete analysis.
-
----
-
-# Output Requirements
-
-For all code modifications provide:
-
-* Summary of changes
-* Functions modified
-* Functions removed
-* Functions added
-* Dependency impact
-* Performance impact
-* Test plan
-* Known risks
-
----
-
-# Prohibited Actions
+Tests update only their assigned section.
 
 Do not:
 
-* rebuild framework from memory
-* ignore specification requirements
-* assume missing files
-* create duplicate workflows
-* create conflicting architectures
-* leave orphaned code
-* bypass dependency review
-* remove governance behavior without approval
+* Rebuild Dashboard Quality
+* Delete Dashboard Quality
+* Recreate Dashboard Quality
+* Insert section rows
+* Delete section rows
+
+Use section-only updates.
 
 ---
 
-# Success Criteria
+# Timing Governance
 
-Every change must improve at least one of:
+Framework Timing Report is the authoritative timing artifact.
 
-* Stability
-* Performance
-* Maintainability
-* Scalability
-* Governance Compliance
+Time:
 
-while preserving approved framework behavior.
+* Major workflows
+* Menu processes
+* Validation workflows
+* Dashboard Quality workflows
 
+Do not time:
+
+* Helper functions
+* Utility functions
+* Formatting functions
+* Color functions
+
+---
+
+# System Sheet Governance
+
+Protected System Sheets:
+
+* Format Dashboard
+* Dashboard Quality Report
+* Framework Timing Report
+* Master List Change Log
+* Disenrolled Exclusion List
+
+Business workflows may not modify system sheet structures.
+
+---
+
+# Continuous Execution Protocol
+
+Proceed through all required phases necessary to complete the requested objective.
+
+Do not stop after completing an intermediate phase solely to request confirmation.
+
+Continue automatically through:
+
+* Reviews
+* Audits
+* Mapping
+* Validation
+* Source Extraction
+* Function Replacement
+* Source Merge
+* Build Activities
+
+Stop only when:
+
+* A governance blocker exists.
+* A required artifact is unavailable.
+* Release approval is required.
+* The requested objective is complete.
+
+---
+
+# Release Approval Boundary
+
+The agent may perform without additional approval:
+
+* Review
+* Audit
+* Validate
+* Analyze
+* Extract
+* Map
+* Merge
+* Build
+* Generate Production Candidates
+* Generate Release Packages
+
+The agent may not:
+
+* Promote a script to Current Approved Production Script
+* Replace Production Baseline
+* Modify Governing Authority
+
+without explicit approval.
+
+---
+
+# Required Output Format
+
+When performing framework engineering provide:
+
+1. Framework Delta Review
+2. Architecture Audit
+3. Helper Audit
+4. Dependency Audit
+5. Performance Audit
+6. Change Summary
+7. Testing Recommendations
+8. Framework Health Check
+9. Recommended Version
+
+---
+
+# Development Philosophy
+
+Use uploaded scripts as source of truth.
+
+Preserve working business logic.
+
+Replace only:
+
+* Performance bottlenecks
+* Dashboard architecture
+* Validation architecture
+* Timing architecture
+* Formatting architecture
+
+Avoid unnecessary rewrites.
+
+Always recommend testing after updates.
+
+---
+
+# Protected Standards
+
+Protected standards include:
+
+* Primary PMR Ownership
+* Single File Architecture
+* Dashboard Driven Formatting
+* Template First Formatting
+* One Pass Processing
+* Dashboard Quality Consolidation
+* Synchronization Ownership
+* Source Data Preservation
+
+Protected standards may not be modified without explicit governance approval.
