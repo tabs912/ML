@@ -19,11 +19,10 @@ jobs:
         run: |
           REQUIRED_FILES=(
             "spec/Dashboard_Architecture_Specification.pdf"
-            "spec/Dashboard_Quality_Test_Specification.pdf"
             "spec/Framework_Timing_Spec.pdf"
             "spec/Framework_Timing_Architecture.pdf"
             "spec/Rebuild Prompt.pdf"
-            "spec/Dashboard_Quality_Specs.pdf"
+            "spec/Dashboard_Quality_Updated_Specifications.pdf"
             "spec/System_Sheet_Architecture_Specification.pdf"
             "spec/System Sheet Template and Formatting - Additional Formatting information_ (1).pdf"
             "spec/Current_Framework_Update_Log.pdf"
