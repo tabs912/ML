@@ -14,6 +14,54 @@ Applies to:
 * Copilot
 * Any AI-assisted framework engineering workflow
 
+Required Startup Procedure
+
+Before performing any work:
+
+1. Determine repository root.
+
+2. Read AGENTS.md completely.
+
+3. Read README.md completely.
+
+4. Read all files in:
+   - /Current_Production
+   - /spec
+
+5. Report missing artifacts.
+
+6. Execute startup verification:
+
+   git status -sb
+   git remote -v
+   git branch --show-current
+   git log -1 --oneline
+   git ls-remote origin
+   git fetch origin --prune
+
+7. Report:
+   - Current branch
+   - Current commit
+   - Remote URL
+   - Synchronization status
+   - Missing artifacts
+   - Readiness status
+
+8. Do not modify files during startup verification.
+
+9. Wait for instructions after reporting results.
+
+Required Artifacts
+
+- AGENTS.md
+- README.md
+- /Current_Production
+- /spec
+
+If any required artifact is missing:
+- Report the missing artifact.
+- Stop and wait for instructions.
+- Do not assume missing artifacts exist.
 ---
 
 # Governing Authority
