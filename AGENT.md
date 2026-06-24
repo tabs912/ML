@@ -340,6 +340,32 @@ Avoid unnecessary rewrites.
 
 Always recommend testing after updates.
 
+# Production Release Management
+
+Upon approval of a new production script:
+
+1. Create the new Current Approved Production Script.
+2. Move the previous Current Approved Production Script into Production_Script_Archive.
+3. Rename the archived script using:
+
+   vX.X.X_Production_Script_Archive.txt
+
+4. Add the new script to:
+
+   Current_Production/
+
+5. Update:
+
+   Current_Framework_Update_Log
+
+6. Commit all release artifacts to the repository.
+
+Only one file may carry the designation:
+
+Current_Approved_Production_Script
+
+
+
 # Production Script Storage
 
 All production scripts shall be saved permanently in:
