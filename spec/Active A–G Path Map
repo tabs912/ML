@@ -1,0 +1,663 @@
+Output 1 — Active A–G Path Map
+Scope of this map:
+
+Format Dashboard setup
+Template creation / refresh
+Dashboard Quality Sections A–E
+Dashboard Quality Section F
+Dashboard Quality Section G
+Dashboard Quality A–G report writing
+Framework Timing wrapper used by these paths
+Out of scope for this map:
+
+Sections H–O
+business monthly workflows
+Master List health checks
+Care Plan sync diagnostics
+full modular split
+legacy removal decisions
+1. Menu entrypoints for current A–G scope
+The active user-facing menu paths for this scope are created in onOpen().
+
+Setup menu
+Setup
+  -> Rebuild Format Dashboard Defaults
+  -> Create / Refresh All Templates
+These map to:
+
+setupReportFormattingDashboardFromScriptDefaults_
+createOrRefreshAllReportTemplates
+The menu entries are defined here. 
+
+Quality menu
+Quality
+  -> Dashboard Quality Start up
+  -> Dashboard Quality Validate Templates
+These map to:
+
+runDashboardQualityStartUp
+runDashboardQualityValidateTemplates
+The quality menu entries are defined here. 
+
+2. High-level A–G workflow map
+1. Rebuild Format Dashboard Defaults
+   setupReportFormattingDashboardFromScriptDefaults_
+
+2. Create / Refresh All Templates
+   createOrRefreshAllReportTemplates
+     -> loadDashboardConfig_
+     -> sortSheetDefinitionsByProductionOrder_
+     -> createOrRefreshTemplateFromDashboard_
+        -> metadata-only refresh OR full template build
+
+3. Dashboard Quality Start Up
+   runDashboardQualityStartUp
+     -> ensureDashboardQualityReportSheet_
+     -> runDashboardQualityDashboardVerificationSections_
+        -> Section A Global Inputs
+        -> Section B Sheet Definitions
+        -> Section C Sheet Headers
+        -> Section D Column Definitions
+        -> Section E Sheet Behaviors
+        -> replaceDashboardQualitySectionsRows_
+
+4. Dashboard Quality Validate Templates
+   runDashboardQualityValidateTemplates
+     -> ensureDashboardQualityReportSheet_
+     -> runDashboardQualityTemplateAndFormatSections_
+        -> loadDashboardConfig_
+        -> Section F Template Structure & Validation
+        -> Section G Date Format Integrity
+        -> replaceDashboardQualitySectionsRows_
+
+5. Framework Timing
+   runFrameworkTimed_
+     -> markFrameworkStep_
+     -> writeFrameworkTimingReport_
+3. Active path: Format Dashboard setup
+Entry function
+setupReportFormattingDashboardFromScriptDefaults_
+Active path
+setupReportFormattingDashboardFromScriptDefaults_
+  -> runFrameworkTimed_("Setup Report Formatting Dashboard")
+     -> clearDashboardConfigCache_
+     -> SpreadsheetApp.getActiveSpreadsheet()
+     -> get or insert Format Dashboard sheet
+     -> showSheetIfNeeded_
+     -> writeDashboardDefaultsFast_
+     -> markFrameworkStep_("Format Dashboard defaults rebuilt through fast governed writer")
+Purpose
+This path rebuilds the governed Format Dashboard defaults and clears dashboard config cache before rewriting the dashboard defaults.
+
+The setup function starts a timed process, clears the dashboard cache, gets or creates the Format Dashboard sheet, shows it if needed, writes defaults through writeDashboardDefaultsFast_, and marks the timing step. 
+
+A–G dependency
+This is the source dashboard that later drives:
+
+template definitions
+
+headers
+
+column definitions
+
+sheet behaviors
+
+global settings
+
+Those values are loaded by loadDashboardConfig_. 
+
+4. Active path: Dashboard config load
+Function
+loadDashboardConfig_
+Active path
+loadDashboardConfig_
+  -> getDashboardConfigCacheKey_
+  -> return cache if valid
+  -> get Format Dashboard sheet
+  -> buildDashboardSectionIndex_
+  -> loadGlobalSettings_
+  -> loadSheetDefinitions_
+  -> loadSheetHeaders_
+  -> loadColumnDefinitions_
+  -> loadSheetBehaviors_
+  -> store config in RFF_DASHBOARD_CONFIG_CACHE_
+  -> return dashboard object
+Dashboard object produced
+{
+  globals,
+  sheetDefinitions,
+  sheetHeaders,
+  columnDefinitions,
+  behaviors,
+  sectionIndex
+}
+The function builds and caches this dashboard object. 
+
+Current Global Settings fields
+The current global loader resolves:
+
+headerRow
+dataStartRow
+freezeRows
+freezeColumns
+row heights
+defaultDateFormat
+standardFont
+standardFontSize
+standardFontColor
+titleFontSize
+titleInfoFontSize
+templateVersion
+Those are loaded in loadGlobalSettings_. 
+
+Importance for next script
+This is the best insertion point for the future:
+
+Global Defaults formatting model
+resolved format object
+sparse override handling
+5. Active path: Template creation / refresh
+Entry function
+createOrRefreshAllReportTemplates
+Active path
+createOrRefreshAllReportTemplates
+  -> runFrameworkTimed_("Create / Refresh All Templates")
+     -> loadDashboardConfig_(true)
+     -> markFrameworkStep_("Dashboard loaded")
+     -> sortSheetDefinitionsByProductionOrder_(dashboard.sheetDefinitions)
+     -> for each sheetDef:
+          createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, timing)
+     -> markFrameworkStep_("All report templates refreshed")
+The entrypoint is centralized and loops through dashboard sheet definitions in production order. 
+
+Per-template function
+createOrRefreshTemplateFromDashboard_
+Active path
+createOrRefreshTemplateFromDashboard_
+  -> get or insert template sheet
+  -> get headers for sheet type
+  -> get behavior for sheet type
+  -> calculate colCount
+  -> resolve rowCount
+  -> build expected template signature
+  -> read stored signature
+  -> compare expected vs stored signature
+  -> decide metadata-only refresh or full build
+
+  If metadata-only:
+    -> refreshTemplateMetadataOnly_
+
+  Else:
+    -> buildTemplateFromDashboard_
+The function gets or creates the template sheet, calculates headers, behavior, dimensions, and signature state, then chooses metadata-only refresh or full build. 
+
+Metadata-only branch
+refreshTemplateMetadataOnly_
+Purpose:
+
+write metadata/signature only
+do not resize
+do not reformat
+do not rebuild filters
+do not hide/show
+do not re-freeze
+The metadata-only comments explicitly state that expensive rebuild operations are intentionally reserved for full builds. 
+
+Full build branch
+buildTemplateFromDashboard_
+Active path
+buildTemplateFromDashboard_
+  -> mark full build required
+  -> clearTemplateForFullBuild_
+  -> resizeSheet_
+  -> applyTemplateBaseFormatting_
+  -> writeTemplateMetadata_
+  -> storeTemplateFormatSignature_
+  -> applyTemplateFreezeAndTabColor_
+  -> enforceTemplateDateAndNumberFormats_ OR skip if configured
+  -> hideTemplateIfNeeded_ if behavior.hiddenTemplate
+  -> mark complete
+The full build sequence is centralized here. 
+
+Importance for next script
+This is the active template-creation path where Global Default formatting should eventually be applied as:
+
+1. broad global defaults
+2. sheet defaults
+3. sparse column overrides
+4. final validation/signature
+6. Active path: Dashboard Quality Sections A–E
+Entry function
+runDashboardQualityStartUp
+Active path
+runDashboardQualityStartUp
+  -> runFrameworkTimed_("Dashboard Quality Start Up")
+     -> ensureDashboardQualityReportSheet_
+     -> runDashboardQualityDashboardVerificationSections_
+     -> markFrameworkStep_("Dashboard Quality Sections A-E updated")
+This entrypoint wraps the A–E startup validation in framework timing. 
+
+A–E worker function
+runDashboardQualityDashboardVerificationSections_
+Active path
+runDashboardQualityDashboardVerificationSections_
+  -> get active spreadsheet
+  -> ensure Dashboard Quality Report sheet
+  -> get Format Dashboard sheet
+
+  If Format Dashboard missing:
+    -> save Section A failure rows
+    -> replace Dashboard Quality section
+    -> mark "Format Dashboard missing"
+    -> return
+
+  Else:
+    -> build section payloads:
+       A Global Inputs
+       B Sheet Definitions
+       C Sheet Headers
+       D Column Definitions
+       E Sheet Behaviors
+
+    -> for each section:
+       -> read previous saved rows
+       -> collect current verification rows
+       -> compare previous/current rows
+       -> save section rows to document properties with deferSheetWrite
+       -> mark timing step
+       -> if changed, stage section write
+
+    -> if any changed:
+       -> replaceDashboardQualitySectionsRows_
+    -> else:
+       -> mark sheet write skipped
+The function builds payloads for Sections A–E and stages changed section writes. 
+
+Sections produced
+Section A — Global Inputs
+Section B — Sheet Definitions
+Section C — Sheet Headers
+Section D — Column Definitions
+Section E — Sheet Behaviors
+The section payload list is defined here. 
+
+7. Active path: Dashboard Quality Section F
+Entry route
+Section F runs through:
+
+runDashboardQualityValidateTemplates
+  -> runDashboardQualityTemplateAndFormatSections_
+     -> validateReportTemplatesCore_
+The top-level validate entrypoint is here. 
+
+Section F function
+validateReportTemplatesCore_
+Active path
+validateReportTemplatesCore_
+  -> activeDashboard = dashboard || loadDashboardConfig_()
+  -> sortSheetDefinitionsByProductionOrder_
+  -> for each sheetDef:
+       validateTemplateFromDashboard_(activeDashboard, sheetDef)
+  -> writeTemplateValidationReport_(results, options)
+  -> mark "Dashboard Quality Section F staged" if deferred
+     OR "Dashboard Quality Section F saved" if direct
+  -> return results
+The function validates each governed template from the dashboard and writes/stages Section F results. 
+
+Current Section F storage behavior
+Inside A–G validation, Section F is called with:
+
+{ deferDashboardWrite: true }
+That means Section F rows are saved/staged, then the F–G caller handles the actual Dashboard Quality section replacement. 
+
+8. Active path: Dashboard Quality Section G
+Current function name
+runFrameworkTest6DateFormattingCore_
+Production role
+Despite the legacy “Framework Test 6” name, this currently acts as:
+
+Dashboard Quality Section G — Date Format Integrity
+The A–G validation path calls it directly for Section G. 
+
+Active path
+runFrameworkTest6DateFormattingCore_
+  -> activeDashboard = dashboard || loadDashboardConfig_()
+  -> results = []
+  -> for each dashboard.sheetDefinition:
+       testDateFormattingForTemplate_(activeDashboard, sheetDef)
+       append results
+       mark "Checked date formats: template"
+  -> writeFrameworkTest6DateFormatReport_(results, options)
+  -> mark "Dashboard Quality Section G staged" if deferred
+     OR "Dashboard Quality Section G saved" if direct
+  -> return results
+The Section G runner loops all sheet definitions and writes/stages the date-format report. 
+
+Per-template Section G check
+testDateFormattingForTemplate_
+Active path
+testDateFormattingForTemplate_
+  -> get template sheet by sheetDef.templateName
+  -> get globals
+  -> get headers for sheet type
+
+  If sheet missing:
+    -> return FAIL result
+
+  Build dateChecks:
+    -> for each header:
+       -> dashboard.columnDefinitions[header]
+       -> if def.dateColumn:
+            expectedFormat = getExpectedNumberFormat_
+            expectedSheetsFormat = getGoogleSheetsNumberFormat_
+            push date check
+
+  If no dateChecks:
+    -> return empty results
+
+  Read sample number formats:
+    -> sampleRows = min(10, maxRows from dataStart)
+    -> lastCol = headers.length
+    -> getRange(dataStartRow, 1, sampleRows, lastCol).getNumberFormats()
+
+  For each date check:
+    -> collect unique actual formats
+    -> compare to expected format
+    -> if failed and repair enabled:
+         repairDateFormatForSectionG_
+         reread repaired sample column
+    -> push PASS/FAIL result
+The date-check construction is here. 
+
+The current broad number-format read is here. 
+
+The repair-in-validation branch is here. 
+
+The full-column repair writes are here. 
+
+Section G report write function
+writeFrameworkTest6DateFormatReport_
+Active path
+writeFrameworkTest6DateFormatReport_
+  -> saveDashboardQualityRowsForTest6_
+  -> deleteLegacyQualityReportSheet_(RFF_TEST6_DATE_FORMAT_SHEET)
+This function saves Section G results into Dashboard Quality storage and deletes the old standalone report sheet if present. 
+
+Section G row builder
+saveDashboardQualityRowsForTest6_
+Active path
+saveDashboardQualityRowsForTest6_
+  -> start rows with header
+  -> collect failures
+  -> if no failures:
+       add one all-templates PASS row
+     else:
+       add failure rows
+  -> saveDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET, rows, options)
+The current Section G output rows collapse all passing date checks into one summary PASS row. 
+
+9. Active path: Dashboard Quality A–G section write layer
+Primary functions
+ensureDashboardQualityReportSheet_
+saveDashboardQualitySectionRows_
+getDashboardQualitySectionRows_
+replaceDashboardQualitySectionsRows_
+replaceDashboardQualitySectionRows_
+Sheet ensure function
+ensureDashboardQualityReportSheet_
+  -> initializeDashboardQualitySheet_
+The ensure function currently delegates to initializeDashboardQualitySheet_. 
+
+The shell repair wrapper only repairs missing/incomplete structure rather than rebuilding a valid report during population. 
+
+Section row save function
+saveDashboardQualitySectionRows_
+Active path
+saveDashboardQualitySectionRows_
+  -> save rows to DocumentProperties:
+       RFF_QA_SECTION_PROP_PREFIX + sectionKey
+       RFF_QA_SECTION_PROP_PREFIX + sectionKey + "_LAST_RUN"
+
+  If options.deferSheetWrite:
+       return
+
+  Else:
+       -> ensure Dashboard Quality sheet
+       -> build timestamped section rows
+       -> replaceDashboardQualitySectionRows_
+The save function writes section rows to document properties and optionally defers the physical sheet write. 
+
+Section row read function
+getDashboardQualitySectionRows_
+Active path
+getDashboardQualitySectionRows_
+  -> read JSON rows from DocumentProperties
+  -> parse rows
+  -> return rows or []
+This function is used for previous/current comparison before deciding whether to rewrite a Dashboard Quality section. 
+
+Multi-section replacement function
+replaceDashboardQualitySectionsRows_
+Active path
+replaceDashboardQualitySectionsRows_
+  -> if shell missing:
+       rebuildDashboardQualityReportShellCompact_
+  -> getDashboardQualitySectionBoundsMap_
+  -> sort section writes bottom-up
+  -> for each section:
+       replaceDashboardQualitySectionRows_(
+         section,
+         deferStyle: true,
+         skipBreakApart: true
+       )
+  -> styleDashboardQualityUpdatedSections_
+This function batches multiple section replacements and styles updated sections once. 
+
+Single-section replacement function
+replaceDashboardQualitySectionRows_
+Active path
+replaceDashboardQualitySectionRows_
+  -> ensure shell exists
+  -> normalize rows to report width
+  -> find section bounds
+  -> build output with spacing rows
+  -> insert/delete rows if output length differs from old section length
+  -> targetRange = section output range
+  -> if content already matches:
+       update Last Updated date/time format
+       return
+  -> clearContent
+  -> optionally breakApart
+  -> setValues(output)
+  -> set Last Updated date/time format
+The function performs row insert/delete if the section output size changes, then writes values only when content differs. 
+
+Importance for performance
+This is a likely contributor to the F–G batch-write cost because it can:
+
+insert rows
+delete rows
+clear content
+write values
+style updated sections
+10. Active path: Dashboard Quality Validate Templates full A–G sequence
+This is the most important A–G path.
+
+runDashboardQualityValidateTemplates
+  -> runFrameworkTimed_("Dashboard Quality Validate Templates")
+     -> ensureDashboardQualityReportSheet_
+     -> runDashboardQualityTemplateAndFormatSections_(timing, false, false)
+        -> loadDashboardConfig_
+        -> mark "Dashboard loaded for Sections F-G"
+
+        -> previousValidationRows = getDashboardQualitySectionRows_(RFF_VALIDATION_SHEET)
+        -> previousDateRows = getDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET)
+
+        -> validateReportTemplatesCore_(dashboard, timing, { deferDashboardWrite: true })
+           -> Section F rows saved to DocumentProperties
+
+        -> validationRows = getDashboardQualitySectionRows_(RFF_VALIDATION_SHEET)
+        -> if changed:
+             stage Section F write
+
+        -> runFrameworkTest6DateFormattingCore_(dashboard, timing, { deferDashboardWrite: true })
+           -> Section G rows saved to DocumentProperties
+
+        -> dateRows = getDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET)
+        -> if changed:
+             stage Section G write
+
+        -> if staged writes exist:
+             replaceDashboardQualitySectionsRows_
+             mark "Dashboard Quality Sections F-G batch written"
+           else:
+             mark "Dashboard Quality Sections F-G sheet write skipped - unchanged"
+
+     -> mark "Dashboard Quality Sections F-G updated"
+This complete F–G orchestration is visible here. 
+
+11. Active path: Framework Timing wrapper
+All major A–G paths are wrapped by:
+
+runFrameworkTimed_
+Active path
+runFrameworkTimed_
+  -> startFrameworkTiming_
+  -> markFrameworkStep_("Start")
+  -> execute callback
+  -> markFrameworkStep_("Complete")
+  -> writeFrameworkTimingReport_
+  -> return result
+
+  On error:
+    -> markFrameworkStep_("ERROR - message")
+    -> writeFrameworkTimingReport_
+    -> throw error
+The timing wrapper is defined here. 
+
+Step logging
+markFrameworkStep_
+markFrameworkStep_ normalizes step names and routes runtime-shaped timing objects to markRuntimeStep_; otherwise it records framework timing. 
+
+12. Current A–G production path dependencies
+A–E depends on
+Format Dashboard sheet exists
+Dashboard Quality report shell exists
+DocumentProperties section storage
+collectFormatDashboardGlobalInputVerificationRows_
+collectFormatDashboardSheetDefinitionVerificationRows_
+collectFormatDashboardSheetHeaderVerificationRows_
+collectFormatDashboardColumnDefinitionVerificationRows_
+collectFormatDashboardSheetBehaviorVerificationRows_
+replaceDashboardQualitySectionsRows_
+Framework Timing
+Primary A–E orchestration is here. 
+
+Section F depends on
+loadDashboardConfig_
+sortSheetDefinitionsByProductionOrder_
+validateTemplateFromDashboard_
+writeTemplateValidationReport_
+saveDashboardQualitySectionRows_
+DocumentProperties section storage
+Primary Section F orchestration is here. 
+
+Section G depends on
+loadDashboardConfig_
+dashboard.sheetDefinitions
+getHeadersForSheetType_
+dashboard.columnDefinitions
+dateColumn flag
+getExpectedNumberFormat_
+getGoogleSheetsNumberFormat_
+numberFormatsMatch_
+repairDateFormatForSectionG_ when enabled
+saveDashboardQualityRowsForTest6_
+saveDashboardQualitySectionRows_
+deleteLegacyQualityReportSheet_
+Primary Section G orchestration is here. 
+
+Template creation depends on
+loadDashboardConfig_
+sheetDefinitions
+sheetHeaders
+columnDefinitions
+behaviors
+template signatures
+resizeSheet_
+applyTemplateBaseFormatting_
+writeTemplateMetadata_
+applyTemplateFreezeAndTabColor_
+enforceTemplateDateAndNumberFormats_
+hideTemplateIfNeeded_
+Framework Timing
+Primary template creation orchestration is here. 
+
+Per-template decision flow is here. 
+
+Full-build flow is here. 
+
+13. Current legacy/rename pressure points inside active A–G path
+These are not removal instructions yet — just active-path observations.
+
+13.1 Section G is production-active but legacy-named
+Current active production path:
+
+runDashboardQualityTemplateAndFormatSections_
+  -> runFrameworkTest6DateFormattingCore_
+This means a function named as a framework test is actively responsible for Dashboard Quality Section G. 
+
+Recommended future cleanup:
+
+runDashboardQualitySectionGDateFormatIntegrity_
+with a temporary wrapper:
+
+runFrameworkTest6DateFormattingCore_
+  -> runDashboardQualitySectionGDateFormatIntegrity_
+13.2 Section G storage key is still test-named
+Section G uses:
+
+RFF_TEST6_DATE_FORMAT_SHEET
+The constant currently points to:
+
+"Framework Test 6 Date Format Report"
+That constant is defined here. 
+
+This is active in the F–G path when reading/writing Section G rows. 
+
+Recommended future cleanup:
+
+RFF_DASHBOARD_QUALITY_SECTION_G_DATE_FORMAT_KEY
+with the old key retained temporarily if needed for migration.
+
+13.3 Section G currently can repair while validating
+Section G checks formats and, if repair is enabled, calls repair logic during validation. 
+
+The repair function formats the full data column range. 
+
+Recommended future cleanup:
+
+audit function separate from repair function
+13.4 Dashboard Quality writer is active and performance-sensitive
+F–G batch write goes through replaceDashboardQualitySectionsRows_, which can perform section row replacement and style updated sections. 
+
+The single-section writer can insert/delete rows, clear content, and write values. 
+
+Recommended future cleanup:
+
+fast path when section size unchanged
+more granular timing inside section writer
+avoid unnecessary style passes
+14. Recommended next output after this map
+Now that the active path is mapped, the next useful output should be:
+
+Output 2 — Legacy/Removable Candidate Inventory
+But I would split that into categories:
+
+A. Active, do not touch
+B. Active but should be renamed/reframed
+C. Compatibility wrapper, keep temporarily
+D. Likely dead code, caller-check required
+E. Removable only after Section G production rename
+F. Removable only after Global Defaults formatting model is active
+That will prevent accidental removal of code that still supports A–G.
