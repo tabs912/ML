@@ -1,0 +1,693 @@
+Output 3 — Global Defaults / Resolved Formatting Design
+Goal:
+
+Create a production-ready formatting model where:
+1. Global defaults define the normal formatting behavior.
+2. Sheet defaults optionally refine formatting by sheet type.
+3. Column definitions only call out overrides when they differ from defaults.
+4. Template creation applies broad defaults first, then sparse overrides.
+5. Dashboard Quality Sections A–G validate the resolved formatting contract.
+6. Section G validates date formats from resolved formatting, not legacy test assumptions.
+This design is intended for the next script after v1.5.42, before modularization.
+
+1. Current formatting model summary
+The current script already has a partial global-formatting model.
+
+loadGlobalSettings_ currently resolves:
+
+headerRow
+dataStartRow
+freezeRows
+freezeColumns
+row heights
+defaultDateFormat
+standardFont
+standardFontSize
+standardFontColor
+titleFontSize
+titleInfoFontSize
+templateVersion
+These are loaded from Dashboard Section A. 
+
+loadColumnDefinitions_ currently resolves per-column values:
+
+header
+width
+headerFontSize
+dateColumn
+hideColumn
+dataWrap
+horizontalAlignment
+verticalAlignment
+numberFormat
+Those are loaded from Dashboard Section D. 
+
+Template creation currently builds templates through one shared dashboard-controlled path:
+
+createOrRefreshAllReportTemplates
+  -> loadDashboardConfig_
+  -> createOrRefreshTemplateFromDashboard_
+  -> metadata-only refresh OR full template build
+The all-template entrypoint is here. 
+
+The per-template decision path is here. 
+
+The full-build sequence is here. 
+
+So the foundation is already in place. The missing layer is a formal:
+
+resolved formatting model
+2. Proposed formatting hierarchy
+The new model should resolve formatting in this order:
+
+Level 1 — Global Defaults
+Level 2 — Sheet-Type Defaults
+Level 3 — Data-Type Defaults
+Level 4 — Column Overrides
+Level 5 — Template/Special Layout Rules
+The key rule:
+
+Resolved format = inherited defaults + explicit overrides
+Blank override fields should mean:
+
+inherit
+Blank should not mean invalid unless the field is required for identification, such as Header or Sheet Type.
+
+3. Level 1 — Global Defaults
+Global defaults apply everywhere unless a more specific level overrides them.
+
+Recommended global defaults
+Header Row
+Data Start Row
+Freeze Rows
+Freeze Columns
+
+Standard Font
+Standard Font Size
+Standard Font Color
+
+Default Header Font Size
+Default Header Font Color
+Default Header Background Strategy
+
+Default Data Font Size
+Default Data Font Color
+
+Default Column Width
+Default Data Wrap
+Default Horizontal Alignment
+Default Vertical Alignment
+
+Default Date Format
+Default Number Format
+Default Text Format
+Default Percent Format
+Default Currency Format
+
+Default Hidden Column Value
+Default Row 1 Height
+Default Row 2 Height
+Default Row 3 Height
+Default Header Row Height
+Default Data Row Height
+
+Template Version
+Current fields already present
+The current script already loads row positions, freeze settings, row heights, default date format, standard font, font size, font color, title font sizes, and template version. 
+
+New fields to consider adding later
+Default Column Width
+Default Data Wrap
+Default Horizontal Alignment
+Default Vertical Alignment
+Default Number Format
+Default Text Format
+Default Header Font Size
+Default Header Font Color
+Default Data Font Size
+Default Data Font Color
+Default Hidden Column Value
+These do not all need to be visible in the first implementation if you want to keep the dashboard stable. They can be internally defaulted first.
+
+4. Level 2 — Sheet-Type Defaults
+Sheet-type defaults apply to all columns in a sheet type unless data type or column override changes them.
+
+Examples:
+
+Raw Data
+Banner Report
+Care Plan Due
+Unlocked Care Plan
+Demo P
+Master List
+Monthly Change
+Disenrolled Exclusion
+Master List Change Log
+Recommended sheet-type default fields
+sheetType
+defaultColumnWidth
+defaultDataWrap
+defaultHorizontalAlignment
+defaultVerticalAlignment
+defaultHidden
+defaultDataFontSize
+defaultHeaderFontSize
+defaultDateFormat
+defaultNumberFormat
+defaultTemplateRowCount
+defaultMinimumRows
+defaultBufferRows
+Why this helps
+Some sheet types are naturally different. For example:
+
+Raw Data may have wide data coverage.
+Banner Report may be compact.
+Monthly Change may have subheaders.
+Master List may need wider columns and more visible status fields.
+A sheet-type default prevents you from repeating the same override across many columns.
+
+5. Level 3 — Data-Type Defaults
+This is the cleanest way to simplify Section G.
+
+Recommended data types
+TEXT
+DATE
+MONTH_YEAR
+NUMBER
+INTEGER
+CURRENCY
+PERCENT
+PHONE
+ID
+STATUS
+BOOLEAN
+NOTES
+URL
+Recommended data-type default mapping
+TEXT       -> Default Text Format
+DATE       -> Default Date Format
+MONTH_YEAR -> mm.yy or governed month-year format
+NUMBER     -> Default Number Format
+INTEGER    -> 0
+CURRENCY   -> $#,##0.00
+PERCENT    -> 0.00%
+PHONE      -> text/plain
+ID         -> text/plain
+STATUS     -> text/plain
+BOOLEAN    -> text/plain or checkbox policy later
+NOTES      -> text/plain + wrap policy
+URL        -> text/plain or hyperlink policy later
+Why this matters for Section G
+Currently Section G identifies date checks from a dateColumn flag in column definitions. 
+
+With data types, Section G can instead use:
+
+resolvedColumn.dataType in DATE_TYPES
+where:
+
+DATE_TYPES = DATE, MONTH_YEAR
+Then the expected format comes from:
+
+resolvedColumn.numberFormat
+That removes special-case logic and makes Section G validate the same resolved format that template creation applies.
+
+6. Level 4 — Column Overrides
+Column overrides should only contain values that differ from defaults.
+
+Current Section D fields
+The current Section D parser reads:
+
+Header
+Width
+Header Font Size
+Date Column
+Hide Column
+Data Wrap
+Horizontal Alignment
+Vertical Alignment
+Number Format
+This is handled in loadColumnDefinitions_. 
+
+Recommended transition model
+Keep the same dashboard layout initially, but reinterpret fields as overrides:
+
+Header                    required
+Width                     blank = inherit
+Header Font Size          blank = inherit
+Date Column               current boolean, later becomes Data Type
+Hide Column               blank = inherit false
+Data Wrap                 blank = inherit
+Horizontal Alignment      blank = inherit
+Vertical Alignment        blank = inherit
+Number Format             blank = inherit from data type/global default
+Recommended eventual Section D layout
+Later, after behavior is stable:
+
+Header
+Data Type
+Override Width
+Override Header Font Size
+Override Data Font Size
+Override Hidden
+Override Wrap
+Override Horizontal Alignment
+Override Vertical Alignment
+Override Number Format
+Notes
+But I recommend not changing the visible dashboard layout immediately. First add the resolved model behind the scenes.
+
+7. Level 5 — Template/Special Layout Rules
+Some formatting is not a simple column default.
+
+Examples:
+
+title rows
+report date cells
+subheaders
+Monthly Change subsection blocks
+filters
+alternating colors
+freeze rows/columns
+tab colors
+hidden templates
+template metadata/signature notes
+These should stay as template/sheet behavior rules, not column overrides.
+
+The full template build path already separates base formatting, metadata/signature, freeze/tab color, final format enforcement, and template visibility. 
+
+The resolved formatting model should feed into:
+
+applyTemplateBaseFormatting_
+enforceTemplateDateAndNumberFormats_
+buildTemplateFormatSignature_
+validateTemplateFromDashboard_
+Section G date-format validation
+8. Proposed resolved objects
+8.1 Resolved global format defaults
+{
+  headerRow: 4,
+  dataStartRow: 5,
+  freezeRows: 4,
+  freezeColumns: 0,
+
+  standardFont: "Arial",
+  standardFontSize: 10,
+  standardFontColor: "#000000",
+
+  defaultHeaderFontSize: 10,
+  defaultHeaderFontColor: "#FFFFFF",
+  defaultDataFontSize: 10,
+  defaultDataFontColor: "#000000",
+
+  defaultColumnWidth: 105,
+  defaultDataWrap: "CLIP",
+  defaultHorizontalAlignment: "left",
+  defaultVerticalAlignment: "middle",
+
+  defaultDateFormat: "mm/dd/yyyy",
+  defaultNumberFormat: "0",
+  defaultTextFormat: "@",
+  defaultPercentFormat: "0.00%",
+  defaultCurrencyFormat: "$#,##0.00",
+
+  defaultHidden: false,
+
+  row1Height: 30,
+  row2Height: 24,
+  row3Height: 24,
+  headerRowHeight: 30,
+  dataRowHeight: 21,
+
+  templateVersion: "v1.5.43"
+}
+8.2 Resolved sheet format defaults
+{
+  sheetType: "Master List",
+  defaultColumnWidth: 105,
+  defaultDataWrap: "CLIP",
+  defaultHorizontalAlignment: "left",
+  defaultVerticalAlignment: "middle",
+  defaultHidden: false,
+  defaultDateFormat: "mm/dd/yyyy",
+  defaultNumberFormat: "0",
+  defaultDataFontSize: 10,
+  defaultHeaderFontSize: 10
+}
+8.3 Resolved column format
+{
+  sheetType: "Master List",
+  header: "Date of Birth",
+  columnIndex: 4,
+
+  dataType: "DATE",
+
+  width: 90,
+  headerFontSize: 10,
+  dataFontSize: 10,
+
+  hidden: false,
+  dataWrap: "CLIP",
+  horizontalAlignment: "left",
+  verticalAlignment: "middle",
+
+  numberFormat: "mm/dd/yyyy",
+
+  sources: {
+    dataType: "COLUMN_DEFINITION",
+    width: "COLUMN_OVERRIDE",
+    headerFontSize: "GLOBAL_DEFAULT",
+    dataFontSize: "GLOBAL_DEFAULT",
+    hidden: "GLOBAL_DEFAULT",
+    dataWrap: "GLOBAL_DEFAULT",
+    horizontalAlignment: "GLOBAL_DEFAULT",
+    verticalAlignment: "GLOBAL_DEFAULT",
+    numberFormat: "DATA_TYPE_DEFAULT"
+  }
+}
+The sources map is optional for formatting, but very useful for Dashboard Quality explanations.
+
+9. Proposed resolver functions
+These can be added while keeping the script single-file.
+
+9.1 Global defaults
+resolveGlobalFormatDefaults_(globals)
+Purpose:
+
+Normalize existing Dashboard Section A settings into a complete global format object.
+Fill missing fields from internal safe defaults.
+9.2 Sheet defaults
+resolveSheetFormatDefaults_(dashboard, sheetDef)
+Purpose:
+
+Start from global defaults.
+Apply sheet-type-specific defaults if configured.
+Return default formatting for this sheet type.
+9.3 Column data type
+resolveColumnDataType_(columnDef)
+Initial transition behavior:
+
+if columnDef.dateColumn true -> DATE
+else if header looks like phone -> PHONE only if desired later
+else if header looks like PMR/ID -> ID only if desired later
+else -> TEXT
+In the first implementation, avoid aggressive inference. Prefer explicit dashboard values where possible.
+
+9.4 Column format
+resolveColumnFormat_(dashboard, sheetDef, header, columnIndex)
+Purpose:
+
+Resolve one column from:
+global defaults
+sheet defaults
+data type defaults
+column overrides
+9.5 Template format plan
+resolveTemplateFormatPlan_(dashboard, sheetDef)
+Returns:
+
+{
+  sheetDef,
+  globals,
+  sheetDefaults,
+  headers,
+  columns,
+  dateColumns,
+  hiddenColumns,
+  widthRuns,
+  formatRuns,
+  signaturePayload
+}
+This would become the shared contract for:
+
+template creation
+template validation
+Section G
+signature generation
+Dashboard Quality explanations
+10. Blank-value inheritance rules
+This is the most important production rule.
+
+General rule
+Blank means inherit.
+Specific rules
+Blank Width
+  -> inherit sheet default width
+  -> else inherit global default width
+
+Blank Header Font Size
+  -> inherit sheet default header font size
+  -> else inherit global default header font size
+
+Blank Data Wrap
+  -> inherit sheet default wrap
+  -> else inherit global default wrap
+
+Blank Horizontal Alignment
+  -> inherit sheet default horizontal alignment
+  -> else inherit global default horizontal alignment
+
+Blank Vertical Alignment
+  -> inherit sheet default vertical alignment
+  -> else inherit global default vertical alignment
+
+Blank Number Format
+  -> inherit from data type default
+  -> else inherit global default text/number/date format
+
+Blank Hide Column
+  -> inherit sheet default hidden
+  -> else false
+
+Blank Date Column
+  -> false for now
+  -> later replaced by Data Type
+Invalid values
+Invalid values should be Dashboard Quality warnings or failures depending on severity:
+
+Invalid width -> WARNING or FAIL
+Invalid alignment -> WARNING
+Invalid wrap strategy -> WARNING
+Invalid number format -> WARNING/FAIL depending on impact
+Invalid data type -> FAIL
+Missing header -> FAIL
+Duplicate header -> WARNING/FAIL depending current rule
+11. Template creation behavior under resolved formatting
+Current full build
+The current full-build path is:
+
+clear template if needed
+resize sheet
+apply template base formatting
+write metadata/signature
+apply freeze/tab color
+final date/number format enforcement
+hide template
+This is centralized in buildTemplateFromDashboard_. 
+
+Proposed new behavior
+buildTemplateFromDashboard_
+  -> resolveTemplateFormatPlan_
+  -> clearTemplateForFullBuild_
+  -> resizeSheet_
+  -> applyTemplateBaseFormattingFromPlan_
+       1. apply broad global/sheet defaults to title/header/data ranges
+       2. apply header labels
+       3. apply column widths in runs
+       4. apply data-type number formats in grouped runs
+       5. apply sparse column overrides
+       6. apply hidden columns
+       7. apply filters/alternating colors/subheaders
+  -> writeTemplateMetadata_
+  -> storeTemplateFormatSignature_
+  -> optionally skip duplicate date/number enforcement
+  -> applyTemplateFreezeAndTabColor_
+  -> hideTemplateIfNeeded_
+Expected benefits
+fewer column-by-column format calls
+clearer signature generation
+faster Section G
+cleaner Dashboard Quality Section D/G explanations
+safer modularization later
+12. Section D validation under resolved formatting
+Section D should stop treating blank override cells as automatically suspicious.
+
+Current purpose
+Section D currently checks column definitions for missing, blank, duplicate, or invalid rows.
+
+Proposed Section D quality checks
+Required checks:
+- Header exists
+- Header is unique
+- Header maps to at least one governed sheet, if that is expected
+- Data Type valid, when introduced
+- Width override blank or valid number
+- Header Font Size override blank or valid number
+- Hide override blank or valid boolean
+- Wrap override blank or valid enum
+- Horizontal alignment blank or valid enum
+- Vertical alignment blank or valid enum
+- Number format blank or valid format string
+
+New notes:
+- Blank formatting fields inherit defaults.
+- Only non-default overrides are expected to be populated.
+Recommended Section D output style
+Column Definitions - PASS
+No missing, duplicate, or invalid column definitions found.
+Blank formatting fields are treated as inherited global/sheet defaults.
+13. Section G validation under resolved formatting
+Current Section G
+Current Section G:
+
+builds date checks from dateColumn
+reads number formats from sample rows across all columns
+optionally repairs failed formats
+writes Framework Test 6 / Section G rows
+Date checks are built from dateColumn. 
+
+The current format read pulls sample rows across the full template width. 
+
+Proposed Section G
+runDashboardQualitySectionGDateFormatIntegrity_
+  -> resolveTemplateFormatPlan_ for each template
+  -> dateColumns = plan.columns where dataType is DATE or MONTH_YEAR
+  -> for each date column:
+       expected = resolvedColumn.numberFormat
+       actual = read number formats only for that column/sample rows
+       compare normalized formats
+  -> write Section G rows
+Recommended statuses
+If audit-only:
+
+PASS
+FAIL
+WARNING
+If repair is retained:
+
+PASS
+PASS AFTER REPAIR
+FAIL
+WARNING
+Recommended Section G row fields
+Template
+Sheet Type
+Header
+Column
+Data Type
+Expected Format
+Actual Format
+Status
+Quality Notes
+Recommended summary behavior
+If all pass:
+
+All templates | All governed sheet types | Date format columns | Governed formats | Matched | PASS | All date format checks passed.
+If repairs occurred:
+
+Template - Master List | Master List | Date of Birth | DATE | mm/dd/yyyy | repaired | PASS AFTER REPAIR | Format corrected during Section G.
+14. Template signature impact
+The current template flow calculates an expected signature and compares it to stored signatures before choosing metadata-only refresh or full build. 
+
+The resolved formatting model should become part of the signature.
+
+Recommended signature payload
+{
+  templateVersion,
+  sheetType,
+  templateName,
+  rowCount,
+  colCount,
+  headers,
+  behavior,
+  globalFormatDefaultsHash,
+  sheetFormatDefaultsHash,
+  resolvedColumnFormatsHash,
+  hiddenColumnsHash,
+  dateFormatsHash,
+  widthRunsHash
+}
+Why this matters
+If a global default changes:
+
+affected templates should rebuild
+If a dashboard override changes:
+
+only templates using that column/sheet type should rebuild
+If metadata changes but resolved formatting does not:
+
+metadata-only refresh should still be allowed
+15. Migration plan
+Phase 1 — Internal resolver only
+No visible dashboard change yet.
+
+- Add resolveGlobalFormatDefaults_
+- Add resolveColumnFormat_
+- Add resolveTemplateFormatPlan_
+- Keep Section D layout unchanged
+- Keep output visually identical
+- Keep old function names as wrappers
+Phase 2 — Section G consumes resolved plan
+- Add runDashboardQualitySectionGDateFormatIntegrity_
+- Existing runFrameworkTest6DateFormattingCore_ calls new function
+- Use resolved date columns
+- Read only date-column formats
+- Keep report output compatible initially
+Phase 3 — Template creation consumes resolved plan
+- apply broad defaults first
+- apply sparse overrides second
+- update template signature payload
+- evaluate duplicate final format enforcement
+Phase 4 — Dashboard Quality Section D explains inheritance
+- Update Section D validation notes
+- Treat blank override fields as inherited defaults
+- Add warnings only for invalid populated values
+Phase 5 — Dashboard layout update, optional
+Only after stable:
+
+- Add Data Type column
+- Rename existing formatting columns to Override fields
+- Hide/deprecate old Date Column boolean
+16. Recommended implementation sequence for next script
+For the next script, I recommend this exact order:
+
+1. Add resolved formatting helper functions.
+2. Keep old Dashboard Section D layout.
+3. Make blank formatting fields inherit defaults.
+4. Add production-named Section G function.
+5. Keep Framework Test 6 wrapper.
+6. Make Section G use resolved date formats.
+7. Optimize Section G to read only date columns.
+8. Update Section D quality notes to explain inheritance.
+9. Do not delete legacy formatting wrappers yet.
+10. Re-run Dashboard Quality Start Up, Validate Templates, Create/Refresh Templates, and Timing Report.
+17. Recommended initial function list
+These are the new functions I would expect in the next script.
+
+resolveGlobalFormatDefaults_
+resolveSheetFormatDefaults_
+resolveColumnDataType_
+resolveDataTypeNumberFormat_
+resolveColumnFormat_
+resolveTemplateFormatPlan_
+getResolvedDateColumnsForTemplate_
+buildResolvedTemplateSignaturePayload_
+runDashboardQualitySectionGDateFormatIntegrity_
+writeDashboardQualitySectionGDateFormatReport_
+saveDashboardQualityRowsForSectionGDateFormats_
+Temporary compatibility wrappers:
+
+runFrameworkTest6DateFormattingCore_
+writeFrameworkTest6DateFormatReport_
+saveDashboardQualityRowsForTest6_
+18. Design decision summary
+Decision	Recommendation
+Blank formatting cells	Inherit defaults
+Visible dashboard layout	Keep unchanged initially
+Section D	Validate overrides, not inherited blanks
+Section G	Use resolved format plan
+Section G repair	Prefer audit-only, or report PASS AFTER REPAIR
+Template creation	Broad defaults first, sparse overrides second
+Template signatures	Include resolved formatting hash
+Legacy wrappers	Keep until resolver and A–G are stable
+Modularization	Wait until this model is stable
+
