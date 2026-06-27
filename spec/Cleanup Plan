@@ -1,0 +1,478 @@
+Output 4 — Cleanup Plan
+Purpose:
+
+Create a safe, staged cleanup plan for the current production script without breaking:
+- Dashboard Quality Sections A–G
+- Format Dashboard setup
+- Template creation / refresh
+- Framework Timing
+- existing business workflows
+This plan assumes your current strategic order is:
+
+1. Stabilize Dashboard and Formatting.
+2. Stabilize Template Creation.
+3. Get Dashboard Quality through Section G production-ready.
+4. Then modularize.
+5. Then expand or repair Sections H–O.
+This cleanup plan does not recommend immediate broad deletion. It prioritizes rename, isolate, replace, then remove.
+
+1. Cleanup principles
+1.1 Do not delete active compatibility wrappers first
+The current script has many no-op legacy formatting wrappers. Examples include:
+
+applyStandardRowHeights_
+
+lockMasterListRowHeightsAndClip_
+
+enforceMasterListFinalDisplay_
+
+These immediately return and state runtime formatting has been removed. 
+
+There are also many larger standard-formatting wrappers that immediately return. 
+
+Even though these look removable, some may still be called by active business workflows. Removing them first could break script execution with ReferenceError.
+
+Cleanup rule:
+
+No function is deleted until caller-check passes.
+1.2 Rename active legacy-named production paths before deleting retired code
+Section G is active, but it is still framed as Framework Test 6.
+
+The current constants still include RFF_TEST6_DATE_FORMAT_SHEET. 
+
+The script section is still labeled FRAMEWORK TEST 6 - DATE FORMATTING. 
+
+The standalone Framework Test 6 function still exists. 
+
+Cleanup rule:
+
+Active production behavior gets production names before old framework-test code is removed.
+1.3 Preserve old keys during migration
+Dashboard Quality section rows are stored in Document Properties through saveDashboardQualitySectionRows_. 
+
+Old section keys may still hold useful rows. Renaming constants abruptly could make the report look blank or stale.
+
+Cleanup rule:
+
+New keys may be introduced, but old keys remain readable during migration.
+1.4 Use the Global Defaults resolver as the replacement authority
+The old runtime formatting functions should not be removed until the new resolved formatting model exists.
+
+Current loadGlobalSettings_ already loads partial global defaults. 
+
+Current loadColumnDefinitions_ loads column-level formatting definitions. 
+
+Cleanup rule:
+
+Do not remove legacy formatting wrappers until resolved formatting becomes the clear production authority.
+2. Cleanup phases
+Recommended phases:
+
+Phase 0 — Baseline and freeze scope
+Phase 1 — Production rename/reframe of Section G
+Phase 2 — Global Defaults / resolved formatting foundation
+Phase 3 — Section G performance and audit cleanup
+Phase 4 — Template creation cleanup
+Phase 5 — Legacy wrapper caller-check
+Phase 6 — Remove confirmed dead no-op wrappers
+Phase 7 — Retire remaining framework-test scaffolding
+Phase 8 — Prepare modular split
+3. Phase 0 — Baseline and freeze scope
+Objective
+Freeze the current target so cleanup does not expand into unrelated areas.
+
+In scope
+Format Dashboard setup
+Dashboard config loading
+Template creation / refresh
+Dashboard Quality Sections A–G
+Framework Timing for those paths
+Global Defaults / resolved formatting
+legacy formatting wrappers only as inventory/caller-check
+Out of scope
+Sections H–O
+Master List Health Check
+Care Plan Sync Diagnostics
+full workflow signoff
+full modular split
+business logic rewrite
+monthly workflow refactor
+Baseline checks before changes
+Run and capture current results:
+
+Dashboard Quality Start Up
+Dashboard Quality Validate Templates
+Create / Refresh All Templates
+Framework Timing Report
+Apps Script execution durations
+Expected baseline issue
+Dashboard Quality Validate Templates is the current main A–G performance concern. Its path is:
+
+runDashboardQualityValidateTemplates
+  -> runDashboardQualityTemplateAndFormatSections_
+  -> validateReportTemplatesCore_
+  -> runFrameworkTest6DateFormattingCore_
+  -> replaceDashboardQualitySectionsRows_
+The entrypoint and F–G orchestration are here. 
+
+4. Phase 1 — Production rename/reframe of Section G
+Objective
+Move active Section G behavior away from framework-test naming without changing behavior.
+
+Current issue
+Section G is production-active but legacy-named.
+
+Current names:
+
+RFF_TEST6_DATE_FORMAT_SHEET
+runFrameworkTest6DateFormatting
+runFrameworkTest6DateFormattingCore_
+writeFrameworkTest6DateFormatReport_
+saveDashboardQualityRowsForTest6_
+RFF_TEST6_DATE_FORMAT_SHEET still uses "Framework Test 6 Date Format Report". 
+
+The Section G logic is under the Framework Test 6 header. 
+
+Actions
+Add production names:
+
+RFF_DASHBOARD_QUALITY_SECTION_G_DATE_FORMAT_KEY
+runDashboardQualitySectionGDateFormatIntegrity_
+writeDashboardQualitySectionGDateFormatReport_
+saveDashboardQualityRowsForSectionGDateFormats_
+Keep compatibility wrappers:
+
+runFrameworkTest6DateFormattingCore_
+  -> runDashboardQualitySectionGDateFormatIntegrity_
+
+writeFrameworkTest6DateFormatReport_
+  -> writeDashboardQualitySectionGDateFormatReport_
+
+saveDashboardQualityRowsForTest6_
+  -> saveDashboardQualityRowsForSectionGDateFormats_
+Update active A–G orchestration:
+
+runDashboardQualityTemplateAndFormatSections_
+  old: runFrameworkTest6DateFormattingCore_
+  new: runDashboardQualitySectionGDateFormatIntegrity_
+The active A–G orchestration currently calls runFrameworkTest6DateFormattingCore_. 
+
+Do not remove yet
+Do not remove the old Framework Test 6 function names in this phase.
+
+Acceptance criteria
+Dashboard Quality Validate Templates still produces Section F and Section G.
+Section G output is unchanged or intentionally equivalent.
+Old wrappers still work if called.
+No standalone legacy report sheet is reintroduced.
+5. Phase 2 — Global Defaults / resolved formatting foundation
+Objective
+Add the new formatting authority without changing visible output.
+
+Current foundation
+Global settings currently load from Dashboard Section A. 
+
+Column definitions currently load from Dashboard Section D. 
+
+Template creation currently uses centralized dashboard template creation. 
+
+Actions
+Add resolver functions:
+
+resolveGlobalFormatDefaults_
+resolveSheetFormatDefaults_
+resolveColumnDataType_
+resolveDataTypeNumberFormat_
+resolveColumnFormat_
+resolveTemplateFormatPlan_
+getResolvedDateColumnsForTemplate_
+buildResolvedTemplateSignaturePayload_
+Rules
+Blank formatting cells mean inherit.
+Current Section D layout stays unchanged.
+No visible dashboard restructuring yet.
+No major legacy formatting deletion yet.
+Template output should remain visually compatible.
+Acceptance criteria
+Template creation still succeeds.
+Dashboard Quality Sections A–G still pass.
+No visual regression in templates.
+Resolved format plan can explain every formatted column.
+Section D treats blank override fields as inherited, not invalid.
+6. Phase 3 — Section G performance and audit cleanup
+Objective
+Make Section G production-quality and faster.
+
+Current issue
+Section G currently builds date checks from dateColumn. 
+
+It reads number formats across the full template width for sample rows. 
+
+It may repair date formats during validation. 
+
+The repair path writes number format across the full data column. 
+
+Actions
+Change Section G to use:
+
+resolvedTemplateFormatPlan_
+resolved date columns
+resolved expected numberFormat
+targeted date-column format reads
+Recommended behavior
+Preferred:
+
+Section G is audit-only by default.
+Repair becomes separate action.
+Acceptable temporary alternative:
+
+Section G may repair, but reports PASS AFTER REPAIR.
+Performance changes
+Replace:
+
+read sample rows across all columns
+with:
+
+read only date columns, or adjacent date-column groups
+Acceptance criteria
+Section G still catches date-format mismatches.
+Section G does not silently convert a failure into an ordinary PASS.
+Dashboard Quality Validate Templates improves runtime.
+Framework Timing has separate steps for:
+  - Section G plan build
+  - Section G format reads
+  - Section G result write
+7. Phase 4 — Template creation cleanup
+Objective
+Use resolved formatting to reduce template-build complexity and prepare for later modularization.
+
+Current template full-build path
+clear template if needed
+resize sheet
+apply template base formatting
+write metadata/signature
+apply freeze/tab color
+final date/number format enforcement
+hide template
+This path is centralized in buildTemplateFromDashboard_. 
+
+Actions
+Update template creation to use:
+
+resolveTemplateFormatPlan_
+apply broad global defaults first
+apply sheet defaults second
+apply sparse column overrides third
+group column-width operations
+group number-format operations
+Keep initially
+existing resize behavior
+existing template signatures
+existing metadata-only refresh path
+existing full-build decision logic
+The per-template metadata-only/full-build decision path is currently here. 
+
+Later optimization
+Once resolved formatting is stable, evaluate:
+
+RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT
+The current full-build path performs base formatting and then conditionally performs final date/number format enforcement. 
+
+Acceptance criteria
+Create / Refresh All Templates passes.
+Template signatures still prevent unnecessary full rebuilds.
+Metadata-only refresh remains available.
+Template visuals remain governed by dashboard defaults/overrides.
+8. Phase 5 — Legacy wrapper caller-check
+Objective
+Determine what is safe to remove.
+
+Caller-check targets
+Formatting no-op wrappers
+Examples:
+
+applyStandardRowHeights_
+lockMasterListRowHeightsAndClip_
+enforceMasterListFinalDisplay_
+applyStandardFormatting_
+applyV23StandardFormatting_
+applyStandardTitleRowsFormat_
+applyStandardBodyFormat_
+applyStandardColumnFormattingByHeader_
+applyStandardDateFormattingByHeader_
+hideColumnsByHeader_
+resetStandardFilter_
+applyMonthlyChangeSubsectionFormat_
+applyMonthlyChangeStandardTopRows_
+applyMonthlyChangeAllSubsectionFormats_
+These no-op wrappers are visible in the script.  
+
+Column cleanup wrappers
+trimEmptyTrailingColumns_
+removeDisallowedRawDataWorkingColumns_
+deleteEmptyColumnsInUsedArea_
+deleteCarePlanDueColumnCFromHeaderToLastRow_
+The script states these runtime column cleanup behaviors are retired or governed by Dashboard Section C/templates.   
+
+Test/framework wrappers
+runFrameworkTest7IntentionalValidationFailure
+runFrameworkTest9MonthlyChangeSubheaders
+runFrameworkTest10DashboardAudit
+runAllFrameworkTestsAndBuildDashboard
+dashboardQualitySectionRanWithinLastHour_
+The retired cache helper is explicitly retained as harmless compatibility. 
+
+runAllFrameworkTestsAndBuildDashboard still exists as a broad old framework-test runner. 
+
+Caller-check requirements
+For each candidate:
+
+1. Direct function calls
+2. Menu references
+3. Trigger references
+4. String-based dispatch
+5. eval-based existence checks
+6. Documented external/manual use
+Acceptance criteria
+Each candidate gets one status:
+
+KEEP_ACTIVE
+KEEP_COMPATIBILITY
+SAFE_REMOVE
+DEFER_FUTURE_PHASE
+9. Phase 6 — Remove confirmed dead no-op wrappers
+Objective
+Remove only functions proven safe.
+
+Removal criteria
+A function can be removed only if:
+
+zero direct callers
+not referenced by menu
+not referenced by trigger
+not referenced by string dispatch
+not part of Section A–G
+not part of template creation
+not needed by business workflows
+not needed as migration wrapper
+First likely removals
+Only after caller-check, the safest removals are likely zero-caller no-op formatting wrappers such as:
+
+applyV23StandardFormatting_
+applyStandardTitleRowsFormat_
+applyStandardBodyFormat_
+applyStandardColumnFormattingByHeader_
+applyStandardDateFormattingByHeader_
+hideColumnsByHeader_
+resetStandardFilter_
+applyDemoPAlternatingColorsBySortOrder_
+applyDisenrolledExclusionAlternatingColors_
+formatMonthlyChangeDateColumns_
+forceTitleToCellCenterAlignment_
+But the exact list must be generated from the caller-check.
+
+Do not remove in this phase
+Section G compatibility wrappers
+legacy report cleanup utilities
+template-builder redirects
+Dashboard Quality shell wrappers
+Framework Timing shell wrappers
+business workflow wrappers with active callers
+10. Phase 7 — Retire remaining framework-test scaffolding
+Objective
+Remove or quarantine old framework-test structures after active production paths are renamed.
+
+Precondition
+Do this only after:
+
+Section G has production names.
+A–G uses production Section G function directly.
+Global Defaults/resolved formatting is stable.
+Framework Test 6 wrappers are no longer needed.
+Sections H–O plan is defined.
+Candidates
+Framework Test 7
+Framework Test 9
+Framework Test 10 naming
+Combined Framework Test Dashboard
+runAllFrameworkTestsAndBuildDashboard
+old RFF_TEST* constants
+old standalone report cleanup references no longer needed
+Important caution
+Do not remove Framework Test 10 / Dashboard Audit if you intend to reuse it for Section H later.
+
+Current Dashboard Audit logic is under Framework Test 10 naming. 
+
+It may be better to rename it later as:
+
+runDashboardQualitySectionHDashboardAudit_
+rather than delete it.
+
+11. Phase 8 — Prepare modular split
+Objective
+Once A–G/template formatting is stable, prepare the code for modular architecture.
+
+Suggested module boundaries
+DashboardConfig
+GlobalDefaultsResolver
+TemplateFormatPlan
+TemplateBuilder
+TemplateValidationSectionF
+DateFormatIntegritySectionG
+DashboardQualityReportWriter
+FrameworkTiming
+LegacyCompatibility
+Before actual split
+In the single script, group functions by future module and remove confirmed dead code.
+
+Do not modularize before
+resolved formatting model is stable
+Section G is production-named
+template creation passes
+Dashboard Quality A–G passes
+legacy wrappers are classified
+12. Cleanup risk matrix
+Cleanup item	Risk	Recommendation
+Rename Section G production path	Low/Medium	Do first with wrappers
+Add Global Defaults resolver	Medium	Do before deleting formatting code
+Make Section G targeted/read-only	Medium	Do after resolver exists
+Remove no-op formatting wrappers	Medium/High	Caller-check first
+Remove Framework Test 6 code	High	Only after Section G extraction
+Remove Framework Test 10 code	High	Defer until H–O phase
+Remove legacy report cleanup utilities	High	Keep for now
+Remove template-builder redirects	Medium/High	Keep until callers migrated
+Remove shell repair wrappers	High	Keep for now
+Modularize	High	After A–G/template foundation stable
+13. Recommended immediate next action
+The next script should implement only these parts:
+
+1. Phase 1 — Section G production rename/reframe
+2. Phase 2 — Global Defaults / resolved formatting foundation
+3. Start Phase 3 — Section G uses resolved date formats
+Do not remove major legacy wrappers yet.
+
+The safest next version goal:
+
+v1.5.43:
+- production-named Section G
+- compatibility wrappers retained
+- Global Defaults resolver added
+- blank formatting fields inherit defaults
+- Section G date checks use resolved formatting
+- no broad legacy deletion
+14. Testing checklist for cleanup phases
+For every cleanup phase, run:
+
+Setup -> Rebuild Format Dashboard Defaults
+Setup -> Create / Refresh All Templates
+Quality -> Dashboard Quality Start up
+Quality -> Dashboard Quality Validate Templates
+Refresh Framework Timing Report
+Apps Script execution duration review
+Expected result:
+
+Dashboard Quality A–G pass
+Template creation passes
+No legacy standalone reports are recreated
+Framework Timing captures the run
+No menu function breaks
