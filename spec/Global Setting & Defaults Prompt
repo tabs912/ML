@@ -1,0 +1,157 @@
+# Codex Task: Dashboard Formatting Inheritance + Title Rows Section
+
+Review the current Master List Framework source, especially v1.5.24, and update the dashboard-driven formatting architecture.
+
+## Objective
+
+The Format Dashboard shall be the source of all formatting. The script shall only rebuild or repair dashboard defaults when needed. Runtime report processing shall not apply formatting directly except where explicitly governed.
+
+## Required Architecture
+
+Implement this inheritance model:
+
+Global Dashboard Standard
+↓
+Sheet-Level Override
+↓
+Column-Level Override
+↓
+Template Build
+↓
+Output Sheet Inherits Template Formatting
+
+Blank dashboard override values mean: inherit the applicable global default.
+
+Examples:
+
+- Global Horizontal Alignment = Left
+- Column Horizontal Alignment = blank
+- Effective Horizontal Alignment = Left
+
+- Global Wrap Strategy = Clip
+- Column Wrap Strategy = blank
+- Effective Wrap Strategy = Clip
+
+- Global Data Font Size = 10
+- Column Data Font Size = blank
+- Effective Data Font Size = 10
+
+Only values that differ from the global default should be populated in sheet-level or column-level override fields.
+
+## Add Dashboard Section: Title Rows
+
+Add a governed Format Dashboard section for Title Rows.
+
+Recommended section name:
+
+SECTION F - Title Rows
+
+Purpose:
+Define title-row behavior for governed sheets and templates.
+
+Required columns:
+
+| Sheet Type | Row | Purpose | Value Source | Label | Target Cell | Height | Font Size | Font Weight | Fill Level | Alignment | Wrap | Notes |
+
+Required default records:
+
+| Sheet Type | Row | Purpose | Value Source | Label | Target Cell | Height | Font Size | Font Weight | Fill Level | Alignment | Wrap | Notes |
+|---|---:|---|---|---|---|---:|---:|---|---|---|---|---|
+| GLOBAL | 1 | Report Title | Sheet Definition | blank | A1 | 25 | 14 | Bold | Level 3 | Left | Clip | Default title row |
+| GLOBAL | 2 | Date Range | Runtime Month | Date | A2:D2 | 20 | 10 | Normal | Level 3 | Left | Clip | A2=Date, B2=start, C2=to, D2=end |
+| GLOBAL | 3 | Spacer | None | blank | A3:D3 | 10 | 10 | Normal | Level 1 | Left | Clip | Spacer row |
+| GLOBAL | 4 | Header Row | Dashboard Headers | blank | Row 4 | 40 | 10 | Bold | Level 2 | Left | Wrap | Governed header row |
+
+## Behavior Rules
+
+1. Add Section F to Format Dashboard creation/rebuild.
+2. Do not overwrite user-entered Section F values unless a full reset is explicitly requested.
+3. Template builders shall read title-row configuration from Section F.
+4. If Section F is missing or blank, fall back to the governed global standards:
+  - Row 1 height 25, Level 3, Arial 14 bold
+  - Row 2 height 20, Level 3, Arial 10
+  - Row 3 height 10, Level 1
+  - Row 4 height 40, Level 2, Arial 10 bold, wrap
+5. Column-level dashboard fields may remain blank when global defaults apply.
+6. Sheet-level and column-level values are overrides only.
+7. Runtime processing functions shall not reformat title rows after output creation.
+8. Output sheets shall inherit title-row formatting from verified templates.
+
+## Dashboard Quality Updates
+
+Update Dashboard Quality validation to include Title Rows verification.
+
+Add validation checks for:
+
+- Section F exists.
+- Required title-row records exist.
+- Row numbers 1, 2, 3, and 4 are defined.
+- Heights are numeric and greater than zero.
+- Fill Level is valid.
+- Header row wrap is governed.
+- Required target cells are present.
+- Missing values inherit from global defaults.
+
+Do not create a standalone QA report. Write results into Dashboard Quality using the governed section-only update architecture.
+
+## Timing Updates
+
+Timing should log only major menu-accessible processes:
+
+- Rebuild Format Dashboard Defaults
+- Create / Refresh All Templates
+- Dashboard Quality Start Up
+- Dashboard Quality Validate Templates
+- Dashboard Quality Workflow
+
+Do not time individual helper functions.
+
+## Required Output
+
+Produce:
+
+1. Framework Delta Review
+2. Architecture Audit
+3. Helper Audit
+4. Dependency Audit
+5. Performance Audit
+6. Change Summary
+7. Testing Recommendations
+8. Framework Health Check
+9. Full replacement script candidate
+
+## Testing Recommendations
+
+After build, test:
+
+1. Rebuild Format Dashboard Defaults
+2. Confirm Section F - Title Rows exists
+3. Confirm user-entered Section F values are preserved
+4. Create / Refresh All Templates
+5. Verify templates inherit title-row settings
+6. Format Raw Data
+7. Process Demo P
+8. Create Master List
+9. Run Dashboard Quality Start Up
+10. Run Dashboard Quality Validate Templates
+11. Run Dashboard Quality Workflow
+12. Review Framework Timing Report
+And add this to your framework/update log:
+## Dashboard Title Rows Governance
+
+The Format Dashboard shall include a governed Title Rows section.
+
+Section Name:
+SECTION F - Title Rows
+
+Purpose:
+Define governed title-row, date-row, spacer-row, and header-row behavior for templates and output sheets.
+
+Required Columns:
+Sheet Type | Row | Purpose | Value Source | Label | Target Cell | Height | Font Size | Font Weight | Fill Level | Alignment | Wrap | Notes
+
+Global title-row standards apply unless a sheet-specific override exists.
+
+Blank sheet-level or column-level formatting fields inherit from the applicable global dashboard standard.
+
+Runtime processing shall not reformat title rows. Templates shall receive title-row formatting from the Dashboard, and output sheets shall inherit formatting from verified templates.
