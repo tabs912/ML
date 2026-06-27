@@ -1,0 +1,505 @@
+Output 2 — Legacy Candidate Inventory
+Purpose of this inventory:
+
+Identify likely legacy, compatibility, retired, or rename-needed code
+without recommending immediate deletion.
+This is not a removal plan yet. It is a classification inventory to support the next cleanup step.
+
+Recommended classification labels:
+
+A. Keep active
+B. Active but should be renamed/reframed
+C. Compatibility wrapper — keep temporarily
+D. Likely removable after caller check
+E. Future-scope / out of current A–G cleanup
+F. Do not remove until replacement architecture exists
+1. Highest-priority legacy candidates in active A–G scope
+These are the most important because they touch the current production target: Dashboard Quality through Section G, Dashboard formatting, and template creation.
+
+1.1 Section G still uses “Framework Test 6” naming
+Current items
+RFF_TEST6_DATE_FORMAT_SHEET
+runFrameworkTest6DateFormatting
+runFrameworkTest6DateFormattingCore_
+writeFrameworkTest6DateFormatReport_
+saveDashboardQualityRowsForTest6_
+Evidence
+RFF_TEST6_DATE_FORMAT_SHEET is still defined as "Framework Test 6 Date Format Report". 
+
+The script section is still labeled FRAMEWORK TEST 6 - DATE FORMATTING. 
+
+The standalone function runFrameworkTest6DateFormatting still exists. 
+
+The writer is still named writeFrameworkTest6DateFormatReport_. 
+
+Classification
+B. Active but should be renamed/reframed
+Why
+This is not dead code. It is active in the A–G path because Dashboard Quality Validate Templates currently calls the Framework Test 6 core function for Section G.
+
+Recommendation
+Do not delete.
+
+Refactor/rename in the next script:
+
+New production name:
+runDashboardQualitySectionGDateFormatIntegrity_
+
+Temporary wrapper:
+runFrameworkTest6DateFormattingCore_
+  -> runDashboardQualitySectionGDateFormatIntegrity_
+Also create a production-named key:
+
+RFF_DASHBOARD_QUALITY_SECTION_G_DATE_FORMAT_KEY
+Keep the old RFF_TEST6_DATE_FORMAT_SHEET key temporarily for migration.
+
+1.2 Framework-test constants still support Dashboard Quality storage
+Current items
+RFF_TEST6_DATE_FORMAT_SHEET
+RFF_TEST7_VALIDATION_FAILURE_SHEET
+RFF_TEST9_SUBHEADER_SHEET
+RFF_TEST10_DASHBOARD_AUDIT_SHEET
+RFF_TEST_DASHBOARD_SHEET
+Evidence
+These constants are defined together. 
+
+Classification
+B. Active but should be renamed/reframed
+Why
+Some constants are still active storage keys for Dashboard Quality sections. The naming is legacy, but the keys may still hold persisted rows in Document Properties.
+
+Recommendation
+Do not remove or rename abruptly.
+
+Use a migration-safe pattern:
+
+1. Introduce production-named constants.
+2. Read old key if new key is empty.
+3. Write new key.
+4. Keep old key cleanup for a later version.
+1.3 “Removable Framework Testing Section” is not fully removable yet
+Current item
+The script explicitly marks a block as removable framework testing code. 
+
+Classification
+B. Active but should be renamed/reframed
+Why
+Although the comment says the framework tests can be removed later, Section G currently still lives inside this area. The whole section is therefore not currently removable.
+
+Recommendation
+First extract production-owned Section G logic out of this framework-test area. Only then evaluate what remains as removable test code.
+
+2. Legacy formatting wrappers — likely cleanup candidates later
+These are mostly no-op functions that return immediately and say runtime formatting was removed because dashboard templates are the formatting authority.
+
+This is exactly the legacy formatting layer your GPT likely identified.
+
+2.1 Early production formatting wrappers
+Current items
+applyStandardRowHeights_
+lockMasterListRowHeightsAndClip_
+enforceMasterListFinalDisplay_
+Evidence
+These three functions immediately return and say runtime formatting was removed. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+Why
+They are no-op wrappers, but they may still be called by business workflows. Removing them before caller cleanup could break runtime paths even though they no longer do formatting.
+
+Recommendation
+Keep until after:
+
+1. Global Defaults/resolved formatting model exists.
+2. Caller map confirms removal is safe.
+3. Business workflows still execute without references.
+2.2 Main legacy standard-formatting wrappers
+Current items
+applyStandardFormatting_
+applyV23StandardFormatting_
+applyStandardTitleRowsFormat_
+applyStandardBodyFormat_
+applyStandardColumnFormattingByHeader_
+applyStandardDateFormattingByHeader_
+hideColumnsByHeader_
+resetStandardFilter_
+applyMonthlyChangeSubsectionFormat_
+applyMonthlyChangeStandardTopRows_
+applyMonthlyChangeAllSubsectionFormats_
+Evidence
+These functions are retained as no-op runtime formatting wrappers. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+Why
+These are very likely legacy formatting shims. Some may have zero callers, while others may still be referenced by older production workflow paths.
+
+Recommendation
+Do not remove in the first cleanup script.
+
+Instead:
+
+1. Move or group them under a clearly labeled Legacy Compatibility Formatting Wrappers block.
+2. Add caller inventory.
+3. Remove only zero-caller wrappers after the new Global Defaults model is active.
+2.3 Additional no-op formatting wrappers across business/report workflows
+Current items
+applyStandardFormattingAfterHeadersAndData_
+enforceDemoPFinalDisplay_
+applyParticipantAlternatingColorsBySortOrder_
+applyDemoPAlternatingColorsBySortOrder_
+applyDisenrolledExclusionAlternatingColors_
+applyStandardFreeze_
+forceStandardTitleCellAlignment_
+applyCurrentVsOlderTabColors_
+copyDemoPColumnWidthsToMasterList_
+applyMasterListTemplateFormatting_
+applyMasterListTemplateModeUpdateDisplay_
+formatMonthlyChangeReportSectionSheet_
+formatMonthlyChangeDateColumns_
+forceTitleToCellCenterAlignment_
+Evidence
+Examples:
+
+applyStandardFormattingAfterHeadersAndData_ is a no-op runtime report-formatting wrapper. 
+
+enforceDemoPFinalDisplay_ is a no-op Demo P display wrapper. 
+
+Participant/Demo P/Disenrolled alternating color functions are no-op wrappers. 
+
+Freeze/title alignment wrappers are no-op formatting wrappers. 
+
+applyCurrentVsOlderTabColors_ is a no-op tab-color wrapper. 
+
+copyDemoPColumnWidthsToMasterList_ is a no-op column-width wrapper. 
+
+applyMasterListTemplateFormatting_ is a no-op legacy Master List template-formatting wrapper. 
+
+Monthly Change formatting wrappers are no-op. 
+
+forceTitleToCellCenterAlignment_ is a no-op title alignment wrapper. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+D. Likely removable after caller check
+Why
+These are almost certainly old runtime formatting hooks. However, some are likely still called by active business workflows to preserve old execution flow even though formatting has moved to templates.
+
+Recommendation
+Treat them as legacy compatibility wrappers, not dead code yet.
+
+Preferred next step:
+
+1. Caller-check each wrapper.
+2. If zero callers: mark likely removable.
+3. If active callers: leave wrapper until the caller is updated or removed.
+3. Retired column/row manipulation helpers
+These are important because your newer governance rule says dashboard Section C/template definitions should control columns, not runtime logic.
+
+3.1 Runtime column trimming and cleanup
+Current items
+trimEmptyTrailingColumns_
+removeDisallowedRawDataWorkingColumns_
+deleteEmptyColumnsInUsedArea_
+deleteCarePlanDueColumnCFromHeaderToLastRow_
+Evidence
+trimEmptyTrailingColumns_ states runtime column trimming is retired and column count is controlled by Dashboard Section C and template rebuilds. 
+
+deleteCarePlanDueColumnCFromHeaderToLastRow_ states Care Plan Due column delete/shift logic is retired and governed by Dashboard Section C. 
+
+removeDisallowedRawDataWorkingColumns_ says raw data column removals are governed by Dashboard Section C/template rebuilds only. 
+
+deleteEmptyColumnsInUsedArea_ says empty-column cleanup is retired from runtime processing. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+D. Likely removable after caller check
+Why
+These return immediately or return 0, so they are no longer functionally doing cleanup. But active workflow code may still call them.
+
+Recommendation
+Keep until caller-check is complete. Then remove only if no active workflow references remain.
+
+4. Legacy template-builder compatibility functions
+These functions are especially important because they are not dead — they redirect legacy template builder calls into the shared dashboard template pipeline.
+
+4.1 Demo P legacy template builder redirect
+Current item
+createOrRefreshDemoPTemplate_
+Evidence
+The comment states the legacy Demo P template builder is restricted and all templates must build through the shared dashboard template pipeline. The function then loads dashboard config and calls createOrRefreshTemplateFromDashboard_. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+Why
+This function may still support old callers while safely routing them into the correct dashboard/template path.
+
+Recommendation
+Keep until old callers are updated to use the shared template creation entrypoint directly.
+
+4.2 Master List legacy template builder redirect
+Current item
+createOrRefreshMasterListTemplate_
+Evidence
+The comment says the legacy Master List template builder is restricted and all templates must build through the shared dashboard template pipeline. The function then loads dashboard config and calls createOrRefreshTemplateFromDashboard_. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+Why
+This is a safe redirect, not obsolete behavior. Removing it could break old callers.
+
+Recommendation
+Keep until callers are migrated.
+
+4.3 Individual template branch selector
+Current item
+shouldUseCorrectedIndividualTemplateBuild_
+Evidence
+The function’s comment states individual template-build branches remain retired and all governed templates use the shared dashboard build sequence. 
+
+Classification
+D. Likely removable after caller check
+Why
+If the function always returns false and no longer gates meaningful behavior, it may be removable. But it should be caller-checked first.
+
+Recommendation
+Mark as a later cleanup candidate after template creation is stable under the Global Defaults model.
+
+5. Framework Timing legacy shell wrapper
+Current item
+ensureFrameworkTimingReportShell_
+Evidence
+The comment says this is a legacy wrapper that repairs only missing/incomplete structure and does not rebuild a valid report during population. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+Why
+This is a shell-repair compatibility function. Even if it has no current direct callers, Timing Report shell lifecycle is sensitive and should not be removed during the A–G cleanup.
+
+Recommendation
+Keep for now.
+
+Evaluate only after:
+
+1. Framework Timing report is stable.
+2. Dashboard Quality A–G is stable.
+3. shell initialization and shell repair paths are mapped separately.
+6. Legacy standalone report cleanup utilities
+Current items
+deleteLegacyQualityReportSheet_
+deleteLegacyStandaloneQualityReports_
+Evidence
+deleteLegacyQualityReportSheet_ deletes old standalone quality report sheets unless the sheet is the main Dashboard Quality Report. 
+
+deleteLegacyStandaloneQualityReports_ deletes legacy standalone quality reports including Framework Test 6, Test 7, Test 9, Test 10, Health Check, Validation, Master List Health Check, and Care Plan Sync Diagnostics report sheets. 
+
+Classification
+A. Keep active
+Why
+Although the name says “legacy,” these functions are still useful because the current architecture consolidates quality output into Dashboard Quality sections rather than standalone report sheets.
+
+Recommendation
+Keep until the report consolidation architecture is finalized.
+
+7. Retired caching helpers
+Current item
+dashboardQualitySectionRanWithinLastHour_
+Evidence
+The comment says Dashboard Quality caching is retired and the helper is retained as a harmless compatibility helper. 
+
+Classification
+D. Likely removable after caller check
+Why
+It explicitly returns false and caching is retired. If no active callers depend on this exact function, it is a likely cleanup candidate.
+
+Recommendation
+Remove only after caller-check confirms no use, or after any callers are updated.
+
+8. Full framework-test / old test-dashboard utilities
+These are future cleanup candidates, but not all should be touched now.
+
+8.1 Framework Test 7
+Current items
+runFrameworkTest7IntentionalValidationFailure
+writeFrameworkTest7ValidationFailureReport_
+saveDashboardQualityRowsForTest7_
+Evidence
+Framework Test 7 is still labeled as an intentional validation failure test. 
+
+Its writer saves Dashboard Quality rows and deletes the legacy standalone report sheet. 
+
+Classification
+E. Future-scope / out of current A–G cleanup
+Why
+This is not part of the current A–G production-readiness target unless you still use it for framework validation.
+
+Recommendation
+Do not remove now. Revisit after Section G is production-named and A–G is stable.
+
+8.2 Framework Test 9
+Current items
+runFrameworkTest9MonthlyChangeSubheaders
+write/save Dashboard Quality rows for Test 9
+Evidence
+Framework Test 9 is labeled as Monthly Change Subheaders. 
+
+Classification
+E. Future-scope / out of current A–G cleanup
+Why
+This appears outside the current A–G target.
+
+Recommendation
+Keep until Monthly Change/template subheader validation is separately reviewed.
+
+8.3 Framework Test 10 / Dashboard Audit
+Current items
+runFrameworkTest10DashboardAudit
+writeFrameworkTest10DashboardAuditReport_
+Evidence
+Framework Test 10 runs dashboard audit logic and writes Dashboard Quality rows. 
+
+Its writer saves dashboard audit rows and deletes the legacy standalone report sheet. 
+
+Classification
+E. Future-scope / out of current A–G cleanup
+Why
+This supports Section H, which you already said is not the current target.
+
+Recommendation
+Do not remove during A–G cleanup.
+
+Later, when H–O work begins, rename/reframe this from Framework Test 10 into production-owned Section H Dashboard Audit.
+
+8.4 Run All Framework Tests
+Current item
+runAllFrameworkTestsAndBuildDashboard
+Evidence
+This function runs Dashboard Quality Quick, then Dashboard Quality Workflow. 
+
+Classification
+E. Future-scope / out of current A–G cleanup
+D. Likely removable after menu/caller check
+Why
+This appears to be a prior framework-test orchestration path. It should not be part of the current A–G production path.
+
+Recommendation
+Caller-check and menu-check before removal. If not exposed or used, it can be retired later.
+
+9. Legacy monthly naming compatibility helpers
+Current items
+buildMonthlySheetName_
+buildMonthlySheetNameNoDashAfterPrefix_
+Evidence
+buildMonthlySheetName_ uses the standardized mm.yy name. 
+
+buildMonthlySheetNameNoDashAfterPrefix_ is explicitly kept for legacy callers and returns the standardized monthly sheet name. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+Why
+These are not formatting/dashboard candidates and may be important for business workflow compatibility.
+
+Recommendation
+Do not touch during the A–G/template cleanup.
+
+10. Legacy auto-hide behavior
+Current item
+autoHidePreviousMonthSheetsAfterWorkflow_
+Evidence
+The function says automatic monthly-sheet hiding was removed and immediately returns. 
+
+Classification
+D. Likely removable after caller check
+Why
+It is a no-op behavior wrapper and outside the A–G/template scope.
+
+Recommendation
+Caller-check later. Do not prioritize now.
+
+11. Dashboard Quality shell compatibility wrappers
+Current items
+ensureDashboardQualityTemplateShell_
+ensureDashboardQualitySectionShells_
+Evidence
+ensureDashboardQualityTemplateShell_ is described as a legacy wrapper that repairs only missing/incomplete structure and does not rebuild a valid report during population. 
+
+Classification
+C. Compatibility wrapper — keep temporarily
+F. Do not remove until replacement architecture exists
+Why
+Dashboard Quality shell repair is part of the reporting foundation. It should not be removed while A–G quality output is still being stabilized.
+
+Recommendation
+Keep for now.
+
+Later, consolidate shell initialization/repair under a clearer production-named report writer module.
+
+12. Inventory summary table
+Area	Candidate	Classification	Action
+Section G	Framework Test 6 naming	B	Rename/reframe, do not delete
+Section G	RFF_TEST6_DATE_FORMAT_SHEET	B	Add production key, migrate safely
+Framework tests	Removable Framework Testing Section	B/E	Do not remove until Section G extracted
+Formatting	No-op runtime formatting wrappers	C/D	Caller-check, keep temporarily
+Column governance	Retired column cleanup helpers	C/D	Caller-check later
+Template creation	Legacy template redirects	C	Keep temporarily
+Template creation	shouldUseCorrectedIndividualTemplateBuild_	D	Caller-check later
+Timing	ensureFrameworkTimingReportShell_	C/F	Keep until Timing shell map is stable
+Reports	Legacy standalone report cleanup utilities	A	Keep active
+Caching	dashboardQualitySectionRanWithinLastHour_	D	Caller-check later
+H–O	Test 10 / Dashboard Audit	E	Leave for future H–O phase
+Framework orchestration	runAllFrameworkTestsAndBuildDashboard	D/E	Caller/menu-check later
+Monthly workflows	monthly naming wrappers	C	Do not touch in A–G cleanup
+Dashboard Quality shell	shell compatibility wrappers	C/F	Keep for now
+13. Recommended cleanup order based on this inventory
+First cleanup target — Rename/reframe Section G
+This is the safest high-value cleanup because it removes legacy naming from the active A–G path without deleting behavior.
+
+Recommended:
+
+runDashboardQualitySectionGDateFormatIntegrity_
+saveDashboardQualityRowsForSectionGDateFormats_
+writeDashboardQualitySectionGDateFormatReport_
+RFF_DASHBOARD_QUALITY_SECTION_G_DATE_FORMAT_KEY
+Keep wrappers:
+
+runFrameworkTest6DateFormattingCore_
+writeFrameworkTest6DateFormatReport_
+saveDashboardQualityRowsForTest6_
+RFF_TEST6_DATE_FORMAT_SHEET
+Second cleanup target — Global Defaults formatting model
+Do this before deleting formatting wrappers.
+
+Reason:
+
+The new Global Defaults resolver becomes the production replacement for old runtime formatting hooks.
+Third cleanup target — Caller-check no-op formatting wrappers
+After Global Defaults is active:
+
+1. Zero-caller wrappers can be removed.
+2. Active-caller wrappers remain until callers are updated.
+3. Business workflow wrappers should be lower priority than A–G/template cleanup.
+Fourth cleanup target — Retired framework/test scaffolding
+Only after:
+
+1. Section G has production naming.
+2. A–G report is stable.
+3. Framework Test 7/9/10 are confirmed outside current production path.
+4. H–O plan is defined.
+14. Do-not-remove-yet list
+These may look legacy, but I recommend keeping them for now:
+
+runFrameworkTest6DateFormattingCore_
+writeFrameworkTest6DateFormatReport_
+saveDashboardQualityRowsForTest6_
+RFF_TEST6_DATE_FORMAT_SHEET
+deleteLegacyQualityReportSheet_
+deleteLegacyStandaloneQualityReports_
+ensureDashboardQualityTemplateShell_
+ensureFrameworkTimingReportShell_
+createOrRefreshDemoPTemplate_
+createOrRefreshMasterListTemplate_
+all business-workflow no-op formatting wrappers with active callers
+Reason:
+
+They either support the active A–G path, redirect legacy callers safely, clean up old report sheets, or preserve compatibility while the new Global Defaults/template architecture is not yet complete.
+
