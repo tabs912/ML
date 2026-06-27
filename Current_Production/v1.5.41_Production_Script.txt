@@ -1,5 +1,5 @@
 /**
- * Master List Framework v1.5.40 - Code.gs - Workflow Error and Dashboard Quality Performance Repair
+ * Master List Framework v1.5.41 - Code.gs - Dashboard Version, First-Build Template, and Output Formatting Repair
  *
  * Purpose:
  * - Preserve v26.9.5 production business logic.
@@ -20,6 +20,7 @@
  * - v1.5.28 consolidates Dashboard Quality corrective highlighting into the batched section-style pass to remove an extra full-report background read/write bottleneck.
  * - v1.5.27 aligns Format Dashboard row 1 with governed report title rows: Report Formatter Framework | - vX.X.X - | Format Dashboard.
  * - v1.5.26 repairs remaining Dashboard Quality/Framework Timing bottlenecks by removing nested timed Section F/G runs, reusing the loaded dashboard, and keeping report styling/report writes consolidated.
+ * - v1.5.41 repairs Format Dashboard version display, restores dashboard-template output creation, corrects first-build template sizing/format coverage, and extends copied template formatting for large outputs.
  * - v1.5.40 repairs runtime workflow blockers, aligns Care Plan sheet-type lookups, applies ERROR severity to runtime timing, and skips unchanged Dashboard Quality section rewrites.
  * - v1.5.39 defines the Banner formatter report-month prompt, forces timed runtime errors to CRITICAL, and reduces Dashboard Quality/template refresh bottlenecks without renaming the release artifact.
  * - v1.5.38 fixes Framework Timing benchmark status/issue detection, adds template build-mode notes, and reports Dashboard Quality completeness as PARTIAL when sections are not run.
@@ -43,11 +44,14 @@
  */
 
 
-const MASTER_LIST_MERGE_ML_VERSION = "1.5.40";
+const MASTER_LIST_MERGE_ML_VERSION = "1.5.41";
 const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
 const RFF_DASHBOARD_CONFIG_MAX_READ_COLS = 13;
 const RFF_ENABLE_AUTO_ARCHIVE_RAW_DATA = false;
 const RFF_DELETE_LOCAL_RAW_AFTER_ARCHIVE = false;
+const RFF_TEMPLATE_FIRST_BUILD_SHRINK_TO_TARGET = true;
+const RFF_OUTPUT_EXTEND_TEMPLATE_FORMATTING = true;
+const RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT = true;
 
 /*
  * v1.5 Section 16 rebuild controls:
@@ -4057,6 +4061,76 @@ function mapRowsToHeaders_(sourceRows, sourceHeaders, targetHeaders) {
       return sourceIdx === undefined ? "" : row[sourceIdx];
     });
   });
+}
+
+
+
+function createOutputSheetFromDashboardTemplate_(sheetType, outputName, outputRows, firstDay, endDate) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dashboard = loadDashboardConfig_();
+  const normalizedSheetType = normalizeDashboardSheetTypeKey_(sheetType);
+  const sheetDef = getSheetDefinitionByType_(dashboard, normalizedSheetType);
+  const headers = getHeadersForSheetType_(dashboard, normalizedSheetType);
+  const template = ss.getSheetByName(sheetDef.templateName);
+
+  if (!template) {
+    throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh All Templates first.");
+  }
+
+  deleteSheetIfExists_(ss, outputName, sheetDef.templateName);
+  const sheet = template.copyTo(ss);
+  sheet.showSheet();
+  setUniqueSheetName_(sheet, outputName);
+  ss.setActiveSheet(sheet);
+
+  const width = Math.max(headers.length, 1);
+  const rows = outputRows || [];
+  const requiredRows = rows.length ? DATA_START_ROW + rows.length - 1 : Math.max(sheet.getLastRow(), DATA_START_ROW);
+
+  ensureOutputSheetHasFormattedRows_(sheet, requiredRows, width);
+
+  try {
+    sheet.getRange("A1").setValue(sheetDef.reportTitle || normalizedSheetType || outputName);
+    if (firstDay) sheet.getRange("B2").setValue(firstDay);
+    if (endDate) sheet.getRange("D2").setValue(endDate);
+    if (headers.length) sheet.getRange(HEADER_ROW, 1, 1, width).setValues([headers]);
+  } catch (err) {
+    Logger.log("Dashboard-template output metadata skipped for " + outputName + ": " + err.message);
+  }
+
+  if (rows.length) {
+    sheet.getRange(DATA_START_ROW, 1, rows.length, width).setValues(rows.map(function(row) {
+      const out = (row || []).slice(0, width);
+      while (out.length < width) out.push("");
+      return out;
+    }));
+  }
+
+  clearSheetRuntimeCachesForSheet_(sheet);
+  return sheet;
+}
+
+
+function ensureOutputSheetHasFormattedRows_(sheet, requiredRows, width) {
+  if (!sheet) return;
+
+  requiredRows = Math.max(Number(requiredRows || 1), DATA_START_ROW);
+  width = Math.max(Number(width || 1), 1);
+
+  const currentRows = sheet.getMaxRows();
+  if (currentRows < requiredRows) {
+    sheet.insertRowsAfter(currentRows, requiredRows - currentRows);
+  }
+
+  if (!RFF_OUTPUT_EXTEND_TEMPLATE_FORMATTING) return;
+
+  const dataRows = Math.max(requiredRows - DATA_START_ROW + 1, 1);
+  try {
+    sheet.getRange(DATA_START_ROW, 1, 1, width)
+      .copyTo(sheet.getRange(DATA_START_ROW, 1, dataRows, width), { formatOnly: true });
+  } catch (err) {
+    Logger.log("Output template formatting extension skipped for " + sheet.getName() + ": " + err.message);
+  }
 }
 
 
@@ -12508,7 +12582,7 @@ function runDashboardQualityDashboardVerificationSections_(timing, qualitySheet)
 
 
 
-const RFF_VERSION = "1.5.34";
+const RFF_VERSION = MASTER_LIST_MERGE_ML_VERSION;
 const RFF_ENABLE_TEST_FRAMEWORK = false;
 const RFF_FAST_TEMPLATE_REFRESH = true;
 const RFF_SMART_TEMPLATE_REFRESH = true;
@@ -12597,7 +12671,7 @@ const RFF_DEFAULTS = {
   templateRows: 500,
   demoPTemplateRows: 2500,
   monthlyChangeTemplateRows: 1000,
-  templateVersion: "1.5.6"
+  templateVersion: MASTER_LIST_MERGE_ML_VERSION
 };
 
 
@@ -14340,8 +14414,8 @@ function buildTemplateFromDashboard_(sheet, dashboard, sheetDef, headers, rowCou
 
 
   clearTemplateForFullBuild_(sheet, sheetDef, timing, templateExisted);
-  resizeSheet_(sheet, rowCount, colCount, { skipShrink: !templateExisted, hideExtraColumns: !templateExisted });
-  markFrameworkStep_(timing, "Resize sheet: " + sheetDef.templateName + " (" + rowCount + " rows x " + colCount + " cols" + (!templateExisted ? "; no-shrink new template; extra columns hidden" : "") + ")");
+  resizeSheet_(sheet, rowCount, colCount, { skipShrink: !templateExisted && !RFF_TEMPLATE_FIRST_BUILD_SHRINK_TO_TARGET, hideExtraColumns: !templateExisted && !RFF_TEMPLATE_FIRST_BUILD_SHRINK_TO_TARGET });
+  markFrameworkStep_(timing, "Resize sheet: " + sheetDef.templateName + " (" + rowCount + " rows x " + colCount + " cols" + (!templateExisted && RFF_TEMPLATE_FIRST_BUILD_SHRINK_TO_TARGET ? "; first-build shrunk to governed template size" : (!templateExisted ? "; no-shrink new template; extra columns hidden" : "")) + ")");
 
 
   applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing);
@@ -14356,8 +14430,12 @@ function buildTemplateFromDashboard_(sheet, dashboard, sheetDef, headers, rowCou
   applyTemplateFreezeAndTabColor_(sheet, dashboard, sheetDef, colCount, timing);
 
 
-  enforceTemplateDateAndNumberFormats_(sheet, dashboard, sheetDef, rowCount);
-  markFrameworkStep_(timing, "Final date/number format enforcement: " + sheetDef.templateName);
+  if (RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT) {
+    markFrameworkStep_(timing, "Final date/number format enforcement skipped - already applied during template base formatting: " + sheetDef.templateName);
+  } else {
+    enforceTemplateDateAndNumberFormats_(sheet, dashboard, sheetDef, rowCount);
+    markFrameworkStep_(timing, "Final date/number format enforcement: " + sheetDef.templateName);
+  }
 
 
   if (behavior.hiddenTemplate) {
