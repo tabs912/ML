@@ -329,6 +329,8 @@ without explicit approval.
 
 # Required Output Format
 
+Never reuse script version unless instructed to do so. 
+
 When performing framework engineering provide:
 
 1. Framework Delta Review
