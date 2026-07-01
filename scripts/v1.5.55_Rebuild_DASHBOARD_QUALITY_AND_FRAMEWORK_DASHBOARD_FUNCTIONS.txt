@@ -1,0 +1,1856 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS
+ *
+ * Scope:
+ * - Dashboard Quality startup/workflow orchestration and Format Dashboard verification rows.
+ * - Dashboard Quality report shell assembly, section storage, targeted section writes, and styling.
+ * - Framework Dashboard summary/signoff/status helpers used by Dashboard Quality.
+ * - Framework Health Check entry points and required-function audits.
+ *
+ * Ownership boundaries:
+ * - Does not own Format Dashboard defaults or template builders.
+ * - Does not move archive/report/spec/binary files into the active diff.
+ * - Deep workflow-verification row collectors remain workflow-owned and are referenced from this section.
+ */
+
+function runDashboardQualityStartUp() {
+  return runFrameworkTimed_("Dashboard Quality Start Up", function(timing) {
+    const sheet = ensureDashboardQualityReportSheet_();
+    runDashboardQualityDashboardVerificationSections_(timing, sheet);
+  });
+}
+
+function runDashboardQualityDashboardVerificationSections_(timing, qualitySheet) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const quality = qualitySheet || ensureDashboardQualityReportSheet_();
+  const dashboard = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+
+  if (!dashboard) {
+    const missingRows = [
+      ["Verification Area", "Verification Item", "Expected Value", "Actual Value", "Status", "Severity", "Quality Notes"],
+      ["Format Dashboard", "Sheet Exists", RFF_DASHBOARD_SHEET, "Missing", "FAIL", "Critical", "Create or rebuild Format Dashboard before template creation."]
+    ];
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, missingRows, { deferSheetWrite: true });
+    replaceDashboardQualitySectionRows_(
+      quality,
+      getDashboardQualitySectionTitleForKey_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY),
+      buildTimestampedDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, missingRows)
+    );
+    markFrameworkStep_(timing, "Format Dashboard missing");
+    return missingRows;
+  }
+
+  const sectionPayloads = [
+    { key: RFF_DASHBOARD_VERIFY_GLOBAL_KEY, rows: collectFormatDashboardGlobalInputVerificationRows_(dashboard), label: "Section A Global Inputs and Section B Title Rows verified" },
+    { key: RFF_DASHBOARD_VERIFY_SHEETS_KEY, rows: collectFormatDashboardSheetDefinitionVerificationRows_(dashboard), label: "Section C Sheet Definitions verified" },
+    { key: RFF_DASHBOARD_VERIFY_HEADERS_KEY, rows: collectFormatDashboardSheetHeaderVerificationRows_(dashboard), label: "Section F Sheet Headers verified" },
+    { key: RFF_DASHBOARD_VERIFY_COLUMNS_KEY, rows: collectFormatDashboardColumnDefinitionVerificationRows_(dashboard), label: "Section D Column Definitions verified" },
+    { key: RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY, rows: collectFormatDashboardSheetBehaviorVerificationRows_(dashboard), label: "Section E Sheet Behaviors verified" }
+  ];
+
+  const sectionWrites = [];
+  sectionPayloads.forEach(function(item) {
+    const previousRows = getDashboardQualitySectionRows_(item.key);
+    const changed = !dashboardQualityRowsEqualValues_(previousRows, item.rows);
+    saveDashboardQualitySectionRows_(item.key, item.rows, { deferSheetWrite: true });
+    markFrameworkStep_(timing, item.label + (changed ? "" : " skipped - unchanged"));
+    if (changed) {
+      sectionWrites.push({
+        title: getDashboardQualitySectionTitleForKey_(item.key),
+        rows: buildTimestampedDashboardQualitySectionRows_(item.key, item.rows)
+      });
+    }
+  });
+
+  if (sectionWrites.length) {
+    replaceDashboardQualitySectionsRows_(quality, sectionWrites);
+    markFrameworkStep_(timing, "Dashboard Quality Sections A-F batch written");
+  } else {
+    markFrameworkStep_(timing, "Dashboard Quality Sections A-F sheet write skipped - unchanged");
+  }
+
+  return true;
+}
+
+function getDashboardVerificationPassRow_(headers, item, notes) {
+  const width = Math.max((headers || []).length, 4);
+  const row = new Array(width).fill("");
+  row[0] = item || "Dashboard Section";
+  row[1] = "PASS";
+  row[2] = "";
+  row[3] = notes || "No issues found.";
+  return row;
+}
+
+function appendDashboardVerificationPassIfNoIssues_(rows, item, notes) {
+  if (rows.length <= 1) rows.push(getDashboardVerificationPassRow_(rows[0], item, notes));
+  return rows;
+}
+
+function getDashboardSectionHeaderWidth_(rows) {
+  return (rows || []).reduce(function(max, row) {
+    return Math.max(max, (row || []).length);
+  }, 0);
+}
+
+function collectBlankDashboardCells_(row, width, labelPrefix) {
+  const blanks = [];
+  for (let i = 0; i < width; i++) {
+    if (String(row[i] === null || row[i] === undefined ? "" : row[i]).trim() === "") {
+      blanks.push((labelPrefix || "Column ") + (i + 1));
+    }
+  }
+  return blanks;
+}
+
+function collectFormatDashboardGlobalInputVerificationRows_(dashboardSheet) {
+  const rows = [["Setting", "Status", "Issue", "Quality Notes"]];
+  let sectionRows = [];
+  try {
+    sectionRows = readDashboardSectionRows_(dashboardSheet, RFF_SECTION_GLOBAL);
+  } catch (err) {
+    rows.push([RFF_SECTION_GLOBAL, "FAIL", "Missing Section", err.message]);
+    return rows;
+  }
+
+  if (!sectionRows.length) {
+    rows.push([RFF_SECTION_GLOBAL, "FAIL", "Blank Section", "Format Dashboard Section A has no setting rows."]);
+    return rows;
+  }
+
+  const seen = {};
+  sectionRows.forEach(function(row, index) {
+    const setting = String(row[0] || "").trim();
+    const value = String(row[1] === null || row[1] === undefined ? "" : row[1]).trim();
+    if (!setting) rows.push(["Row " + (index + 1), "FAIL", "Blank Setting", "Format Dashboard Section A contains a blank setting name."]);
+    if (setting && seen[setting]) rows.push([setting, "WARNING", "Duplicate Setting", "Format Dashboard Section A contains this setting more than once."]);
+    if (setting) seen[setting] = true;
+    if (setting && !value) rows.push([setting, "FAIL", "Blank Value", "Format Dashboard Section A setting is blank."]);
+  });
+
+  collectFormatDashboardTitleRowsVerificationRows_(dashboardSheet).slice(1).forEach(function(row) {
+    rows.push(row);
+  });
+
+  return appendDashboardVerificationPassIfNoIssues_(rows, "Global Inputs / Title Rows", "Format Dashboard Section A settings and Section B title rows are present and populated.");
+}
+
+function collectFormatDashboardTitleRowsVerificationRows_(dashboardSheet) {
+  const rows = [["Title Row", "Status", "Issue", "Quality Notes"]];
+  let titleRows = [];
+  try {
+    titleRows = readDashboardSectionRows_(dashboardSheet, RFF_SECTION_TITLE_ROWS);
+  } catch (err) {
+    rows.push([RFF_SECTION_TITLE_ROWS, "FAIL", "Missing Section", err.message]);
+    return rows;
+  }
+
+  if (!titleRows.length) {
+    rows.push([RFF_SECTION_TITLE_ROWS, "FAIL", "Blank Section", "Format Dashboard Section B has no title row records."]);
+    return rows;
+  }
+
+  const requiredRows = { 1: false, 2: false, 3: false, 4: false };
+  const validFillLevels = { "LEVEL 1": true, "LEVEL 2": true, "LEVEL 3": true };
+  titleRows.forEach(function(row, index) {
+    const sheetType = String(row[0] || "").trim();
+    const rowNumber = numberOrDefault_(row[1], 0);
+    const label = (sheetType || "Row " + (index + 1)) + " title row " + (rowNumber || "?");
+    if (!sheetType) rows.push([label, "FAIL", "Blank Sheet Type", "Format Dashboard Section B title row has no sheet type."]);
+    if (!rowNumber) rows.push([label, "FAIL", "Invalid Row", "Format Dashboard Section B title row number must be numeric."]);
+    if (sheetType.toUpperCase() === "GLOBAL" && requiredRows[rowNumber] !== undefined) requiredRows[rowNumber] = true;
+    if (isBlankCell_(row[5])) rows.push([label, "FAIL", "Blank Target Cell", "Format Dashboard Section B title row must define a target cell."]);
+    if (isBlankCell_(row[6]) || numberOrDefault_(row[6], 0) <= 0) rows.push([label, "FAIL", "Invalid Height", "Format Dashboard Section B title row height must be greater than zero."]);
+    if (isBlankCell_(row[9]) || !validFillLevels[String(row[9] || "").trim().toUpperCase()]) rows.push([label, "FAIL", "Invalid Fill Level", "Fill Level must be Level 1, Level 2, or Level 3."]);
+    if (rowNumber === 4 && String(row[11] || "").trim().toUpperCase() !== "WRAP") rows.push([label, "WARNING", "Header Wrap", "Header row should be governed as Wrap."]);
+  });
+
+  Object.keys(requiredRows).forEach(function(rowNumber) {
+    if (!requiredRows[rowNumber]) rows.push(["GLOBAL row " + rowNumber, "FAIL", "Missing Required Title Row", "Format Dashboard Section B must include GLOBAL rows 1, 2, 3, and 4."]);
+  });
+
+  return appendDashboardVerificationPassIfNoIssues_(rows, "Title Rows", "Format Dashboard Section B title row records are present and valid.");
+}
+
+function collectFormatDashboardSheetDefinitionVerificationRows_(dashboardSheet) {
+  const rows = [["Sheet", "Status", "Issue", "Quality Notes"]];
+  let sectionRows = [];
+  try {
+    sectionRows = readDashboardSectionRows_(dashboardSheet, RFF_SECTION_SHEETS);
+  } catch (err) {
+    rows.push([RFF_SECTION_SHEETS, "FAIL", "Missing Section", err.message]);
+    return rows;
+  }
+
+  if (!sectionRows.length) {
+    rows.push([RFF_SECTION_SHEETS, "FAIL", "Blank Section", "Format Dashboard Section C has no sheet definition rows."]);
+    return rows;
+  }
+
+  const width = getDashboardSectionHeaderWidth_(sectionRows);
+  const seen = {};
+  sectionRows.forEach(function(row, index) {
+    const sheetType = String(row[0] || "").trim();
+    if (!sheetType) rows.push(["Row " + (index + 1), "FAIL", "Blank Sheet", "Format Dashboard Section C contains a blank sheet type."]);
+    if (sheetType && seen[sheetType]) rows.push([sheetType, "WARNING", "Duplicate Sheet", "Format Dashboard Section C contains this sheet type more than once."]);
+    if (sheetType) seen[sheetType] = true;
+    const blanks = collectBlankDashboardCells_(row, width, "Column ");
+    if (sheetType && blanks.length) rows.push([sheetType, "WARNING", "Blank Configuration", blanks.join(", ") + " are blank in Format Dashboard Section C."]);
+  });
+
+  return appendDashboardVerificationPassIfNoIssues_(rows, "Sheet Definitions", "Format Dashboard Section C sheet definitions are populated.");
+}
+
+function collectFormatDashboardSheetHeaderVerificationRows_(dashboardSheet) {
+  const rows = [["Header", "Status", "Issue", "Quality Notes"]];
+  let sectionRows = [];
+  try {
+    sectionRows = readDashboardSectionRows_(dashboardSheet, RFF_SECTION_HEADERS);
+  } catch (err) {
+    rows.push([RFF_SECTION_HEADERS, "FAIL", "Missing Section", err.message]);
+    return rows;
+  }
+
+  if (!sectionRows.length) {
+    rows.push([RFF_SECTION_HEADERS, "FAIL", "Blank Section", "Format Dashboard Section F has no header definition rows."]);
+    return rows;
+  }
+
+  const seen = {};
+  const counts = {};
+  sectionRows.forEach(function(row, index) {
+    const sheetType = String(row[0] || "").trim();
+    const header = String(row[2] || row[1] || "").trim();
+    const label = sheetType && header ? sheetType + " - " + header : "Row " + (index + 1);
+    if (!sheetType) rows.push([label, "FAIL", "Blank Sheet Type", "Format Dashboard Section F row has no sheet type."]);
+    if (!header) rows.push([label, "FAIL", "Blank Header", "Format Dashboard Section F row has no header name."]);
+    if (!sheetType || !header) return;
+    counts[sheetType] = (counts[sheetType] || 0) + 1;
+    const key = sheetType + "||" + header;
+    if (seen[key]) rows.push([label, "WARNING", "Duplicate Header", "Header is duplicated within the same Format Dashboard sheet type."]);
+    seen[key] = true;
+  });
+
+  Object.keys(counts).forEach(function(sheetType) {
+    if (counts[sheetType] < 1) rows.push([sheetType, "FAIL", "No Headers", "No headers are defined for this sheet type."]);
+  });
+
+  return appendDashboardVerificationPassIfNoIssues_(rows, "Sheet Headers", "No missing, blank, duplicate, or invalid Format Dashboard Section F headers found.");
+}
+
+function collectFormatDashboardColumnDefinitionVerificationRows_(dashboardSheet) {
+  const rows = [["Column", "Status", "Issue", "Quality Notes"]];
+  let columnRows = [];
+  try {
+    columnRows = readDashboardSectionRows_(dashboardSheet, RFF_SECTION_COLUMNS);
+  } catch (err) {
+    rows.push([RFF_SECTION_COLUMNS, "FAIL", "Missing Section", err.message]);
+    return rows;
+  }
+
+  if (!columnRows.length) {
+    rows.push([RFF_SECTION_COLUMNS, "FAIL", "Blank Section", "Format Dashboard Section D has no column definition rows."]);
+    return rows;
+  }
+
+  const seen = {};
+  columnRows.forEach(function(row, index) {
+    const header = String(row[0] || "").trim();
+    const width = row[1];
+    const label = header || "Row " + (index + 1);
+    if (!header) rows.push([label, "FAIL", "Blank Column", "Format Dashboard Section D row has no column/header name."]);
+    if (!header) return;
+    if (seen[header]) rows.push([label, "WARNING", "Duplicate Column Definition", "Column definition is duplicated for this header."]);
+    if (!isBlankCell_(width) && numberOrDefault_(width, 0) <= 0) rows.push([label, "WARNING", "Invalid Width", "Column width override must be greater than zero when populated. Blank width inherits Default Column Width."]);
+    seen[header] = true;
+  });
+
+  return appendDashboardVerificationPassIfNoIssues_(rows, "Column Definitions", "No missing, blank, duplicate, or invalid Format Dashboard Section D column definitions found.");
+}
+
+function collectFormatDashboardSheetBehaviorVerificationRows_(dashboardSheet) {
+  const rows = [["Behavior", "Status", "Issue", "Quality Notes"]];
+  let behaviorRows = [];
+  try {
+    behaviorRows = readDashboardSectionRows_(dashboardSheet, RFF_SECTION_BEHAVIORS);
+  } catch (err) {
+    rows.push([RFF_SECTION_BEHAVIORS, "FAIL", "Missing Section", err.message]);
+    return rows;
+  }
+
+  if (!behaviorRows.length) {
+    rows.push([RFF_SECTION_BEHAVIORS, "FAIL", "Blank Section", "Format Dashboard Section E has no behavior rows."]);
+    return rows;
+  }
+
+  const width = 6;
+  behaviorRows.forEach(function(row, index) {
+    const sheetType = String(row[0] || "").trim();
+    const behavior = String(row[1] || "").trim();
+    const label = sheetType && behavior ? sheetType + " - " + behavior : "Row " + (index + 1);
+    if (!sheetType) rows.push([label, "FAIL", "Blank Sheet Type", "Format Dashboard Section E row has no sheet type."]);
+    if (!behavior) rows.push([label, "FAIL", "Blank Behavior", "Format Dashboard Section E row has no behavior setting."]);
+    const blanks = collectBlankDashboardCells_(row, width, "Column ");
+    if ((sheetType || behavior) && blanks.length) rows.push([label, "WARNING", "Blank Behavior Configuration", blanks.join(", ") + " are blank in Format Dashboard Section E."]);
+  });
+
+  return appendDashboardVerificationPassIfNoIssues_(rows, "Sheet Behaviors", "Format Dashboard Section E sheet behavior rows are populated.");
+}
+
+function getDashboardQualitySectionLastRunMillis_(sectionKey) {
+  try {
+    const raw = PropertiesService.getDocumentProperties().getProperty(RFF_QA_SECTION_PROP_PREFIX + sectionKey + "_LAST_RUN");
+    const value = Number(raw || 0);
+    return isNaN(value) ? 0 : value;
+  } catch (err) {
+    return 0;
+  }
+}
+
+function dashboardQualitySectionRanWithinLastHour_(sectionKey) {
+  // v1.5: Caching retired; retained as a harmless compatibility helper.
+  return false;
+}
+
+function runDashboardQualitySectionIfDue_(sectionKey, stepName, fn, timing) {
+  /*
+   * v1.5:
+   * Dashboard Quality caching removed. Quick and Workflow QA are separate menu paths,
+   * so each selected section runs when requested.
+   */
+  fn();
+  markFrameworkStep_(timing, stepName + " complete");
+  return "RUN";
+}
+
+function runDashboardQualityQuick() {
+  return runDashboardQualityStartUp();
+}
+
+function runDashboardQualityValidateTemplates() {
+  return runFrameworkTimed_("Dashboard Quality Validate Templates", function(timing) {
+    const sheet = ensureDashboardQualityReportSheet_();
+    runDashboardQualityTemplateAndFormatSections_(timing, false, false);
+    markFrameworkStep_(timing, "Dashboard Quality Sections F-G updated");
+  });
+}
+
+function runDashboardQualityTemplateAndFormatSections_(timing, includeDashboardAudit, includeHealthAndSignoff) {
+  const dashboard = loadDashboardConfig_();
+  markFrameworkStep_(timing, "Dashboard loaded for Sections F-G");
+
+  const previousValidationRows = getDashboardQualitySectionRows_(RFF_VALIDATION_SHEET);
+  const previousDateRows = getDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET);
+  const stagedSectionWrites = [];
+
+  validateReportTemplatesCore_(dashboard, timing, { deferDashboardWrite: true });
+  const validationRows = getDashboardQualitySectionRows_(RFF_VALIDATION_SHEET);
+  if (!dashboardQualityRowsEqualValues_(previousValidationRows, validationRows)) {
+    stagedSectionWrites.push({
+      title: getDashboardQualitySectionTitleForKey_(RFF_VALIDATION_SHEET),
+      rows: buildTimestampedDashboardQualitySectionRows_(RFF_VALIDATION_SHEET, validationRows)
+    });
+  }
+
+  runFrameworkTest6DateFormattingCore_(dashboard, timing, { deferDashboardWrite: true });
+  const dateRows = getDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET);
+  if (!dashboardQualityRowsEqualValues_(previousDateRows, dateRows)) {
+    stagedSectionWrites.push({
+      title: getDashboardQualitySectionTitleForKey_(RFF_TEST6_DATE_FORMAT_SHEET),
+      rows: buildTimestampedDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET, dateRows)
+    });
+  }
+
+  if (stagedSectionWrites.length) {
+    replaceDashboardQualitySectionsRows_(ensureDashboardQualityReportSheet_(), stagedSectionWrites);
+    markFrameworkStep_(timing, "Dashboard Quality Sections F-G batch written");
+  } else {
+    markFrameworkStep_(timing, "Dashboard Quality Sections F-G sheet write skipped - unchanged");
+  }
+
+  if (includeDashboardAudit) {
+  }
+
+  if (includeHealthAndSignoff) {
+    runDashboardQualitySectionIfDue_(RFF_HEALTH_CHECK_SHEET, "Section I Framework Health Check", runFrameworkHealthCheck, timing);
+    runDashboardQualitySectionIfDue_("Signoff", "Section J Signoff", updateDashboardQualitySignoffSection_, timing);
+  }
+}
+
+function getDashboardQualitySectionRegistry_() {
+  const registry = {};
+  RFF_DASHBOARD_QUALITY_SECTIONS.forEach(function(section) {
+    registry[section.title.substring(8, 9)] = {
+      key: section.key,
+      title: section.title,
+      startRow: getDashboardQualityFixedSectionStartRow_(section.title)
+    };
+  });
+  return registry;
+}
+
+function collectDashboardQualityPerformanceSummaryRows_() {
+  const sheet = ensureFrameworkTimingReport_();
+  const detailRows = getFrameworkTimingDetailRows_(sheet);
+  const latestRows = getLatestFrameworkTimingRowsByProcess_(detailRows.slice(-500));
+  const processRows = buildFrameworkTimingProcessSummaryRows_(latestRows);
+  const rows = [["Process", "Steps Logged", "Total Runtime", "Slow/Bottleneck/Critical Steps", "Worst Severity", "Last Timestamp", "Quality Notes"]];
+
+  if (!processRows.length) {
+    rows.push(["Framework Timing", 0, 0, 0, "OK", "", "No timing rows logged yet."]);
+    return rows;
+  }
+
+  const processMap = {};
+  (detailRows || []).forEach(function(row) {
+    const process = String(row[1] || "").trim();
+    if (!process) return;
+    if (!processMap[process]) {
+      processMap[process] = {
+        steps: 0,
+        runtime: 0,
+        issueSteps: 0,
+        worst: "OK",
+        lastTimestamp: row[0] || ""
+      };
+    }
+    const item = processMap[process];
+    const severity = String((row.length >= 7 ? row[5] : row[4]) || "OK").trim() || "OK";
+    item.steps += 1;
+    item.runtime += Number(row[3]) || 0;
+    item.issueSteps += severity === "OK" ? 0 : 1;
+    item.worst = worseTimingSeverity_(item.worst, severity);
+    item.lastTimestamp = row[0] || item.lastTimestamp;
+  });
+
+  Object.keys(processMap).sort().forEach(function(process) {
+    const item = processMap[process];
+    rows.push([
+      process,
+      item.steps,
+      Number(item.runtime.toFixed(3)),
+      item.issueSteps,
+      item.worst,
+      item.lastTimestamp,
+      item.issueSteps ? "Review timing issue details in Framework Timing Report." : "Within target"
+    ]);
+  });
+
+  return rows;
+}
+
+function runDashboardQualityPerformanceSummary_() {
+  return runFrameworkTimed_("Dashboard Quality Performance Summary", function(timing) {
+    const rows = collectDashboardQualityPerformanceSummaryRows_();
+    saveDashboardQualitySectionRows_(RFF_PERFORMANCE_SUMMARY_KEY, rows);
+    markFrameworkStep_(timing, "Dashboard Quality Section L saved");
+    return rows;
+  });
+}
+
+function runDashboardQualityFull() {
+  return runFrameworkTimed_("Dashboard Quality Workflow", function(timing) {
+    ensureDashboardQualityReportSheet_();
+
+    runDashboardQualitySectionIfDue_(RFF_HEALTH_CHECK_SHEET, "Section I Framework Health Check", runFrameworkHealthCheck, timing);
+    runDashboardQualitySectionIfDue_("Signoff", "Section J Signoff", updateDashboardQualitySignoffSection_, timing);
+    runDashboardQualitySectionIfDue_("Summary", "Section K Summary", updateDashboardQualitySummarySection_, timing);
+    runDashboardQualitySectionIfDue_(RFF_PERFORMANCE_SUMMARY_KEY, "Section L Performance Summary", runDashboardQualityPerformanceSummary_, timing);
+    runDashboardQualitySectionIfDue_(RFF_MASTER_LIST_HEALTH_KEY, "Section M Master List Health Check", runDashboardQualityMasterListHealthCheck_, timing);
+    runDashboardQualitySectionIfDue_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, "Section N Workflow & Synchronization Verification", runDashboardQualityWorkflowSyncVerification_, timing);
+
+    styleDashboardQualityReport_(ensureDashboardQualityReportSheet_());
+    writeCombinedFrameworkTimingReport_();
+    markFrameworkStep_(timing, "Dashboard Quality Sections H-N updated");
+  });
+}
+
+function runAllFrameworkTestsAndBuildDashboard() {
+  return runFrameworkTimed_("Run All Framework Tests + Dashboard", function(timing) {
+    runDashboardQualityQuick();
+    markFrameworkStep_(timing, "Dashboard Quality Quick complete");
+    runDashboardQualityFull();
+    markFrameworkStep_(timing, "Dashboard Quality Workflow complete");
+  });
+}
+
+function repairAllTemplateDateFormats() {
+  return runFrameworkTimed_("Repair / Re-Enforce Date Formats", function(timing) {
+    const dashboard = loadDashboardConfig_();
+    markFrameworkStep_(timing, "Dashboard loaded");
+
+    dashboard.sheetDefinitions.forEach(function(sheetDef) {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetDef.templateName);
+      if (!sheet) {
+        markFrameworkStep_(timing, "Skipped missing template: " + sheetDef.templateName);
+        return;
+      }
+      const rowCount = Math.max(sheet.getMaxRows(), resolveTemplateRowCount_(sheetDef, dashboard.globals));
+      enforceTemplateDateAndNumberFormats_(sheet, dashboard, sheetDef, rowCount);
+      markFrameworkStep_(timing, "Date formats re-enforced: " + sheetDef.templateName);
+    });
+
+  });
+}
+
+/**
+ * v1.4.18: Consolidated Dashboard Quality Report data store.
+ * Individual framework tests no longer create/erase separate report sheets.
+ * They save compact rows here; the Dashboard Quality Report reads these rows
+ * and rewrites only when the combined dashboard is explicitly built.
+ */
+
+const RFF_MASTER_LIST_HEALTH_KEY = "Master List Health Check";
+const RFF_CP_SYNC_DIAGNOSTICS_KEY = "Care Plan Sync Diagnostics";
+const RFF_WORKFLOW_SYNC_VERIFICATION_KEY = "Workflow & Synchronization Verification";
+const RFF_PERFORMANCE_SUMMARY_KEY = "Performance Summary";
+const RFF_SYSTEM_SHEET_VERIFICATION_KEY = "System Sheet Verification";
+
+const RFF_DASHBOARD_VERIFY_GLOBAL_KEY = "Format Dashboard Global Inputs";
+const RFF_DASHBOARD_VERIFY_SHEETS_KEY = "Format Dashboard Sheet Definitions";
+const RFF_DASHBOARD_VERIFY_HEADERS_KEY = "Format Dashboard Sheet Headers";
+const RFF_DASHBOARD_VERIFY_COLUMNS_KEY = "Format Dashboard Column Definitions";
+const RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY = "Format Dashboard Sheet Behaviors";
+
+const RFF_DASHBOARD_QUALITY_SECTIONS = [
+  { key: RFF_DASHBOARD_VERIFY_GLOBAL_KEY, title: "SECTION A - GLOBAL INPUTS VERIFICATION" },
+  { key: RFF_DASHBOARD_VERIFY_SHEETS_KEY, title: "SECTION B - SHEET DEFINITIONS VERIFICATION" },
+  { key: RFF_DASHBOARD_VERIFY_HEADERS_KEY, title: "SECTION C - SHEET HEADERS VERIFICATION" },
+  { key: RFF_DASHBOARD_VERIFY_COLUMNS_KEY, title: "SECTION D - COLUMN DEFINITIONS VERIFICATION" },
+  { key: RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY, title: "SECTION E - SHEET BEHAVIOR VERIFICATION" },
+  { key: RFF_VALIDATION_SHEET, title: "SECTION F - TEMPLATE STRUCTURE & VALIDATION" },
+  { key: RFF_TEST6_DATE_FORMAT_SHEET, title: "SECTION G - DATE FORMAT INTEGRITY VALIDATION" },
+  { key: RFF_HEALTH_CHECK_SHEET, title: "SECTION I - FRAMEWORK HEALTH CHECK" },
+  { key: "Signoff", title: "SECTION J - SIGNOFF" },
+  { key: "Summary", title: "SECTION K - SUMMARY" },
+  { key: RFF_PERFORMANCE_SUMMARY_KEY, title: "SECTION L - PERFORMANCE SUMMARY" },
+  { key: RFF_MASTER_LIST_HEALTH_KEY, title: "SECTION M - MASTER LIST HEALTH CHECK" },
+  { key: RFF_WORKFLOW_SYNC_VERIFICATION_KEY, title: "SECTION N - WORKFLOW & SYNCHRONIZATION VERIFICATION" }
+];
+
+const RFF_DASHBOARD_QUALITY_COL_WIDTHS = [250, 325, 225, 200, 150, 100, null];
+const RFF_DASHBOARD_QUALITY_WRAP_COLUMNS = [2, 3, 4, 5, 6, 7];
+const RFF_SYSTEM_SHEET_TITLE_COLOR = "#79b5d2";
+const RFF_SYSTEM_SHEET_SECTION_COLOR = "#9fcadf";
+const RFF_SYSTEM_SHEET_SUBHEADER_COLOR = "#c6dfec";
+const RFF_SYSTEM_SHEET_BORDER_COLOR = "#cccccc";
+
+/*
+ * v1.5.9 compact system sheet section helpers:
+ * - Builds all Dashboard Quality and Framework Timing sections contiguously.
+ * - Preserves each section's existing rows when the shell is reverified.
+ * - Replaces only the target section body between its title row and the next
+ *   section marker so later sections cannot be overwritten by Section A.
+ */
+const RFF_DASHBOARD_QUALITY_MIN_SECTION_ROWS = 5;
+
+function normalizeSectionRowForWidth_(row, width) {
+  const out = (row || []).slice(0, width);
+  while (out.length < width) out.push("");
+  return out;
+}
+
+function rowHasAnyValue_(row) {
+  return (row || []).some(function(value) {
+    return String(value === null || value === undefined ? "" : value).trim() !== "";
+  });
+}
+
+function trimTrailingBlankRows_(rows) {
+  const out = (rows || []).slice();
+  while (out.length && !rowHasAnyValue_(out[out.length - 1])) out.pop();
+  return out;
+}
+
+function getDefaultDashboardQualityDetailHeader_(section) {
+  const title = String(section && section.title || "");
+
+  if (title.indexOf("SECTION A - ") === 0) return ["Setting", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION B - ") === 0) return ["Sheet", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION C - ") === 0) return ["Header", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION D - ") === 0) return ["Column", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION E - ") === 0) return ["Behavior", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION F - ") === 0) return ["Template", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION G - ") === 0) return ["Column Header", "Date Format Present", "Status", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION H - ") === 0) return ["Area", "Item", "Status", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION I - ") === 0) return ["Health Check", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION J - ") === 0) return ["Audit Item", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION K - ") === 0) return ["Metric", "Value", "Status", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION L - ") === 0) return ["Process", "Runtime", "Status", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION M - ") === 0) return ["Validation Item", "Status", "Issue", "Quality Notes", "", "", ""];
+  if (title.indexOf("SECTION N - ") === 0) return ["Sync Check", "Status", "Issue", "Quality Notes", "", "", ""];
+
+  return ["Item", "Status", "Issue", "Quality Notes", "", "", ""];
+}
+
+function collectExistingDashboardQualitySectionBlocks_(sheet) {
+  const blocks = {};
+  if (!sheet || sheet.getLastRow() < 1) return blocks;
+
+  RFF_DASHBOARD_QUALITY_SECTIONS.forEach(function(section) {
+    const titleRow = findDashboardQualitySectionRow_(sheet, section.title);
+    if (!titleRow) return;
+
+    const nextRow = findNextDashboardQualitySectionRow_(sheet, titleRow + 1);
+    const endRow = nextRow ? nextRow - 1 : sheet.getLastRow();
+    const rowCount = Math.max(1, endRow - titleRow + 1);
+    const values = sheet.getRange(titleRow, 1, rowCount, RFF_DASHBOARD_QUALITY_COL_WIDTHS.length).getValues();
+    blocks[section.title] = trimTrailingBlankRows_(values);
+  });
+
+  return blocks;
+}
+
+function getDashboardQualityNotRunMessage_(section) {
+  const title = String(section && section.title || "");
+  if (/SECTION [H-N] - /.test(title)) return "Run Dashboard Quality Workflow to populate this section.";
+  if (/SECTION [A-E] - /.test(title)) return "Run Dashboard Quality Start Up to populate this section.";
+  if (/SECTION [F-G] - /.test(title)) return "Run Dashboard Quality Validate Templates to populate this section.";
+  return "Run the assigned Dashboard Quality workflow to populate this section.";
+}
+
+function buildDefaultDashboardQualitySectionBlock_(section) {
+  const block = [
+    [""],
+    [section.title],
+    ["Last Updated", "Date and time"],
+    getDefaultDashboardQualityDetailHeader_(section),
+    ["NOT RUN", getDashboardQualityNotRunMessage_(section)]
+  ];
+
+  while (block.length < 18) {
+    block.push([""]);
+  }
+
+  return block;
+}
+
+function normalizeDashboardQualitySectionBlock_(section, block) {
+  /*
+   * v1.5.24:
+   * Dashboard Quality sections are dynamic subheader groups, not fixed blocks.
+   * Each group has one clear Arial 10 row above, a three-row subheader
+   * (section / last updated / detail header), writes data on group row 5,
+   * and keeps two clear rows below the section data.
+   */
+  let rows = trimTrailingBlankRows_(block || []);
+  let titleIndex = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (String((rows[i] || [])[0] || "").trim() === section.title) {
+      titleIndex = i;
+      break;
+    }
+  }
+
+  if (titleIndex < 0) rows = buildDefaultDashboardQualitySectionBlock_(section);
+  else rows = rows.slice(titleIndex);
+
+  let detailHeaderIndex = -1;
+  for (let i = 1; i < rows.length; i++) {
+    const joined = (rows[i] || []).join(" ").toLowerCase();
+    if (joined.indexOf("quality notes") !== -1 || joined.indexOf("status") !== -1) {
+      detailHeaderIndex = i;
+      break;
+    }
+  }
+
+  const dataRows = [];
+  if (detailHeaderIndex >= 0) {
+    for (let r = detailHeaderIndex + 1; r < rows.length; r++) {
+      if (rowHasAnyValue_(rows[r])) dataRows.push(rows[r]);
+    }
+  }
+  if (!dataRows.length) dataRows.push(["Enter Data here"]);
+
+  const output = [[""], [section.title], ["Last Updated", "Date and time"], getDefaultDashboardQualityDetailHeader_(section)]
+    .concat(dataRows)
+    .concat([[""], [""]]);
+  return output.map(function(row) {
+    return normalizeSectionRowForWidth_(row, RFF_DASHBOARD_QUALITY_COL_WIDTHS.length);
+  });
+}
+
+function rebuildDashboardQualityReportShellCompact_(sheet) {
+  if (!sheet) return;
+
+  const requiredCols = RFF_DASHBOARD_QUALITY_COL_WIDTHS.length;
+  if (sheet.getMaxColumns() < requiredCols) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredCols - sheet.getMaxColumns());
+  }
+
+  const existingBlocks = collectExistingDashboardQualitySectionBlocks_(sheet);
+  const rows = [normalizeSectionRowForWidth_(["Dashboard Quality Report", "- v" + MASTER_LIST_MERGE_ML_VERSION + " -", "Report Formatter Framework"], requiredCols)];
+
+  RFF_DASHBOARD_QUALITY_SECTIONS.forEach(function(section) {
+    const block = normalizeDashboardQualitySectionBlock_(section, existingBlocks[section.title]);
+    block.forEach(function(row) {
+      rows.push(normalizeSectionRowForWidth_(row, requiredCols));
+    });
+  });
+
+  if (sheet.getMaxRows() < rows.length) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), rows.length - sheet.getMaxRows());
+  }
+
+  const clearRows = Math.max(sheet.getLastRow(), rows.length, 1);
+  sheet.getRange(1, 1, clearRows, requiredCols).clearContent().breakApart();
+  sheet.getRange(1, 1, rows.length, requiredCols).setValues(rows);
+
+  try {
+    sheet.getRange(1, 1, 1, requiredCols)
+      .setFontFamily("Arial")
+      .setFontSize(12)
+      .setFontWeight("bold")
+      .setBackground(RFF_SYSTEM_SHEET_TITLE_COLOR);
+    sheet.setFrozenRows(1);
+  } catch (err) {
+    Logger.log("Dashboard Quality shell title formatting skipped: " + err.message);
+  }
+
+  applyDashboardQualityReportColumnSettings_(sheet);
+  styleDashboardQualityUpdatedSections_(sheet, RFF_DASHBOARD_QUALITY_SECTIONS.map(function(section) {
+    return section.title;
+  }));
+}
+
+function getDashboardQualitySectionTitleForKey_(sectionKey) {
+  const key = String(sectionKey || "");
+  const match = RFF_DASHBOARD_QUALITY_SECTIONS.filter(function(item) {
+    return item.key === key;
+  })[0];
+  return match ? match.title : key;
+}
+
+function getDashboardQualitySectionKeyForTitle_(sectionTitle) {
+  const title = String(sectionTitle || "");
+  const match = RFF_DASHBOARD_QUALITY_SECTIONS.filter(function(item) {
+    return item.title === title;
+  })[0];
+  return match ? match.key : title;
+}
+
+function hasDashboardQualityTemplateShell_(sheet) {
+  if (!sheet) return false;
+
+  const titleValues = sheet.getRange(1, 1, 1, 3).getDisplayValues()[0].map(function(value) {
+    return String(value || "").trim();
+  });
+  if (titleValues[0] !== "Dashboard Quality Report") return false;
+  if (titleValues[1] !== "- v" + MASTER_LIST_MERGE_ML_VERSION + " -") return false;
+  if (titleValues[2] !== "Report Formatter Framework") return false;
+
+  for (let i = 0; i < RFF_DASHBOARD_QUALITY_SECTIONS.length; i++) {
+    if (!findDashboardQualitySectionRow_(sheet, RFF_DASHBOARD_QUALITY_SECTIONS[i].title)) return false;
+  }
+
+  return true;
+}
+
+function initializeDashboardQualitySheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(RFF_TEST_DASHBOARD_SHEET);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(RFF_TEST_DASHBOARD_SHEET);
+  } else {
+    showSheetIfNeeded_(sheet);
+  }
+
+  if (!hasDashboardQualityTemplateShell_(sheet)) {
+    rebuildDashboardQualityReportShellCompact_(sheet);
+  } else {
+    applyDashboardQualityReportColumnSettings_(sheet, { skipRangeFormat: true });
+  }
+
+  return sheet;
+}
+
+function initializeSystemSheets_() {
+  const quality = initializeDashboardQualitySheet_();
+  const timing = initializeFrameworkTimingSheet_();
+  return {
+    dashboardQuality: quality,
+    frameworkTiming: timing
+  };
+}
+
+function ensureDashboardQualityReportSheet_() {
+  return initializeDashboardQualitySheet_();
+}
+
+function ensureDashboardQualityTemplateShell_(sheet) {
+  if (!sheet) return;
+
+  /*
+   * v1.5.11:
+   * Lifecycle refactor. Shell setup is initialization-only.
+   * This legacy wrapper now repairs only missing/incomplete structure and does
+   * not rebuild a valid report during population.
+   */
+  if (!hasDashboardQualityTemplateShell_(sheet)) {
+    rebuildDashboardQualityReportShellCompact_(sheet);
+  }
+}
+
+function ensureDashboardQualitySectionShells_(sheet) {
+  if (!sheet) return;
+  ensureDashboardQualityTemplateShell_(sheet);
+}
+
+function getDashboardQualityFixedSectionStartRow_(sectionTitle) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RFF_TEST_DASHBOARD_SHEET);
+  const titleRow = findDashboardQualitySectionRow_(sheet, sectionTitle);
+  return titleRow || 2;
+}
+
+function applyDashboardQualityReportColumnSettings_(sheet, options) {
+  if (!sheet) return;
+
+  trimSheetToColumnCount_(sheet, RFF_DASHBOARD_QUALITY_COL_WIDTHS.length, "Dashboard Quality Report");
+
+  for (let i = 0; i < RFF_DASHBOARD_QUALITY_COL_WIDTHS.length; i++) {
+    const width = RFF_DASHBOARD_QUALITY_COL_WIDTHS[i];
+    if (!width) continue;
+    try {
+      if (sheet.getColumnWidth(i + 1) !== width) {
+        sheet.setColumnWidth(i + 1, width);
+      }
+    } catch (err) {
+      Logger.log("Dashboard Quality width skipped for column " + (i + 1) + ": " + err.message);
+    }
+  }
+
+  if (options && options.skipRangeFormat) {
+    try {
+      sheet.setFrozenRows(1);
+    } catch (err) {
+      Logger.log("Dashboard Quality freeze skipped: " + err.message);
+    }
+    return;
+  }
+
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastCol = RFF_DASHBOARD_QUALITY_COL_WIDTHS.length;
+
+  try {
+    sheet.getRange(1, 1, lastRow, lastCol)
+      .setFontFamily("Arial")
+      .setFontSize(10)
+      .setVerticalAlignment("top")
+      .setHorizontalAlignment("left")
+      .setBorder(true, true, true, true, true, true, RFF_SYSTEM_SHEET_BORDER_COLOR, SpreadsheetApp.BorderStyle.DOTTED);
+
+    sheet.getRange(1, 1, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+    RFF_DASHBOARD_QUALITY_WRAP_COLUMNS.forEach(function(col) {
+      sheet.getRange(1, col, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+    });
+
+    sheet.setFrozenRows(1);
+  } catch (err) {
+    Logger.log("Dashboard Quality base style skipped: " + err.message);
+  }
+}
+
+function styleDashboardQualityReport_(sheet, sectionTitles) {
+  if (!sheet) return;
+
+  const sections = sectionTitles && sectionTitles.length ? sectionTitles : RFF_DASHBOARD_QUALITY_SECTIONS.map(function(section) {
+    return section.title;
+  });
+
+  applyDashboardQualityReportColumnSettings_(sheet, sectionTitles && sectionTitles.length ? { skipRangeFormat: true } : null);
+  styleDashboardQualityUpdatedSections_(sheet, sections, { highlightProblemRows: true });
+}
+
+function normalizeDashboardQualityHeaderLabels_(row) {
+  return normalizeDashboardQualityOutputRow_(row || [], null);
+}
+
+function isDashboardQualityNotesLabel_(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return text === "quality notes" || text === "notes" || text === "details";
+}
+
+function normalizeDashboardQualityOutputRow_(row, governedHeader) {
+  const width = RFF_DASHBOARD_QUALITY_COL_WIDTHS.length;
+  const source = row || [];
+  const out = source.slice(0, width);
+  while (out.length < width) out.push("");
+
+  let notesIndex = -1;
+  for (let i = 0; i < source.length; i++) {
+    if (isDashboardQualityNotesLabel_(source[i])) {
+      notesIndex = i;
+      break;
+    }
+  }
+
+  if (notesIndex >= 0 && notesIndex !== 3) {
+    out[3] = source[notesIndex] || "Quality Notes";
+    if (notesIndex < width) out[notesIndex] = "";
+  } else if (notesIndex === 3) {
+    out[3] = source[notesIndex] || "Quality Notes";
+  }
+
+  if (governedHeader && governedHeader.length) {
+    for (let i = 0; i < governedHeader.length && i < width; i++) {
+      out[i] = governedHeader[i] || "";
+    }
+  }
+
+  for (let i = 4; i < width; i++) out[i] = "";
+  return out;
+}
+
+function getDashboardQualitySectionLetter_(section) {
+  const match = String(section && section.title || "").match(/^SECTION\s+([A-Z])\s+-/);
+  return match ? match[1] : "";
+}
+
+function normalizeDashboardQualityIssueValue_(value, fallback) {
+  const text = String(value === null || value === undefined ? "" : value).trim();
+  if (!text || /^(ok|complete|present|populated|pass)$/i.test(text)) return fallback || "";
+  return text;
+}
+
+function normalizeDashboardQualityRowsForSection_(section, rows) {
+  const input = rows || [];
+  const governedHeader = getDefaultDashboardQualityDetailHeader_(section);
+  if (!input.length) return [governedHeader, normalizeDashboardQualityOutputRow_(["Enter Data here"], null)];
+
+  const letter = getDashboardQualitySectionLetter_(section);
+  const output = [governedHeader];
+
+  for (let r = 1; r < input.length; r++) {
+    const row = input[r] || [];
+    let mapped;
+    if (letter === "A") mapped = [row[1] || row[0] || "", row[4] || row[1] || "", normalizeDashboardQualityIssueValue_(row[3], row[2]), row[6] || row[3] || ""];
+    else if (letter === "B") mapped = [row[1] || row[0] || "", row[4] || row[1] || "", normalizeDashboardQualityIssueValue_(row[3], row[2]), row[6] || row[3] || ""];
+    else if (letter === "C") mapped = [row[1] ? String(row[0] || "") + " - " + String(row[1]) : row[0] || "", row[4] || row[1] || "", normalizeDashboardQualityIssueValue_(row[3], row[2]), row[6] || row[3] || ""];
+    else if (letter === "D") mapped = [row[1] ? String(row[0] || "") + " - " + String(row[1]) : row[0] || "", row[4] || row[1] || "", normalizeDashboardQualityIssueValue_(row[3], row[2]), row[6] || row[3] || ""];
+    else if (letter === "E") mapped = [row[1] ? String(row[0] || "") + " - " + String(row[1]) : row[0] || "", row[4] || row[1] || "", normalizeDashboardQualityIssueValue_(row[3], row[2]), row[6] || row[3] || ""];
+    else if (letter === "F") mapped = [row[0] || "", row[2] || row[1] || "", row[3] || row[4] || "", row[6] || row[3] || ""];
+    else if (letter === "G") mapped = [row[2] || row[0] || "", row[3] || row[1] || "", row[5] || row[2] || "", row[6] || row[4] || ""];
+    else if (letter === "H") mapped = [row[0] || "", row[1] || "", row[2] || "", row[3] || ""];
+    else if (letter === "I") mapped = [row[1] || row[0] || "", row[2] || row[1] || "", row[3] || "", row[4] || row[3] || ""];
+    else if (letter === "J") mapped = [row[0] || "", row[1] || "", row[2] || "", row[3] || ""];
+    else if (letter === "K") mapped = [row[0] || "", row[3] || row[2] || "", row[1] || "", row[2] || row[3] || ""];
+    else if (letter === "L") mapped = [row[0] || "", row[2] || row[1] || "", row[4] || row[2] || "", row[6] || row[3] || ""];
+    else if (letter === "M" || letter === "N" || letter === "O") mapped = [row[0] || "", row[1] || "", row[2] || "", row[3] || ""];
+    else mapped = [row[0] || "", row[1] || "", row[2] || "", row[3] || ""];
+
+    output.push(normalizeDashboardQualityOutputRow_(mapped, null));
+  }
+
+  if (output.length === 1) output.push(normalizeDashboardQualityOutputRow_(["Enter Data here"], null));
+  return output;
+}
+
+function normalizeDashboardQualityDataRows_(rows) {
+  const input = rows || [];
+  if (!input.length) return [];
+  const output = [normalizeDashboardQualityOutputRow_(input[0], null)];
+  for (let r = 1; r < input.length; r++) output.push(normalizeDashboardQualityOutputRow_(input[r], null));
+  return output;
+}
+
+function buildTimestampedDashboardQualitySectionRows_(sectionKey, rows) {
+  const now = new Date();
+  const section = RFF_DASHBOARD_QUALITY_SECTIONS.filter(function(item) {
+    return item.key === sectionKey;
+  })[0] || { key: sectionKey, title: getDashboardQualitySectionTitleForKey_(sectionKey) };
+
+  const storedRows = rows && rows.length ? rows : [getDefaultDashboardQualityDetailHeader_(section), ["Enter Data here"]];
+  const normalizedRows = normalizeDashboardQualityRowsForSection_(section, storedRows);
+  const header = normalizedRows.length ? normalizedRows[0] : getDefaultDashboardQualityDetailHeader_(section);
+  const detailRows = normalizedRows.length > 1 ? normalizedRows.slice(1) : [["Enter Data here"]];
+
+  const output = [];
+  output.push([section.title]);
+  output.push(["Last Updated", now]);
+  output.push(header);
+  detailRows.forEach(function(row) {
+    output.push(row);
+  });
+  return output.map(function(row) {
+    return normalizeSectionRowForWidth_(row, RFF_DASHBOARD_QUALITY_COL_WIDTHS.length);
+  });
+}
+
+function getStatusFromDashboardQualityRows_(rows) {
+  if (!rows || !rows.length) return "MISSING";
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    for (let c = 0; c < row.length; c++) {
+      const value = String(row[c] || "").trim().toUpperCase();
+      if (value === "FAIL") return "FAIL";
+    }
+  }
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    for (let c = 0; c < row.length; c++) {
+      const value = String(row[c] || "").trim().toUpperCase();
+      if (value === "WARNING" || value === "MISSING") return value;
+    }
+  }
+  return "PASS";
+}
+
+function getMostRecentTimingDurationForSectionKey_(sectionKey) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RFF_TIMING_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return "";
+
+    const lastCol = Math.min(sheet.getLastColumn(), 7);
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getDisplayValues();
+    const processName = getTimingProcessNameForDashboardQualitySection_(sectionKey);
+    if (!processName) return "";
+
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (String(values[i][1] || "") !== processName) continue;
+
+      // Timing Report columns:
+      // A Timestamp, B Process, C Step, D Step Seconds, E Total Seconds, F Severity, G Details.
+      // Dashboard Quality duration must summarize the process total, not the last step duration.
+      return values[i][4] || values[i][3] || "";
+    }
+  } catch (err) {
+    Logger.log("Dashboard Quality timing lookup skipped: " + err.message);
+  }
+  return "";
+}
+
+function getTimingProcessNameForDashboardQualitySection_(sectionKey) {
+  if (sectionKey === RFF_DASHBOARD_VERIFY_GLOBAL_KEY) return "Verify Framework Configuration";
+  if (sectionKey === RFF_DASHBOARD_VERIFY_SHEETS_KEY) return "Verify Framework Configuration";
+  if (sectionKey === RFF_DASHBOARD_VERIFY_HEADERS_KEY) return "Verify Framework Configuration";
+  if (sectionKey === RFF_DASHBOARD_VERIFY_COLUMNS_KEY) return "Verify Framework Configuration";
+  if (sectionKey === RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY) return "Verify Framework Configuration";
+  if (sectionKey === RFF_VALIDATION_SHEET) return "Validate Templates";
+  if (sectionKey === "Template Header Audit") return "Template Header Audit";
+  if (sectionKey === RFF_TEST6_DATE_FORMAT_SHEET) return "Framework Test 6 - Date Formatting";
+  if (sectionKey === RFF_TEST7_VALIDATION_FAILURE_SHEET) return "Framework Test 7 - Intentional Validation Failure";
+  if (sectionKey === RFF_TEST9_SUBHEADER_SHEET) return "Framework Test 9 - Monthly Change Subheaders";
+  if (sectionKey === RFF_TEST10_DASHBOARD_AUDIT_SHEET) return "Framework Test 10 - Dashboard Audit";
+  if (sectionKey === RFF_HEALTH_CHECK_SHEET) return "Framework Health Check";
+  if (sectionKey === "Signoff") return "Dashboard Quality Signoff";
+  if (sectionKey === "Summary") return "Dashboard Quality Summary";
+  if (sectionKey === RFF_MASTER_LIST_HEALTH_KEY) return "Master List Health Check";
+  if (sectionKey === RFF_CP_SYNC_DIAGNOSTICS_KEY) return "Care Plan Sync Diagnostics";
+  if (sectionKey === RFF_WORKFLOW_SYNC_VERIFICATION_KEY) return "Workflow & Synchronization Verification";
+  if (sectionKey === RFF_SYSTEM_SHEET_VERIFICATION_KEY) return "System Sheet Verification";
+  return "";
+}
+
+const RFF_QA_SECTION_PROP_PREFIX = "MLF_QA_SECTION_";
+
+function dashboardQualityRowsEqualValues_(leftRows, rightRows) {
+  try {
+    return JSON.stringify(leftRows || []) === JSON.stringify(rightRows || []);
+  } catch (err) {
+    return false;
+  }
+}
+
+function saveDashboardQualitySectionRows_(sectionKey, rows, options) {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    props.setProperty(
+      RFF_QA_SECTION_PROP_PREFIX + sectionKey,
+      JSON.stringify(rows || [])
+    );
+    props.setProperty(
+      RFF_QA_SECTION_PROP_PREFIX + sectionKey + "_LAST_RUN",
+      String(new Date().getTime())
+    );
+  } catch (err) {
+    Logger.log("Could not save Dashboard Quality section " + sectionKey + ": " + err.message);
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(RFF_TEST_DASHBOARD_SHEET);
+    if (!sheet || !hasDashboardQualityTemplateShell_(sheet)) {
+      sheet = ensureDashboardQualityReportSheet_();
+    }
+    const sectionRows = buildTimestampedDashboardQualitySectionRows_(sectionKey, rows || []);
+    replaceDashboardQualitySectionRows_(sheet, getDashboardQualitySectionTitleForKey_(sectionKey), sectionRows);
+  } catch (err) {
+    Logger.log("Could not write Dashboard Quality section " + sectionKey + ": " + err.message);
+  }
+}
+
+function getDashboardQualitySectionRows_(sectionKey) {
+  try {
+    const raw = PropertiesService.getDocumentProperties().getProperty(RFF_QA_SECTION_PROP_PREFIX + sectionKey);
+    if (!raw) return [];
+    const rows = JSON.parse(raw);
+    return Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    Logger.log("Could not read Dashboard Quality section " + sectionKey + ": " + err.message);
+    return [];
+  }
+}
+
+function deleteLegacyQualityReportSheet_(sheetName) {
+  try {
+    if (!sheetName || sheetName === RFF_TEST_DASHBOARD_SHEET) return;
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (sheet && ss.getSheets().length > 1) ss.deleteSheet(sheet);
+  } catch (err) {
+    Logger.log("Could not delete legacy quality report sheet " + sheetName + ": " + err.message);
+  }
+}
+
+function deleteLegacyStandaloneQualityReports_() {
+  [
+    RFF_TEST6_DATE_FORMAT_SHEET,
+    RFF_TEST7_VALIDATION_FAILURE_SHEET,
+    RFF_TEST9_SUBHEADER_SHEET,
+    RFF_TEST10_DASHBOARD_AUDIT_SHEET,
+    RFF_HEALTH_CHECK_SHEET,
+    RFF_VALIDATION_SHEET,
+    "Master List Health Check",
+    "Care Plan Sync Diagnostics"
+  ].forEach(deleteLegacyQualityReportSheet_);
+}
+
+function saveDashboardQualityRowsForTest6_(results, options) {
+  const rows = [["Template", "Sheet Type", "Header", "Expected", "Actual", "Status", "Issues"]];
+  const failures = (results || []).filter(function(item) {
+    return String(item && item.status || "").toUpperCase() !== "PASS";
+  });
+
+  if (!failures.length) {
+    rows.push(["All templates", "All governed sheet types", "Date format columns", "Governed formats", "Matched", "PASS", "All date format checks passed."]);
+  } else {
+    failures.forEach(function(item) {
+      rows.push([
+        item.templateName || "",
+        item.sheetType || "",
+        item.header || "",
+        item.expectedFormat || "",
+        item.actualFormats || "",
+        item.status || "FAIL",
+        item.issues || "Date format mismatch"
+      ]);
+    });
+  }
+
+  saveDashboardQualitySectionRows_(RFF_TEST6_DATE_FORMAT_SHEET, rows, options);
+}
+
+function saveDashboardQualityRowsForTest7_(results) {
+  const rows = [["Template", "Sheet Type", "Header", "Expected", "Forced", "Status", "Notes"]];
+  (results || []).forEach(function(row) {
+    rows.push(Array.isArray(row) ? row : [
+      row.templateName || "",
+      row.sheetType || "",
+      row.header || "",
+      row.expected || "",
+      row.forced || "",
+      row.status || "",
+      row.notes || ""
+    ]);
+  });
+  saveDashboardQualitySectionRows_(RFF_TEST7_VALIDATION_FAILURE_SHEET, rows);
+}
+
+function saveDashboardQualityRowsForTest9_(results) {
+  const rows = [["Template Name", "Sheet Type", "Status", "Issues"]];
+  (results || []).forEach(function(item) {
+    rows.push(["Monthly Change Subheaders", item.subsection || "", item.status || "", item.issues || ""]);
+  });
+  saveDashboardQualitySectionRows_(RFF_VALIDATION_SHEET, rows);
+}
+
+function saveDashboardQualityRowsForDashboardAudit_(results) {
+  const rows = [["Area", "Item", "Status", "Quality Notes"]];
+  (results || []).forEach(function(item) {
+    rows.push([item.area || "", item.item || "", item.status || "", item.notes || ""]);
+  });
+  saveDashboardQualitySectionRows_(RFF_TEST10_DASHBOARD_AUDIT_SHEET, rows);
+}
+
+function saveDashboardQualityRowsForTemplateValidation_(results, options) {
+  const rows = [["Template Name", "Sheet Type", "Status", "Issues"]];
+  (results || []).forEach(function(item) {
+    rows.push([item.templateName || "", item.sheetType || "", item.status || "", item.issues || ""]);
+  });
+  saveDashboardQualitySectionRows_(RFF_VALIDATION_SHEET, rows, options);
+}
+
+function saveDashboardQualityRowsForHealthCheck_(results) {
+  const rows = [["Area", "Item", "Status", "Quality Notes"]];
+  (results || []).forEach(function(row) {
+    rows.push([
+      row[0] === undefined ? "" : row[0],
+      row[1] === undefined ? "" : row[1],
+      row[2] === undefined ? "" : row[2],
+      row[3] === undefined ? "" : row[3]
+    ]);
+  });
+  saveDashboardQualitySectionRows_(RFF_HEALTH_CHECK_SHEET, rows);
+}
+
+function getStoredDashboardQualityOverallStatus_(sectionKey, statusCol) {
+  const rows = getDashboardQualitySectionRows_(sectionKey);
+  if (!rows.length) return "MISSING";
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][statusCol - 1] || "").trim().toUpperCase() === "FAIL") return "FAIL";
+  }
+  return "PASS";
+}
+
+function getStoredDashboardQualityFailureNotes_(sectionKey, statusCol) {
+  const rows = getDashboardQualitySectionRows_(sectionKey);
+  if (!rows.length) return "Not run";
+  const notes = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][statusCol - 1] || "").trim().toUpperCase() === "FAIL") {
+      notes.push(rows[i].filter(function(v) { return String(v || "").trim() !== ""; }).join(" | "));
+    }
+  }
+  return notes.length ? notes.slice(0, 5).join(" ; ") : "OK";
+}
+
+function buildDatedDisenrolledOutputName_(monthParts) {
+  const date = monthParts && monthParts.firstDay ? monthParts.firstDay : getTodayLocalDate_();
+  const suffix = Utilities.formatDate(date, Session.getScriptTimeZone(), "MM.yy");
+  return "Disenrolled " + suffix;
+}
+
+function forceSheetRowCount_(sheet, desiredRows) {
+  if (!sheet || !desiredRows) return;
+  desiredRows = Math.max(1, Number(desiredRows) || 1);
+  const current = sheet.getMaxRows();
+  if (current > desiredRows) {
+    sheet.deleteRows(desiredRows + 1, current - desiredRows);
+  } else if (current < desiredRows) {
+    sheet.insertRowsAfter(current, desiredRows - current);
+  }
+}
+
+function buildCombinedFrameworkTestDashboard() {
+  return runFrameworkTimed_("Build Dashboard Quality Report", function(timing) {
+    const sheet = ensureDashboardQualityReportSheet_();
+    markFrameworkStep_(timing, "Dashboard Quality Report shell verified");
+
+    const rows = buildCombinedFrameworkTestDashboardRows_();
+    let currentSection = "";
+    let buffer = [];
+
+    function flushSection() {
+      if (!currentSection || !buffer.length) return;
+      const key = getDashboardQualitySectionKeyForTitle_(currentSection);
+      const sectionRows = buildTimestampedDashboardQualitySectionRows_(key, buffer.slice(1));
+      replaceDashboardQualitySectionRows_(sheet, currentSection, sectionRows);
+      buffer = [];
+    }
+
+    rows.forEach(function(row) {
+      const first = String((row || [])[0] || "");
+      if (/^SECTION [A-Z] - /.test(first)) {
+        flushSection();
+        currentSection = first;
+        buffer = [row];
+      } else if (currentSection) {
+        buffer.push(row);
+      }
+    });
+    flushSection();
+
+    deleteLegacyStandaloneQualityReports_();
+    markFrameworkStep_(timing, "Dashboard Quality sections refreshed");
+  });
+}
+
+function updateDashboardQualitySummaryTimingAndSignoffSections_() {
+  updateDashboardQualitySignoffSection_();
+  updateDashboardQualitySummarySection_();
+  writeCombinedFrameworkTimingReport_();
+}
+
+function updateDashboardQualitySignoffSection_() {
+  const sheet = ensureDashboardQualityReportSheet_();
+  const signoffRows = [];
+  appendCombinedDashboardSignOffRows_(signoffRows);
+  while (signoffRows.length && signoffRows[0].length === 1 && String(signoffRows[0][0] || "") === "") {
+    signoffRows.shift();
+  }
+  replaceDashboardQualitySectionRows_(sheet, "SECTION J - SIGNOFF", buildTimestampedDashboardQualitySectionRows_("Signoff", signoffRows.slice(1)));
+  styleDashboardQualityUpdatedSections_(sheet, ["SECTION J - SIGNOFF"]);
+  PropertiesService.getDocumentProperties().setProperty(RFF_QA_SECTION_PROP_PREFIX + "Signoff" + "_LAST_RUN", String(new Date().getTime()));
+}
+
+function updateDashboardQualitySummarySection_() {
+  const sheet = ensureDashboardQualityReportSheet_();
+  const summaryRows = [["Metric", "Value", "Status", "Quality Notes"]];
+  buildFrameworkSummaryRows_().forEach(function(row) {
+    summaryRows.push(row);
+  });
+  replaceDashboardQualitySectionRows_(sheet, "SECTION K - SUMMARY", buildTimestampedDashboardQualitySectionRows_("Summary", summaryRows));
+  styleDashboardQualityUpdatedSections_(sheet, ["SECTION K - SUMMARY"]);
+  PropertiesService.getDocumentProperties().setProperty(RFF_QA_SECTION_PROP_PREFIX + "Summary" + "_LAST_RUN", String(new Date().getTime()));
+}
+
+function updateDashboardQualityTimingSummarySection_() {
+  writeCombinedFrameworkTimingReport_();
+}
+
+function getDashboardQualitySectionBoundsMap_(sheet) {
+  const bounds = {};
+  if (!sheet) return bounds;
+
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const values = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  const sectionRows = [];
+
+  for (let i = 0; i < values.length; i++) {
+    const title = String(values[i][0] || "").trim();
+    if (/^SECTION [A-Z] - /.test(title)) {
+      sectionRows.push({ title: title, row: i + 1 });
+    }
+  }
+
+  sectionRows.forEach(function(section, index) {
+    const replaceStartRow = Math.max(2, section.row - 1);
+    const nextTitleRow = index + 1 < sectionRows.length ? sectionRows[index + 1].row : 0;
+    const replaceEndRow = nextTitleRow ? Math.max(replaceStartRow, nextTitleRow - 2) : lastRow;
+    bounds[section.title] = {
+      titleRow: section.row,
+      replaceStartRow: replaceStartRow,
+      oldCount: Math.max(1, replaceEndRow - replaceStartRow + 1)
+    };
+  });
+
+  return bounds;
+}
+
+function replaceDashboardQualitySectionsRows_(sheet, sectionWrites) {
+  if (!sheet || !sectionWrites || !sectionWrites.length) return;
+
+  if (!hasDashboardQualityTemplateShell_(sheet)) {
+    rebuildDashboardQualityReportShellCompact_(sheet);
+  }
+
+  const bounds = getDashboardQualitySectionBoundsMap_(sheet);
+  sectionWrites.slice().sort(function(a, b) {
+    const aBound = bounds[a.title] || { replaceStartRow: 0 };
+    const bBound = bounds[b.title] || { replaceStartRow: 0 };
+    return bBound.replaceStartRow - aBound.replaceStartRow;
+  }).forEach(function(sectionWrite) {
+    replaceDashboardQualitySectionRows_(sheet, sectionWrite.title, sectionWrite.rows, { sectionBounds: bounds, deferStyle: true, skipBreakApart: true });
+  });
+  styleDashboardQualityUpdatedSections_(sheet, sectionWrites.map(function(sectionWrite) { return sectionWrite.title; }));
+}
+
+function replaceDashboardQualitySectionRows_(sheet, sectionTitle, rows, options) {
+  if (!sheet || !rows || !rows.length) return;
+
+  if (!hasDashboardQualityTemplateShell_(sheet)) {
+    rebuildDashboardQualityReportShellCompact_(sheet);
+  }
+
+  const width = RFF_DASHBOARD_QUALITY_COL_WIDTHS.length;
+  const normalized = rows.map(function(row) {
+    return normalizeSectionRowForWidth_(row || [], width);
+  });
+
+  const bounds = options && options.sectionBounds ? options.sectionBounds : getDashboardQualitySectionBoundsMap_(sheet);
+  let sectionBound = bounds[sectionTitle];
+
+  if (!sectionBound) {
+    rebuildDashboardQualityReportShellCompact_(sheet);
+    sectionBound = getDashboardQualitySectionBoundsMap_(sheet)[sectionTitle];
+  }
+  if (!sectionBound) throw new Error("Dashboard Quality section not found after shell repair: " + sectionTitle);
+
+  const replaceStartRow = sectionBound.replaceStartRow;
+  let oldCount = sectionBound.oldCount;
+
+  const output = [normalizeSectionRowForWidth_([], width)].concat(normalized).concat([
+    normalizeSectionRowForWidth_([], width),
+    normalizeSectionRowForWidth_([], width)
+  ]);
+
+  if (output.length > oldCount) {
+    sheet.insertRowsAfter(replaceStartRow + oldCount - 1, output.length - oldCount);
+    oldCount = output.length;
+  } else if (output.length < oldCount) {
+    sheet.deleteRows(replaceStartRow + output.length, oldCount - output.length);
+    oldCount = output.length;
+  }
+
+  const targetRange = sheet.getRange(replaceStartRow, 1, oldCount, width);
+  if (dashboardQualitySectionContentMatches_(targetRange, output)) {
+    try {
+      sheet.getRange(replaceStartRow + 2, 2).setValue(output[2][1]).setNumberFormat("mm/dd/yyyy hh:mm:ss");
+    } catch (err) {
+      Logger.log("Dashboard Quality Last Updated date-time format skipped for unchanged " + sectionTitle + ": " + err.message);
+    }
+    return;
+  }
+
+  targetRange.clearContent();
+  if (!options || !options.skipBreakApart) targetRange.breakApart();
+  targetRange.setValues(output);
+
+  try {
+    sheet.getRange(replaceStartRow + 2, 2).setNumberFormat("mm/dd/yyyy hh:mm:ss");
+  } catch (err) {
+    Logger.log("Dashboard Quality Last Updated date-time format skipped for " + sectionTitle + ": " + err.message);
+  }
+
+  if (!options || !options.deferStyle) {
+    styleDashboardQualityUpdatedSections_(sheet, [sectionTitle]);
+  }
+}
+
+function findDashboardQualitySectionRow_(sheet, sectionTitle) {
+  if (!sheet) return 0;
+  const target = String(sectionTitle || "").trim();
+  if (!target) return 0;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return 0;
+
+  const values = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0] || "").trim() === target) return i + 1;
+  }
+  return 0;
+}
+
+function findNextDashboardQualitySectionRow_(sheet, startRow) {
+  const lastRow = sheet.getLastRow();
+  if (startRow > lastRow) return 0;
+  const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getDisplayValues();
+  for (let i = 0; i < values.length; i++) {
+    const value = String(values[i][0] || "").trim();
+    if (/^SECTION [A-Z] - /.test(value)) return startRow + i;
+  }
+  return 0;
+}
+
+function dashboardQualitySectionContentMatches_(range, output) {
+  if (!range || !output || !output.length) return false;
+  try {
+    const existing = range.getValues();
+    if (existing.length !== output.length) return false;
+    for (let r = 0; r < output.length; r++) {
+      for (let c = 0; c < output[r].length; c++) {
+        if (r === 2 && c === 1) continue; // Last Updated timestamp changes every run.
+        const oldValue = existing[r] && existing[r][c] instanceof Date ? existing[r][c].getTime() : String(existing[r] && existing[r][c] !== undefined ? existing[r][c] : "");
+        const newValue = output[r] && output[r][c] instanceof Date ? output[r][c].getTime() : String(output[r] && output[r][c] !== undefined ? output[r][c] : "");
+        if (oldValue !== newValue) return false;
+      }
+    }
+    return true;
+  } catch (err) {
+    Logger.log("Dashboard Quality unchanged-section comparison skipped: " + err.message);
+    return false;
+  }
+}
+
+function mergeDashboardQualityStyleRanges_(ranges) {
+  const sorted = (ranges || []).slice().sort(function(a, b) { return a.startRow - b.startRow; });
+  const merged = [];
+  sorted.forEach(function(item) {
+    const start = Math.max(1, Number(item.startRow) || 1);
+    const count = Math.max(1, Number(item.rowCount) || 1);
+    const end = start + count - 1;
+    const previous = merged.length ? merged[merged.length - 1] : null;
+    if (previous && start <= previous.endRow + 2) {
+      previous.endRow = Math.max(previous.endRow, end);
+      previous.rowCount = previous.endRow - previous.startRow + 1;
+    } else {
+      merged.push({ startRow: start, endRow: end, rowCount: count });
+    }
+  });
+  return merged;
+}
+
+function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
+  if (!sheet) return;
+  const width = RFF_DASHBOARD_QUALITY_COL_WIDTHS.length;
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+
+  const requested = sectionTitles && sectionTitles.length ? sectionTitles : RFF_DASHBOARD_QUALITY_SECTIONS.map(function(section) {
+    return section.title;
+  });
+  const bounds = getDashboardQualitySectionBoundsMap_(sheet);
+  const sectionMap = {};
+  RFF_DASHBOARD_QUALITY_SECTIONS.forEach(function(section) {
+    sectionMap[section.title] = true;
+  });
+
+  let ranges = [];
+  requested.forEach(function(title) {
+    const bound = bounds[title];
+    if (bound) {
+      ranges.push({ startRow: bound.replaceStartRow, rowCount: bound.oldCount });
+    }
+  });
+  if (!ranges.length) ranges.push({ startRow: 1, rowCount: lastRow });
+  ranges = mergeDashboardQualityStyleRanges_(ranges);
+
+  try {
+    ranges.forEach(function(item) {
+      const rowCount = Math.max(1, Math.min(item.rowCount, lastRow - item.startRow + 1));
+      if (rowCount <= 0) return;
+      const range = sheet.getRange(item.startRow, 1, rowCount, width);
+      const values = range.getDisplayValues();
+      const backgrounds = [];
+      const fontWeights = [];
+      const fontStyles = [];
+      const fontSizes = [];
+
+      for (let r = 0; r < rowCount; r++) {
+        const absoluteRow = item.startRow + r;
+        const first = String((values[r] || [])[0] || "").trim();
+        const previousFirst = r > 0 ? String((values[r - 1] || [])[0] || "").trim() : "";
+        const twoBackFirst = r > 1 ? String((values[r - 2] || [])[0] || "").trim() : "";
+        let background = "#FFFFFF";
+        let weight = "normal";
+        let style = "normal";
+        let size = 10;
+
+        if (absoluteRow === 1) {
+          background = RFF_SYSTEM_SHEET_TITLE_COLOR;
+          weight = "bold";
+          size = 12;
+        } else if (sectionMap[first]) {
+          background = RFF_SYSTEM_SHEET_SECTION_COLOR;
+          weight = "bold";
+        } else if (sectionMap[previousFirst]) {
+          background = RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
+          style = "italic";
+        } else if (sectionMap[twoBackFirst]) {
+          background = RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
+          weight = "bold";
+        }
+
+        if (options && options.highlightProblemRows && values[r].some(function(cell) {
+          return /^(FAIL|WARNING|MISSING|ACTION REQUIRED)$/i.test(String(cell || "").trim());
+        })) {
+          background = "#efd0d0";
+        }
+
+        backgrounds.push(new Array(width).fill(background));
+        fontWeights.push(new Array(width).fill(weight));
+        fontStyles.push(new Array(width).fill(style));
+        fontSizes.push(new Array(width).fill(size));
+      }
+
+      range
+        .setFontFamily("Arial")
+        .setVerticalAlignment("top")
+        .setHorizontalAlignment("left")
+        .setBackgrounds(backgrounds)
+        .setFontWeights(fontWeights)
+        .setFontStyles(fontStyles)
+        .setFontSizes(fontSizes);
+    });
+  } catch (err) {
+    Logger.log("Dashboard Quality section styling skipped: " + err.message);
+  }
+}
+
+function appendCombinedDashboardSignOffRows_(rows) {
+  const dashboardAudit = getLiveDashboardAuditStatus_();
+  const templateValidation = getLiveTemplateValidationStatus_();
+  const frameworkHealth = getLiveFrameworkHealthStatus_();
+  const masterHealth = getStoredSectionStatusAndNotes_(RFF_MASTER_LIST_HEALTH_KEY, 2);
+  const workflowVerification = getStoredSectionStatusAndNotes_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, 2);
+
+  rows.push([""]);
+  rows.push(["SECTION M - SIGNOFF"]);
+  rows.push(["Dashboard Integrity", dashboardAudit.status, dashboardAudit.notes]);
+  rows.push(["Template Validation", templateValidation.status, templateValidation.notes]);
+  rows.push(["Date Formatting", getReportOverallStatus_(RFF_TEST6_DATE_FORMAT_SHEET, 7), getReportFailureNotes_(RFF_TEST6_DATE_FORMAT_SHEET, 7)]);
+  rows.push(["Framework Health Check", frameworkHealth.status, frameworkHealth.notes]);
+  rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes]);
+  rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes]);
+}
+
+function buildFrameworkSummaryRows_() {
+  const rows = [];
+  const dashboardGlobal = getStoredSectionStatusAndNotes_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, 2);
+  const dashboardSheets = getStoredSectionStatusAndNotes_(RFF_DASHBOARD_VERIFY_SHEETS_KEY, 2);
+  const dashboardHeaders = getStoredSectionStatusAndNotes_(RFF_DASHBOARD_VERIFY_HEADERS_KEY, 2);
+  const dashboardColumns = getStoredSectionStatusAndNotes_(RFF_DASHBOARD_VERIFY_COLUMNS_KEY, 2);
+  const dashboardBehaviors = getStoredSectionStatusAndNotes_(RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY, 2);
+  const templateValidation = getStoredSectionStatusAndNotes_(RFF_VALIDATION_SHEET, 2);
+  const dateIntegrity = getStoredSectionStatusAndNotes_(RFF_TEST6_DATE_FORMAT_SHEET, 3);
+  const dashboardAudit = getStoredSectionStatusAndNotes_(RFF_TEST10_DASHBOARD_AUDIT_SHEET, 3);
+  const frameworkHealth = getStoredSectionStatusAndNotes_(RFF_HEALTH_CHECK_SHEET, 2);
+  const performance = getStoredSectionStatusAndNotes_(RFF_PERFORMANCE_SUMMARY_KEY, 3);
+  const masterHealth = getStoredSectionStatusAndNotes_(RFF_MASTER_LIST_HEALTH_KEY, 2);
+  const workflowVerification = getStoredSectionStatusAndNotes_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, 2);
+
+  rows.push(["Dashboard Global Inputs", dashboardGlobal.status, dashboardGlobal.notes, "Dashboard Quality Report Section A"]);
+  rows.push(["Dashboard Sheet Definitions", dashboardSheets.status, dashboardSheets.notes, "Dashboard Quality Report Section B"]);
+  rows.push(["Dashboard Sheet Headers", dashboardHeaders.status, dashboardHeaders.notes, "Dashboard Quality Report Section C"]);
+  rows.push(["Dashboard Column Definitions", dashboardColumns.status, dashboardColumns.notes, "Dashboard Quality Report Section D"]);
+  rows.push(["Dashboard Sheet Behaviors", dashboardBehaviors.status, dashboardBehaviors.notes, "Dashboard Quality Report Section E"]);
+  rows.push(["Template Structure & Validation", templateValidation.status, templateValidation.notes, "Dashboard Quality Report Section F"]);
+  rows.push(["Date Format Integrity Validation", dateIntegrity.status, dateIntegrity.notes, "Dashboard Quality Report Section G"]);
+  rows.push(["Dashboard Audit", dashboardAudit.status, dashboardAudit.notes, "Dashboard Quality Report Section H"]);
+  rows.push(["Framework Health Check", frameworkHealth.status, frameworkHealth.notes, "Dashboard Quality Report Section I"]);
+  rows.push(["Performance Summary", performance.status, performance.notes, "Dashboard Quality Report Section L"]);
+  rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes, "Dashboard Quality Report Section M"]);
+  rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes, "Dashboard Quality Report Section N"]);
+
+  const anyFail = rows.some(function(r) { return r[1] === "FAIL"; });
+  const anyNotRun = rows.some(function(r) { return r[1] === "MISSING" || r[1] === "NOT RUN"; });
+  rows.unshift(["OVERALL FRAMEWORK STATUS", anyFail ? "ACTION REQUIRED" : (anyNotRun ? "PARTIAL" : "READY"), anyFail ? "Resolve failing Dashboard Quality sections" : (anyNotRun ? "Some Dashboard Quality sections have not been run" : "All automated framework checks pass"), "Calculated"]);
+  return rows;
+}
+
+function getStoredSectionStatusAndNotes_(sectionKey, statusCol) {
+  const rows = getDashboardQualitySectionRows_(sectionKey);
+  if (!rows || !rows.length) return { status: "NOT RUN", notes: "Section has not been run" };
+  const failures = [];
+  const warnings = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const statuses = row.map(function(value) { return String(value || "").trim().toUpperCase(); });
+    if (statuses.indexOf("FAIL") !== -1 || statuses.indexOf("CRITICAL") !== -1) failures.push(row);
+    if (statuses.indexOf("WARNING") !== -1) warnings.push(row);
+  }
+  const issueRows = failures.length ? failures : warnings;
+  return {
+    status: failures.length ? "FAIL" : (warnings.length ? "WARNING" : "PASS"),
+    notes: issueRows.length ? issueRows.slice(0, 5).map(function(row) {
+      return row.filter(function(v) { return String(v || "").trim() !== ""; }).join(" | ");
+    }).join("; ") : "OK"
+  };
+}
+
+function getReportOverallStatus_(sheetName, statusCol) {
+  const storedRows = getDashboardQualitySectionRows_(sheetName);
+  if (storedRows && storedRows.length) return getStoredDashboardQualityOverallStatus_(sheetName, statusCol);
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return "MISSING";
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < statusCol) return "PASS";
+  const values = sheet.getRange(1, 1, Math.min(lastRow, RFF_COMBINED_DASHBOARD_MAX_SOURCE_ROWS), lastCol).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][statusCol - 1] || "").trim().toUpperCase() === "FAIL") return "FAIL";
+  }
+  return "PASS";
+}
+
+function getReportFailureNotes_(sheetName, statusCol) {
+  const storedRows = getDashboardQualitySectionRows_(sheetName);
+  if (storedRows && storedRows.length) return getStoredDashboardQualityFailureNotes_(sheetName, statusCol);
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return "Not run";
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < statusCol) return "OK";
+  const values = sheet.getRange(1, 1, Math.min(lastRow, RFF_COMBINED_DASHBOARD_MAX_SOURCE_ROWS), lastCol).getValues();
+  const notes = [];
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][statusCol - 1] || "").trim().toUpperCase() === "FAIL") {
+      notes.push(values[i].filter(function(v) { return String(v || "").trim() !== ""; }).join(" | "));
+    }
+  }
+  return notes.length ? notes.slice(0, 5).join(" ; ") : "OK";
+}
+
+/* ============================================================================
+ * FRAMEWORK HEALTH CHECK
+ * ========================================================================== */
+
+function runFrameworkHealthCheck() {
+  return runFrameworkTimed_("Framework Health Check", function(timing) {
+    const results = collectFrameworkHealthCheckRows_();
+
+    writeFrameworkHealthCheckReport_(results);
+    markFrameworkStep_(timing, "Dashboard Quality Section I saved");
+
+    const issues = getFrameworkHealthCheckIssueRows_(results);
+    if (issues.length) {
+      markFrameworkStep_(
+        timing,
+        "Framework Health Check issues detected: " + issues.length,
+        formatFrameworkHealthCheckIssuesForTiming_(issues)
+      );
+    }
+
+    const failed = issues.filter(function(row) {
+      return String(row[2] || "").trim().toUpperCase() === "FAIL";
+    });
+
+    if (failed.length) {
+      const err = new Error("Framework Health Check failed: " + failed.length + " failure(s)");
+      err.timingDetails = formatFrameworkHealthCheckIssuesForTiming_(failed);
+      throw err;
+    }
+
+    return results;
+  });
+}
+
+function getFrameworkHealthCheckIssueRows_(results) {
+  return (results || []).filter(function(row) {
+    return String(row && row[2] || "").trim().toUpperCase() !== "PASS";
+  });
+}
+
+function formatFrameworkHealthCheckIssuesForTiming_(issues) {
+  return (issues || []).map(function(row) {
+    const area = row && row[0] !== undefined ? row[0] : "";
+    const item = row && row[1] !== undefined ? row[1] : "";
+    const status = row && row[2] !== undefined ? row[2] : "";
+    const notes = row && row[3] !== undefined ? row[3] : "";
+    return [area, item, status, notes].filter(function(value) {
+      return String(value || "").trim() !== "";
+    }).join(" - ");
+  }).join(" | ");
+}
+
+function appendRequiredFunctionChecks_(results, area, names) {
+  names.forEach(function(name) {
+    const exists = existsFunctionByName_(name);
+    results.push([area, name, exists ? "PASS" : "FAIL", exists ? "OK" : "Missing function"]);
+  });
+}
+
+function existsFunctionByName_(name) {
+  try {
+    return eval("typeof " + name) === "function";
+  } catch (err) {
+    return false;
+  }
+}
+
+function writeFrameworkHealthCheckReport_(results) {
+  saveDashboardQualityRowsForHealthCheck_(results);
+  deleteLegacyQualityReportSheet_(RFF_HEALTH_CHECK_SHEET);
+}
+
+function normalizeFrameworkHealthCheckRows_(rows) {
+  return (rows || []).map(function(row) {
+    const source = Array.isArray(row) ? row : [row];
+    return [
+      source[0] === undefined ? "" : source[0],
+      source[1] === undefined ? "" : source[1],
+      source[2] === undefined ? "" : source[2],
+      source[3] === undefined ? "" : source[3]
+    ];
+  });
+}
+
+function getRequiredHelperFunctionNames_() {
+  return [
+    "toBool_",
+    "truthy_",
+    "toNumber_",
+    "normalizeHeader_",
+    "normalizeAlignment_",
+    "normalizeText_",
+    "normalizeKey_",
+    "getWrapStrategy_",
+    "compareValues_",
+    "safeColor_",
+    "safeSheetName_"
+  ];
+}
+
+function getRequiredMenuFunctionNames_() {
+  return [
+    "setupReportFormattingDashboard",
+    "createOrRefreshAllReportTemplates",
+    "runDashboardQualityQuick",
+    "runDashboardQualityFull",
+    "hideReportTemplates",
+    "showReportTemplates",
+    "hideSystemSheetsNow",
+    "showSystemSheetsNow",
+    "formatBannerReport",
+    "validateActiveBannerFormatterOutput",
+    "archiveActiveRawDataSheet",
+    "runMonthlyChangeValidation"
+  ];
+}
+
+function getRequiredDashboardFunctionNames_() {
+  return [
+    "setupReportFormattingDashboard",
+    "loadDashboardConfig_",
+    "writeDashboardTitle_",
+    "writeDashboardSection_",
+    "styleDashboard_"
+  ];
+}
+
+function getRequiredTemplateFunctionNames_() {
+  return [
+    "createOrRefreshTemplateFromDashboard_",
+    "createOrRefreshAllReportTemplates",
+    "hideReportTemplates",
+    "showReportTemplates"
+  ];
+}
+
+function getRequiredValidationFunctionNames_() {
+  return [
+    "validateTemplateFromDashboard_",
+    "validateReportTemplates",
+    "writeTemplateValidationReport_"
+  ];
+}
+
+function getRequiredTimingFunctionNames_() {
+  return [
+    "runFrameworkTimed_",
+    "markFrameworkStep_",
+    "writeFrameworkTimingReport_",
+    "writeTimingReport_"
+  ];
+}
+
+function getRequiredFrameworkDashboardFunctionNames_() {
+  return [
+    "runAllFrameworkTestsAndBuildDashboard",
+    "buildCombinedFrameworkTestDashboard",
+    "buildCombinedFrameworkTestDashboardRows_",
+    "appendCompactFrameworkDashboardSectionRows_",
+    "appendCompactTimingSummaryRows_",
+    "appendCombinedDashboardSignOffRows_",
+    "styleCombinedFrameworkTestDashboard_"
+  ];
+}
+
+/**
+ * v1.5.54 Dashboard Quality Section N
+ * Workflow & Synchronization Verification
+ *
+ * Purpose:
+ * - Verify the downstream Demo P processing steps that were stable in v1.4.23.
+ * - Verify month-matched CP Due / Unlocked CP synchronization using the Master List month.
+ * - Verify Primary PMR assignment is completed on Demo P.
+ *
+ * This is verification only. It does not alter Demo P, Master List, CP Due, Unlocked CP,
+ * Banner, Monthly Change, or Disenrolled data.
+ */
+
+function runWorkflowSyncVerification() {
+  return runDashboardQualityWorkflowSyncVerification_();
+}
+
+function runDashboardQualityWorkflowSyncVerification_() {
+  return runFrameworkTimed_("Workflow & Synchronization Verification", function(timing) {
+    const rows = collectWorkflowSyncVerificationRows_();
+    saveDashboardQualitySectionRows_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, rows);
+    markFrameworkStep_(timing, "Dashboard Quality Section N saved");
+    return rows;
+  });
+}
