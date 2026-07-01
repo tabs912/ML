@@ -1,3 +1,4 @@
+
 /**
  * Master List Framework v1.5.55 Rebuild Candidate - MENU FUNCTIONS Section
  *
@@ -27,6 +28,15 @@ const ML_MENU_CALLBACKS = Object.freeze({
     "runDashboardQualityStartUp",
     "createOrRefreshAllReportTemplates",
     "runDashboardQualityValidateTemplates"
+  setup: Object.freeze([
+    "setupSystemSheets",
+    "setupReportFormattingDashboardFromScriptDefaults_",
+    "createOrRefreshAllReportTemplates"
+  ]),
+  quality: Object.freeze([
+    "runDashboardQualityStartUp",
+    "runDashboardQualityValidateTemplates",
+    "runDashboardQualityFull"
   ]),
   workflowFormat: Object.freeze([
     "formatBannerReport",
@@ -66,6 +76,15 @@ function onOpen() {
     .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
     .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates");
+  const setupMenu = ui.createMenu("Setup")
+    .addItem("Set up System Sheets", "setupSystemSheets")
+    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
+    .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
+
+  const qualityMenu = ui.createMenu("Quality")
+    .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
+    .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates")
+    .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
 
   const workflowFormatMenu = ui.createMenu("Format")
     .addItem("Format Banner Report", "formatBannerReport")
@@ -87,6 +106,7 @@ function onOpen() {
     .addSubMenu(workflowCreateMenu)
     .addSubMenu(workflowUpdateMenu)
     .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
+    .addSubMenu(workflowUpdateMenu);
 
   const templateManagementMenu = ui.createMenu("Templates")
     .addItem("Hide Templates", "hideReportTemplates")
@@ -102,6 +122,8 @@ function onOpen() {
 
   ui.createMenu("Master List Tools")
     .addSubMenu(startUpMenu)
+    .addSubMenu(setupMenu)
+    .addSubMenu(qualityMenu)
     .addSubMenu(workflowMenu)
     .addSubMenu(sheetManagementMenu)
     .addToUi();
