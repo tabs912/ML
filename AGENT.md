@@ -108,6 +108,9 @@ Only include:
 - AGENTS.md
 - README.md
 
+Do not read these directories.
+.codexignore/
+
 If the diff exceeds 25 files or 2000 lines:
 - Stop
 - Clean the diff
