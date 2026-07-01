@@ -1,0 +1,1486 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS Section
+ *
+ * Depends on:
+ * - CONFIGURATION rebuild section for release constants, sheet type identifiers, and bootstrap rows.
+ * - HELPER FUNCTIONS rebuild section for normalization, safe values, and row-width utilities.
+ * - MENU FUNCTIONS calls setupReportFormattingDashboardFromScriptDefaults_ but does not own implementation.
+ * - FRAMEWORK AND TIMING FUNCTIONS supplies timing wrappers used by dashboard setup.
+ * - TEMPLATE FUNCTIONS AND VALIDATION supplies template-specific display helpers used by downstream consumers.
+ *
+ * Purpose:
+ * - Own the Format Dashboard sheet, global defaults, sheet definitions, title rows, header definitions, column definitions, and behavior definitions.
+ * - Own dashboard config loading/parsing and dashboard default writers.
+ * - Do not own template creation, Dashboard Quality report sections, Framework Timing report sections, or business workflow processing.
+ */
+
+// ============================================================================
+// FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Dashboard constants, section names, and global defaults
+// ----------------------------------------------------------------------------
+const RFF_DASHBOARD_SHEET = "Format Dashboard";
+const RFF_VALIDATION_SHEET = "Dashboard Quality Report";
+const RFF_TIMING_SHEET = "Timing Report";
+const RFF_TIMING_SUMMARY_SHEET = "Timing Summary Report";
+const RFF_TEST6_DATE_FORMAT_SHEET = "Framework Test 6 Date Format Report";
+const RFF_TEST7_VALIDATION_FAILURE_SHEET = "Framework Test 7 Validation Failure Report";
+const RFF_TEST9_SUBHEADER_SHEET = "Framework Test 9 Monthly Change Subheader Report";
+const RFF_TEST10_DASHBOARD_AUDIT_SHEET = "Framework Test 10 Dashboard Audit Report";
+const RFF_TEST_DASHBOARD_SHEET = "Dashboard Quality Report";
+const RFF_HEALTH_CHECK_SHEET = "Framework Health Check Report";
+const RFF_SECTION_GLOBAL = "SECTION A - GLOBAL SETTINGS";
+const RFF_SECTION_TITLE_ROWS = "SECTION B - TITLE ROWS";
+const RFF_SECTION_SHEETS = "SECTION C - SHEET DEFINITIONS";
+const RFF_SECTION_COLUMNS = "SECTION D - COLUMN DEFINITIONS";
+const RFF_SECTION_BEHAVIORS = "SECTION E - SHEET BEHAVIORS";
+const RFF_SECTION_HEADERS = "SECTION F - SHEET HEADERS";
+let RFF_DASHBOARD_CONFIG_CACHE_ = null;
+let RFF_DASHBOARD_CONFIG_CACHE_KEY_ = "";
+let RFF_LAST_TEMPLATE_REFRESH_MODE_ = "";
+
+const RFF_DEFAULTS = {
+  headerRow: 4,
+  dataStartRow: 5,
+  freezeRows: 4,
+  freezeColumns: 2,
+  row1Height: 25,
+  row2Height: 20,
+  row3Height: 10,
+  headerRowHeight: 40,
+  dataRowHeight: 25,
+  defaultDateFormat: "mm/dd/yyyy",
+  defaultNumberFormat: "General",
+  defaultTextFormat: "@",
+  defaultColumnWidth: 105,
+  defaultDataWrap: "CLIP",
+  defaultHorizontalAlignment: "left",
+  defaultVerticalAlignment: "middle",
+  standardFont: "Arial",
+  standardFontSize: 10,
+  standardFontColor: "#000000",
+  titleFontSize: 14,
+  titleInfoFontSize: 5,
+  templateRows: 500,
+  demoPTemplateRows: 2500,
+  monthlyChangeTemplateRows: 1000,
+  templateVersion: MASTER_LIST_MERGE_ML_VERSION
+};
+
+
+const RFF_SHEET_TYPES = {
+  RAW_DATA: "Raw Data",
+  BANNER: "Banners",
+  CARE_PLAN_DUE: "CP Due Date",
+  UNLOCKED: "Unlock CP",
+  DEMO_P: "Demo P",
+  MASTER_LIST: "Master List",
+  MONTHLY_CHANGE: "Monthly Change",
+  DISENROLLED: "Disenrolled Exclusion",
+  MASTER_LIST_CHANGE_LOG: "Master List Change Log"
+};
+
+
+const RFF_MONTHLY_CHANGE_SUBSECTIONS = [
+  "Enrollment",
+  "Disenrolled",
+  "Demographic Changes",
+  "Caseload Changes",
+  "Contact Changes",
+  "Banner Summary Changes"
+];
+
+// NOTE: Dashboard Quality section registry remains in DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS.
+// NOTE: Framework Timing registries/benchmarks remain in FRAMEWORK AND TIMING FUNCTIONS.
+// NOTE: Template creation and validation functions remain in TEMPLATE FUNCTIONS AND VALIDATION.
+
+
+// ----------------------------------------------------------------------------
+// Dashboard cache and section-name helpers
+// ----------------------------------------------------------------------------
+
+function clearDashboardConfigCache_() {
+  RFF_DASHBOARD_CONFIG_CACHE_ = null;
+  RFF_DASHBOARD_CONFIG_CACHE_KEY_ = "";
+}
+
+function getDashboardConfigCacheKey_() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+    if (!sheet) return "";
+    return [
+      ss.getId(),
+      sheet.getSheetId(),
+      sheet.getLastRow(),
+      sheet.getLastColumn(),
+      sheet.getRange(1, 1).getDisplayValue()
+    ].join("||");
+  } catch (err) {
+    return "";
+  }
+}
+
+function getFormatDashboardSectionNames_() {
+  return [
+    RFF_SECTION_GLOBAL,
+    RFF_SECTION_TITLE_ROWS,
+    RFF_SECTION_SHEETS,
+    RFF_SECTION_COLUMNS,
+    RFF_SECTION_BEHAVIORS,
+    RFF_SECTION_HEADERS
+  ];
+}
+
+function getRequiredFrameworkSheetTypes_() {
+  return [
+    RFF_SHEET_TYPES.RAW_DATA,
+    RFF_SHEET_TYPES.BANNER,
+    RFF_SHEET_TYPES.CARE_PLAN_DUE,
+    RFF_SHEET_TYPES.UNLOCKED,
+    RFF_SHEET_TYPES.DEMO_P,
+    RFF_SHEET_TYPES.MASTER_LIST,
+    RFF_SHEET_TYPES.MONTHLY_CHANGE,
+    RFF_SHEET_TYPES.DISENROLLED,
+    RFF_SHEET_TYPES.MASTER_LIST_CHANGE_LOG
+  ];
+}
+
+
+// ----------------------------------------------------------------------------
+// Default dashboard data builders
+// ----------------------------------------------------------------------------
+
+function getDefaultGlobalSettingsRows_() {
+  return [
+    ["Header Row", RFF_DEFAULTS.headerRow],
+    ["Data Start Row", RFF_DEFAULTS.dataStartRow],
+    ["Freeze Rows", RFF_DEFAULTS.freezeRows],
+    ["Freeze Columns", RFF_DEFAULTS.freezeColumns],
+    ["Row 1 Height", RFF_DEFAULTS.row1Height],
+    ["Row 2 Height", RFF_DEFAULTS.row2Height],
+    ["Row 3 Height", RFF_DEFAULTS.row3Height],
+    ["Header Row Height", RFF_DEFAULTS.headerRowHeight],
+    ["Default Data Row Height", RFF_DEFAULTS.dataRowHeight],
+    ["Default Column Width", RFF_DEFAULTS.defaultColumnWidth],
+    ["Default Date Format", RFF_DEFAULTS.defaultDateFormat],
+    ["Default Number Format", RFF_DEFAULTS.defaultNumberFormat],
+    ["Default Text Format", RFF_DEFAULTS.defaultTextFormat],
+    ["Default Data Wrap", RFF_DEFAULTS.defaultDataWrap],
+    ["Default Horizontal Alignment", RFF_DEFAULTS.defaultHorizontalAlignment],
+    ["Default Vertical Alignment", RFF_DEFAULTS.defaultVerticalAlignment],
+    ["Standard Font", RFF_DEFAULTS.standardFont],
+    ["Standard Font Size", RFF_DEFAULTS.standardFontSize],
+    ["Standard Font Color", RFF_DEFAULTS.standardFontColor],
+    ["Title Font Size", RFF_DEFAULTS.titleFontSize],
+    ["Title Info Font Size", RFF_DEFAULTS.titleInfoFontSize],
+    ["Template Version", RFF_DEFAULTS.templateVersion]
+  ];
+}
+
+function getDefaultTitleRowRows_() {
+  return [
+    ["GLOBAL", 1, "Report Title", "Sheet Definition", "", "A1", 25, 14, "Bold", "Level 3", "Left", "Clip", "Default title row"],
+    ["GLOBAL", 2, "Date Range", "Runtime Month", "Date", "A2:D2", 20, 10, "Normal", "Level 3", "Left", "Clip", "A2=Date, B2=start, C2=to, D2=end"],
+    ["GLOBAL", 3, "Spacer", "None", "", "A3:D3", 10, 10, "Normal", "Level 1", "Left", "Clip", "Spacer row"],
+    ["GLOBAL", 4, "Header Row", "Dashboard Headers", "", "Row 4", 40, 10, "Bold", "Level 2", "Left", "Wrap", "Governed header row"]
+  ];
+}
+
+function getDefaultSheetDefinitionRows_() {
+  return [
+  ["Banners", "Banner Report", "Template - Banner Report", "Banners mm.yy", "#65A9CC", true, "Last Day of Prompt Month", 500, "FIXED", 375, 125, 500, false],
+  ["CP Due Date", "Care Plan Due Date Report", "Template - Care Plan Due", "CP Due mm.yy", "#65CC99", true, "Pulled From Spreadsheet", 500, "FIXED", 365, 135, 500, false],
+  ["Unlock CP", "Unlocked Care Plan Report", "Template - Unlocked Care Plan", "Unlock CP mm.yy", "#65CCC3", true, "Pulled From Spreadsheet", 500, "FIXED", 365, 135, 500, false],
+  ["Raw Data", "Raw Data", "Template - Raw Data", "Raw Data mm.yy", "#657FCC", true, "Last Day of Prompt Month", 6500, "FIXED", 5937, 563, 6500, false],
+  ["Demo P", "Demo P", "Template - Demo P", "Demo P mm.yy", "#657FCC", true, "Last Day of Prompt Month", 2500, "FIXED", 2125, 375, 2500, false],
+  ["Disenrolled Exclusion", "Disenrolled Exclusion List", "Template - Disenrolled Exclusion", "Disenrolled mm.yy", "#CC65A1", true, "Last Day of Prompt Month", 1000, "FIXED", 725, 75, 1000, false],
+  ["Master List", "Master List", "Template - Master List", "Master List mm.yy", "#7665CC", true, "Last Day of Prompt Month", 500, "FIXED", 343, 157, 500, false],
+  ["Monthly Change", "Monthly Change Report", "Template - Monthly Change", "Monthly Change mm.yy", "#A165CC", true, "Last Day of Prompt Month", 1000, "FIXED", 900, 100, 1000, false],
+  ["Master List Change Log", "Master List Change Log", "Template - Master List Change Log", "ML Change Log", "#CC65CC", false, "Last Day Updated", 1000, "FIXED", 750, 250, 1000, false]
+];
+}
+
+function getDefaultSheetDefinitionRowsWithColumnCounts_() {
+  const counts = {};
+  getDefaultSheetHeaderRows_().forEach(function(row) {
+    const sheetType = normalizeDashboardSheetTypeKey_(row[0]);
+    const order = numberOrDefault_(row[1], 0);
+    if (!sheetType || !order) return;
+    counts[sheetType] = Math.max(counts[sheetType] || 0, order);
+  });
+
+  return getDefaultSheetDefinitionRows_().map(function(row) {
+    const sheetType = normalizeDashboardSheetTypeKey_(row[0]);
+    return row.slice(0, 8).concat([counts[sheetType] || ""], row.slice(8));
+  });
+}
+
+function getDefaultBehaviorRows_() {
+  return [
+  ["Banners", true, true, true, false, true],
+  ["CP Due Date", true, true, true, false, true],
+  ["Unlocked CP", true, true, true, false, true],
+  ["Raw Data", true, true, true, false, true],
+  ["Demo P", true, true, true, false, true],
+  ["Disenrolled Exclusion", true, true, true, false, true],
+  ["Master List", true, true, true, false, true],
+  ["Monthly Change", true, true, true, true, true],
+  ["Master List Change Log", true, true, true, false, true]
+];
+}
+
+function getDefaultSheetHeaderRows_() {
+  const rows = [];
+  const headerSets = getDefaultHeaderSets_();
+
+
+  Object.keys(headerSets).forEach(function(sheetType) {
+    headerSets[sheetType].forEach(function(item, index) {
+      rows.push([sheetType, index + 1, item.header, item.source || "Populates via process"]);
+    });
+  });
+
+
+  return rows;
+}
+
+function getDefaultHeaderSets_() {
+  /*
+   * v1.5.24:
+   * Dashboard Section C defaults mirror spec/Current Dashboard Settings.xlsx.
+   * Raw Data source columns are governed as Unformatted Data per production
+   * dashboard settings; runtime processing must not add or remove headers here.
+   */
+  return {
+    [RFF_SHEET_TYPES.BANNER]: [
+      h_("Last Name", "Primary Data"),
+      h_("First Name", "Primary Data"),
+      h_("Participant PMR#", "Primary Data"),
+      h_("Safety - 2 Person", "Primary Data"),
+      h_("Wanderer", "Primary Data"),
+      h_("Interpreter Needed", "Primary Data"),
+      h_("Fall Risk", "Primary Data"),
+      h_("DPOA or Guardian Active", "Primary Data"),
+      h_("Palliative Care", "Primary Data")
+    ],
+    [RFF_SHEET_TYPES.CARE_PLAN_DUE]: [
+      h_("Participant Name", "Primary Data"),
+      h_("Enrollment Date", "Primary Data"),
+      h_("Last Care Plan", "Primary Data"),
+      h_("Next Care Plan Due", "Primary Data"),
+      h_("CP Type", "Primary Data")
+    ],
+    [RFF_SHEET_TYPES.UNLOCKED]: [
+      h_("Participant Name", "Primary Data"),
+      h_("PMR #", "Primary Data"),
+      h_("IDT Meeting Date", "Primary Data"),
+      h_("Care Plan Start Date", "Primary Data")
+    ],
+    [RFF_SHEET_TYPES.RAW_DATA]: [
+      h_("Last Name", "Unformatted Data"),
+      h_("First Name", "Unformatted Data"),
+      h_("Preferred Name", "Unformatted Data"),
+      h_("Date of Birth", "Unformatted Data"),
+      h_("Participant PMR#", "Unformatted Data"),
+      h_("Phone Number", "Unformatted Data"),
+      h_("Address Line 1", "Unformatted Data"),
+      h_("Address Line 2", "Unformatted Data"),
+      h_("City", "Unformatted Data"),
+      h_("State", "Unformatted Data"),
+      h_("Zip", "Unformatted Data"),
+      h_("Oxygen", "Unformatted Data"),
+      h_("Primary Language", "Unformatted Data"),
+      h_("Residence Type", "Unformatted Data"),
+      h_("Contact - Last Name", "Unformatted Data"),
+      h_("Contact - First Name", "Unformatted Data"),
+      h_("Type of Contact", "Unformatted Data"),
+      h_("Contact - Primary Language", "Unformatted Data"),
+      h_("Relationship", "Unformatted Data"),
+      h_("AD1 - Phone", "Unformatted Data"),
+      h_("AD1 - Phone Valid Dates From", "Unformatted Data"),
+      h_("AD1 - Phone Valid Dates To", "Unformatted Data"),
+      h_("AD2 - Phone", "Unformatted Data"),
+      h_("AD2 - Phone Valid Dates From", "Unformatted Data"),
+      h_("AD2 - Phone Valid Dates To", "Unformatted Data"),
+      h_("AD3 - Phone", "Unformatted Data"),
+      h_("AD3 - Phone Valid Dates From", "Unformatted Data"),
+      h_("AD3 - Phone Valid Dates To", "Unformatted Data"),
+      h_("Company", "Unformatted Data"),
+      h_("Contact - Notes", "Unformatted Data"),
+      h_("Capitation Date", "Unformatted Data"),
+      h_("Enrollment Status", "Unformatted Data"),
+      h_("Disenrollment Date", "Unformatted Data"),
+      h_("Disenrollment Effective Date", "Unformatted Data"),
+      h_("Disenrollment Reason", "Unformatted Data"),
+      h_("Date of Death", "Unformatted Data"),
+      h_("Caseload - Social Work", "Unformatted Data"),
+      h_("Caseload - RN", "Unformatted Data"),
+      h_("Caseload - PCP", "Unformatted Data"),
+      h_("Caseload - HCC", "Unformatted Data"),
+      h_("Caseload - Activities", "Unformatted Data"),
+      h_("Caseload - OT", "Unformatted Data"),
+      h_("Caseload - PT", "Unformatted Data"),
+      h_("Caseload - RD", "Unformatted Data"),
+      h_("Caseload - Supervising MD", "Unformatted Data"),
+      h_("Additional Important Information", "Unformatted Data"),
+      h_("Notes", "Unformatted Data"),
+      h_("Primary PMR Row", "Format Raw Data")
+    ],
+    [RFF_SHEET_TYPES.DEMO_P]: [
+      h_("Last Name", "Raw Data"),
+      h_("First Name", "Raw Data"),
+      h_("Preferred Name", "Raw Data"),
+      h_("Date of Birth", "Raw Data"),
+      h_("Participant PMR#", "Raw Data"),
+      h_("Phone Number", "Raw Data"),
+      h_("Address Line 1", "Raw Data"),
+      h_("Address Line 2", "Raw Data"),
+      h_("City", "Raw Data"),
+      h_("State", "Raw Data"),
+      h_("Zip", "Raw Data"),
+      h_("Oxygen", "Raw Data"),
+      h_("Primary Language", "Raw Data"),
+      h_("Residence Type", "Raw Data"),
+      h_("Contact - Last Name", "Raw Data"),
+      h_("Contact - First Name", "Raw Data"),
+      h_("Type of Contact", "Raw Data"),
+      h_("Contact - Primary Language", "Raw Data"),
+      h_("Relationship", "Raw Data"),
+      h_("AD1 - Phone", "Raw Data"),
+      h_("AD1 - Phone Valid Dates From", "Raw Data"),
+      h_("AD1 - Phone Valid Dates To", "Raw Data"),
+      h_("AD2 - Phone", "Raw Data"),
+      h_("AD2 - Phone Valid Dates From", "Raw Data"),
+      h_("AD2 - Phone Valid Dates To", "Raw Data"),
+      h_("AD3 - Phone", "Raw Data"),
+      h_("AD3 - Phone Valid Dates From", "Raw Data"),
+      h_("AD3 - Phone Valid Dates To", "Raw Data"),
+      h_("Company", "Raw Data"),
+      h_("Contact - Notes", "Raw Data"),
+      h_("Capitation Date", "Raw Data"),
+      h_("Enrollment Status", "Raw Data"),
+      h_("Disenrollment Date", "Raw Data"),
+      h_("Disenrollment Effective Date", "Raw Data"),
+      h_("Disenrollment Reason", "Raw Data"),
+      h_("Date of Death", "Raw Data"),
+      h_("Caseload - Social Work", "Raw Data"),
+      h_("Caseload - RN", "Raw Data"),
+      h_("Caseload - PCP", "Raw Data"),
+      h_("Caseload - HCC", "Raw Data"),
+      h_("Caseload - Activities", "Raw Data"),
+      h_("Caseload - OT", "Raw Data"),
+      h_("Caseload - PT", "Raw Data"),
+      h_("Caseload - RD", "Raw Data"),
+      h_("Caseload - Supervising MD", "Raw Data"),
+      h_("Additional Important Information", "Raw Data"),
+      h_("Primary PMR Row", "Demo P process"),
+      h_("Banner Summary", "Demo P process"),
+      h_("Phone 1 - Label", "Demo P process"),
+      h_("Phone 1 - Value", "Demo P process"),
+      h_("Phone 2 - Label", "Demo P process"),
+      h_("Phone 2 - Value", "Demo P process"),
+      h_("Phone 3 - Label", "Demo P process"),
+      h_("Phone 3 - Value", "Demo P process"),
+      h_("Phone 4 - Label", "Demo P process"),
+      h_("Phone 4 - Value", "Demo P process"),
+      h_("Address 1 - Street", "Demo P process"),
+      h_("Custom Field 1 - Label", "Demo P process"),
+      h_("Custom Field 1 - Value", "Demo P process"),
+      h_("Notes", "Demo P process"),
+      h_("Contact - 1", "Demo P process"),
+      h_("Contact - 2", "Demo P process"),
+      h_("Contact - 3", "Demo P process"),
+      h_("Contact - 4", "Demo P process"),
+      h_("Contact - 5", "Demo P process"),
+      h_("Contact - 6", "Demo P process"),
+      h_("Contact - 7", "Demo P process"),
+      h_("Contact - 8", "Demo P process"),
+      h_("Contact - Summary", "Demo P process"),
+      h_("Demo P Update Status", "Demo P process"),
+      h_("Demo P Update Month", "Demo P process"),
+      h_("Demo P Source Sheet", "Demo P process")
+    ],
+    [RFF_SHEET_TYPES.DISENROLLED]: [
+      h_("Participant Name", "Demo P"),
+      h_("Preferred Name", "Demo P"),
+      h_("Date of Birth", "Demo P"),
+      h_("Address 1 - Street", "Demo P"),
+      h_("City", "Demo P"),
+      h_("State", "Demo P"),
+      h_("Zip", "Demo P"),
+      h_("Phone 1 - Value", "Demo P"),
+      h_("Phone 2 - Value", "Demo P"),
+      h_("Participant PMR#", "Demo P"),
+      h_("Primary Language", "Demo P"),
+      h_("Residence Type", "Demo P"),
+      h_("Notes", "Demo P"),
+      h_("IDT Meeting Date", "Demo P"),
+      h_("Care Plan Start Date", "Demo P"),
+      h_("Enrollment Date", "Demo P"),
+      h_("Last Care Plan", "Demo P"),
+      h_("Next Care Plan Due", "Demo P"),
+      h_("CP Type", "Demo P"),
+      h_("Oxygen", "Demo P"),
+      h_("Caseload - Social Work", "Demo P"),
+      h_("Caseload - RN", "Demo P"),
+      h_("Caseload - PCP", "Demo P"),
+      h_("Caseload - HCC", "Demo P"),
+      h_("Caseload - Activities", "Demo P"),
+      h_("Caseload - OT", "Demo P"),
+      h_("Caseload - PT", "Demo P"),
+      h_("Caseload - RD", "Demo P"),
+      h_("Caseload - Supervising MD", "Demo P"),
+      h_("Capitation Date", "Demo P"),
+      h_("Enrollment Status", "Demo P"),
+      h_("Disenrollment Date", "Demo P"),
+      h_("Disenrollment Effective Date", "Demo P"),
+      h_("Disenrollment Reason", "Demo P"),
+      h_("Date of Death", "Demo P"),
+      h_("Contact - Last Name", "Demo P"),
+      h_("Contact - First Name", "Demo P"),
+      h_("Type of Contact", "Demo P"),
+      h_("Contact - Primary Language", "Demo P"),
+      h_("Relationship", "Demo P"),
+      h_("AD1 - Phone", "Demo P"),
+      h_("AD1 - Phone Valid Dates From", "Demo P"),
+      h_("AD1 - Phone Valid Dates To", "Demo P"),
+      h_("AD2 - Phone", "Demo P"),
+      h_("AD2 - Phone Valid Dates From", "Demo P"),
+      h_("AD2 - Phone Valid Dates To", "Demo P"),
+      h_("AD3 - Phone", "Demo P"),
+      h_("AD3 - Phone Valid Dates From", "Demo P"),
+      h_("AD3 - Phone Valid Dates To", "Demo P"),
+      h_("Company", "Demo P"),
+      h_("Contact - Notes", "Demo P"),
+      h_("Safety - 2 Person", "Demo P"),
+      h_("Wanderer", "Demo P"),
+      h_("Interpreter Needed", "Demo P"),
+      h_("Fall Risk", "Demo P"),
+      h_("DPOA or Guardian Active", "Demo P"),
+      h_("Palliative Care", "Demo P"),
+      h_("Last Name", "Demo P"),
+      h_("First Name", "Demo P"),
+      h_("Phone Number", "Demo P"),
+      h_("Address Line 1", "Demo P"),
+      h_("Address Line 2", "Demo P"),
+      h_("Additional Important Information", "Demo P"),
+      h_("PMR #", "Demo P")
+    ],
+    [RFF_SHEET_TYPES.MASTER_LIST]: [
+      h_("Participant Name", "Demo P"),
+      h_("Preferred Name", "Demo P"),
+      h_("Date of Birth", "Demo P"),
+      h_("Address 1 - Street", "Demo P"),
+      h_("City", "Demo P"),
+      h_("State", "Demo P"),
+      h_("Zip", "Demo P"),
+      h_("Phone 1 - Value", "Demo P"),
+      h_("Phone 2 - Value", "Demo P"),
+      h_("Participant PMR#", "Demo P"),
+      h_("Primary Language", "Demo P"),
+      h_("Residence Type", "Demo P"),
+      h_("Notes", "Demo P"),
+      h_("IDT Meeting Date", "Demo P"),
+      h_("Care Plan Start Date", "Demo P"),
+      h_("Enrollment Date", "Demo P"),
+      h_("Last Care Plan", "Demo P"),
+      h_("Next Care Plan Due", "Demo P"),
+      h_("CP Type", "Demo P"),
+      h_("Completed", "Demo P"),
+      h_("Face Sheet", "Demo P"),
+      h_("HHA", "Demo P"),
+      h_("Oxygen", "Demo P"),
+      h_("Equipment", "Demo P"),
+      h_("Caseload - Social Work", "Demo P"),
+      h_("Caseload - RN", "Demo P"),
+      h_("Caseload - PCP", "Demo P"),
+      h_("Caseload - HCC", "Demo P"),
+      h_("Caseload - Activities", "Demo P"),
+      h_("Caseload - OT", "Demo P"),
+      h_("Caseload - PT", "Demo P"),
+      h_("Caseload - RD", "Demo P"),
+      h_("Caseload - Supervising MD", "Demo P"),
+      h_("Capitation Date", "Demo P"),
+      h_("Enrollment Status", "Demo P"),
+      h_("Master List Update Status", ""),
+      h_("Master List Update Month", ""),
+      h_("Master List Source Sheet", ""),
+      h_("Primary PMR Row", "Demo P")
+    ],
+    [RFF_SHEET_TYPES.MASTER_LIST_CHANGE_LOG]: [
+      h_("Log Timestamp", "Process"),
+      h_("Change Month", "Process"),
+      h_("Participant PMR#", "Process"),
+      h_("Reason", "Process"),
+      h_("Removed From Sheet", "Process"),
+      h_("Original Row Number", "Process"),
+      h_("Source Monthly Change Report", "Process"),
+      h_("Removed Row Data", "Process")
+    ],
+    [RFF_SHEET_TYPES.MONTHLY_CHANGE]: [
+      h_("Participant Name", ""),
+      h_("Preferred Name", ""),
+      h_("Date of Birth", ""),
+      h_("Address 1 - Street", ""),
+      h_("City", ""),
+      h_("State", ""),
+      h_("Zip", ""),
+      h_("Phone 1 - Value", ""),
+      h_("Phone 2 - Value", ""),
+      h_("Participant PMR#", ""),
+      h_("Primary Language", ""),
+      h_("Residence Type", ""),
+      h_("Notes", ""),
+      h_("IDT Meeting Date", ""),
+      h_("Care Plan Start Date", ""),
+      h_("Enrollment Date", ""),
+      h_("Last Care Plan", ""),
+      h_("Next Care Plan Due", ""),
+      h_("CP Type", ""),
+      h_("Oxygen", ""),
+      h_("Caseload - Social Work", ""),
+      h_("Caseload - RN", ""),
+      h_("Caseload - PCP", ""),
+      h_("Caseload - HCC", ""),
+      h_("Caseload - Activities", ""),
+      h_("Caseload - OT", ""),
+      h_("Caseload - PT", ""),
+      h_("Caseload - RD", ""),
+      h_("Caseload - Supervising MD", ""),
+      h_("Capitation Date", ""),
+      h_("Enrollment Status", ""),
+      h_("Disenrollment Date", ""),
+      h_("Disenrollment Effective Date", ""),
+      h_("Disenrollment Reason", ""),
+      h_("Date of Death", ""),
+      h_("Contact - Last Name", ""),
+      h_("Contact - First Name", ""),
+      h_("Type of Contact", ""),
+      h_("Contact - Primary Language", ""),
+      h_("Relationship", ""),
+      h_("AD1 - Phone", ""),
+      h_("AD1 - Phone Valid Dates From", ""),
+      h_("AD1 - Phone Valid Dates To", ""),
+      h_("AD2 - Phone", ""),
+      h_("AD2 - Phone Valid Dates From", ""),
+      h_("AD2 - Phone Valid Dates To", ""),
+      h_("AD3 - Phone", ""),
+      h_("AD3 - Phone Valid Dates From", ""),
+      h_("AD3 - Phone Valid Dates To", ""),
+      h_("Company", ""),
+      h_("Contact - Notes", ""),
+      h_("Safety - 2 Person", ""),
+      h_("Wanderer", ""),
+      h_("Interpreter Needed", ""),
+      h_("Fall Risk", ""),
+      h_("DPOA or Guardian Active", ""),
+      h_("Palliative Care", ""),
+      h_("Last Name", ""),
+      h_("First Name", ""),
+      h_("Phone Number", ""),
+      h_("Address Line 1", ""),
+      h_("Address Line 2", ""),
+      h_("Additional Important Information", ""),
+      h_("PMR #", "")
+    ]
+  };
+}
+
+function h_(header, source) {
+  return {
+    header: header,
+    source: source
+  };
+}
+
+function getDefaultColumnDefinitionRows_() {
+  return [
+  ["AD1 - Phone", 90, 10, false, true, "CLIP", "left", "middle", ""],
+  ["AD1 - Phone Valid Dates From", 80, 7, true, true, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["AD2 - Phone", 90, 10, false, true, "CLIP", "left", "middle", ""],
+  ["AD2 - Phone Valid Dates From", 110, 7, true, true, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["AD2 - Phone Valid Dates To", 110, 7, true, true, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["AD3 - Phone", 90, 10, false, true, "CLIP", "left", "middle", ""],
+  ["AD3 - Phone Valid Dates From", 110, 7, true, true, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["AD3 - Phone Valid Dates To", 110, 7, true, true, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Additional Important Information", 105, 7, false, true, "CLIP", "left", "middle", ""],
+  ["Address 1 - Street", 250, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Address Line 1", 240, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Address Line 2", 90, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Banner Summary", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Capitation Date", 100, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Care Plan Start Date", 100, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Caseload - Activities", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - HCC", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - OT", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - PCP", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - PT", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - RD", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - RN", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - Social Work", 105, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Caseload - Supervising MD", 105, 7, false, true, "CLIP", "left", "middle", ""],
+  ["Change Section", 150, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Change Timestamp", 140, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Change Type", 120, 10, false, false, "CLIP", "left", "middle", ""],
+  ["City", 90, 10, false, false, "CLIP", "left", "middle", ""],
+  ["AD1 - Phone Valid Dates To", 110, 7, true, true, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Column Header", 180, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Columns With Change", 220, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Company", 90, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 1", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 2", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 3", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 4", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 5", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 6", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 7", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - 8", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - First Name", 90, 9, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - Last Name", 90, 9, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - Notes", 100, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - Primary Language", 90, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Contact - Summary", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["CP Type", 100, 10, false, false, "CLIP", "left", "middle", ""],
+  ["CP Updated", 140, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Custom Field 1 - Label", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Custom Field 1 - Value", 140, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Date of Birth", 90, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Date of Death", 80, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Demo P Source Sheet", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Demo P Update Month", 140, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Demo P Update Status", 140, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Disenrollment Date", 115, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Disenrollment Effective Date", 115, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Disenrollment Reason", 115, 10, false, false, "CLIP", "left", "middle", ""],
+  ["DPOA or Guardian Active", 90, 7, false, false, "CLIP", "left", "middle", ""],
+  ["Enrollment Date", 100, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Enrollment Status", 100, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Equipment", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Face Sheet", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Fall Risk", 60, 10, false, false, "CLIP", "left", "middle", ""],
+  ["First Name", 100, 10, false, false, "CLIP", "left", "middle", ""],
+  ["IDT Meeting Date", 100, 9, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Interpreter Needed", 95, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Last Care Plan", 100, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Last Name", 165, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Master List Source Sheet", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Master List Update Month", 140, 10, false, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Master List Update Status", 140, 10, false, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["New Value", 180, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Next Care Plan Due", 100, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Notes", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Old Value", 180, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Oxygen", 74, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Palliative Care", 95, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Participant Name", 250, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Participant PMR#", 100, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Phone 1 - Label", 85, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Phone 1 - Value", 85, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Phone 2 - Label", 85, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Phone 2 - Value", 85, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Phone 3 - Label", 85, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Phone 3 - Value", 85, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Phone 4 - Label", 85, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Phone 4 - Value", 85, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Phone Number", 90, 10, false, false, "CLIP", "left", "middle", ""],
+  ["PMR #", 100, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Preferred Name", 120, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Primary Language", 90, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Primary PMR Row", 110, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Relationship", 110, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Report Month", 110, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Residence Type", 95, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Safety - 2 Person", 84, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Source Sheet", 150, 10, false, false, "CLIP", "left", "middle", ""],
+  ["State", 69, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Type of Contact", 90, 10, false, true, "CLIP", "left", "middle", ""],
+  ["Updated By", 140, 10, false, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Wanderer", 90, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Completed", 120, 10, false, false, "CLIP", "left", "middle", ""],
+  ["HHA", 140, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Log Timestamp", 150, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Change Month", 120, 10, true, false, "CLIP", "left", "middle", "mm/dd/yyyy"],
+  ["Reason", 180, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Removed From Sheet", 180, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Original Row Number", 120, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Source Monthly Change Report", 220, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Removed Row Data", 300, 10, false, false, "CLIP", "left", "middle", ""],
+  ["Zip", 80, 10, false, false, "CLIP", "left", "middle", ""]
+];
+}
+
+function getAllUniqueHeaders_() {
+  const headerSets = getDefaultHeaderSets_();
+  const seen = {};
+  const output = [];
+
+
+  Object.keys(headerSets).forEach(function(sheetType) {
+    headerSets[sheetType].forEach(function(item) {
+      const header = normalizeHeader_(item.header);
+      if (!header || seen[header]) return;
+      seen[header] = true;
+      output.push(header);
+    });
+  });
+
+
+  return output;
+}
+
+function getColumnStandards_() {
+  return {
+    "Last Name": c_(165, 10, false, false),
+    "First Name": c_(100, 10, false, false),
+    "Preferred Name": c_(120, 10, false, false),
+    "Date of Birth": c_(90, 10, true, false),
+    "Participant PMR#": c_(100, 10, false, false),
+    "Phone Number": c_(90, 10, false, false),
+    "Address Line 1": c_(240, 10, false, false),
+    "Address Line 2": c_(90, 10, false, false),
+    "City": c_(90, 10, false, false),
+    "State": c_(69, 10, false, false),
+    "Zip": c_(80, 10, false, false),
+    "Oxygen": c_(74, 10, false, false),
+    "Primary Language": c_(90, 10, false, false),
+    "Residence Type": c_(95, 10, false, false),
+    "Contact - Last Name": c_(90, 9, false, true),
+    "Contact - First Name": c_(90, 9, false, true),
+    "Type of Contact": c_(90, 10, false, true),
+    "Contact - Primary Language": c_(90, 10, false, true),
+    "Relationship": c_(110, 10, false, true),
+    "AD1 - Phone": c_(90, 10, false, true),
+    "AD1 - Phone Valid Dates From": c_(80, 7, true, true),
+    "AD1 - Phone Valid Dates To": c_(110, 7, true, true),
+    "AD2 - Phone": c_(90, 10, false, true),
+    "AD2 - Phone Valid Dates From": c_(110, 7, true, true),
+    "AD2 - Phone Valid Dates To": c_(110, 7, true, true),
+    "AD3 - Phone": c_(90, 10, false, true),
+    "AD3 - Phone Valid Dates From": c_(110, 7, true, true),
+    "AD3 - Phone Valid Dates To": c_(110, 7, true, true),
+    "Company": c_(90, 10, false, true),
+    "Contact - Notes": c_(100, 10, false, true),
+    "Capitation Date": c_(100, 10, true, false),
+    "Enrollment Status": c_(100, 10, false, false),
+    "Disenrollment Date": c_(115, 10, true, false),
+    "Disenrollment Effective Date": c_(115, 10, true, false),
+    "Disenrollment Reason": c_(115, 10, false, false),
+    "Date of Death": c_(80, 10, true, false),
+    "Caseload - Social Work": c_(105, 10, false, false),
+    "Caseload - RN": c_(105, 10, false, false),
+    "Caseload - PCP": c_(105, 10, false, false),
+    "Caseload - HCC": c_(105, 10, false, false),
+    "Caseload - Activities": c_(105, 10, false, false),
+    "Caseload - OT": c_(105, 10, false, false),
+    "Caseload - PT": c_(105, 10, false, false),
+    "Caseload - RD": c_(105, 10, false, false),
+    "Caseload - Supervising MD": c_(105, 7, false, true),
+    "Additional Important Information": c_(105, 7, false, true),
+    "Safety - 2 Person": c_(84, 10, false, false),
+    "Wanderer": c_(90, 10, false, false),
+    "Interpreter Needed": c_(95, 10, false, false),
+    "Fall Risk": c_(60, 10, false, false),
+    "DPOA or Guardian Active": c_(90, 7, false, false),
+    "Palliative Care": c_(95, 10, false, false),
+    "Banner Summary": c_(140, 10, false, false),
+    "Participant Name": c_(250, 10, false, false),
+    "PMR #": c_(100, 10, false, false),
+    "IDT Meeting Date": c_(100, 9, true, false),
+    "Care Plan Start Date": c_(100, 10, true, false),
+    "Enrollment Date": c_(100, 10, true, false),
+    "Last Care Plan": c_(100, 10, true, false),
+    "Next Care Plan Due": c_(100, 10, true, false),
+    "CP Type": c_(100, 10, false, false),
+    "Phone 1 - Label": c_(85, 10, false, true),
+    "Phone 1 - Value": c_(85, 10, false, false),
+    "Phone 2 - Label": c_(85, 10, false, true),
+    "Phone 2 - Value": c_(85, 10, false, false),
+    "Phone 3 - Label": c_(85, 10, false, true),
+    "Phone 3 - Value": c_(85, 10, false, false),
+    "Phone 4 - Label": c_(85, 10, false, true),
+    "Phone 4 - Value": c_(85, 10, false, false),
+    "Address 1 - Street": c_(250, 10, false, true),
+    "Custom Field 1 - Label": c_(140, 10, false, true),
+    "Custom Field 1 - Value": c_(140, 10, false, true),
+    "Notes": c_(140, 10, false, false),
+    "Contact - 1": c_(140, 10, false, true),
+    "Contact - 2": c_(140, 10, false, true),
+    "Contact - 3": c_(140, 10, false, true),
+    "Contact - 4": c_(140, 10, false, true),
+    "Contact - 5": c_(140, 10, false, true),
+    "Contact - 6": c_(140, 10, false, true),
+    "Contact - 7": c_(140, 10, false, true),
+    "Contact - 8": c_(140, 10, false, true),
+    "Contact - Summary": c_(140, 10, false, true),
+    "Master List Update Status": c_(140, 10, false, false),
+    "Master List Update Month": c_(140, 10, false, false),
+    "Master List Source Sheet": c_(140, 10, false, false),
+    "Sort Order": c_(100, 10, false, true),
+    "Primary PMR Row": c_(110, 10, false, true),
+    "Columns With Change": c_(220, 10, false, false),
+    "Change Timestamp": c_(140, 10, true, false),
+    "Report Month": c_(110, 10, false, false),
+    "Source Sheet": c_(150, 10, false, false),
+    "Change Section": c_(150, 10, false, false),
+    "Column Header": c_(180, 10, false, false),
+    "Old Value": c_(180, 10, false, false),
+    "New Value": c_(180, 10, false, false),
+    "Change Type": c_(120, 10, false, false),
+    "Updated By": c_(140, 10, false, false)
+  };
+}
+
+function c_(width, fontSize, dateColumn, hideColumn) {
+  return {
+    width: width,
+    fontSize: fontSize,
+    dateColumn: dateColumn,
+    hideColumn: hideColumn,
+    dataWrap: "CLIP",
+    horizontalAlignment: "left",
+    verticalAlignment: "middle",
+    numberFormat: dateColumn ? RFF_DEFAULTS.defaultDateFormat : ""
+  };
+}
+
+
+// ----------------------------------------------------------------------------
+// Dashboard writing and styling helpers
+// ----------------------------------------------------------------------------
+
+function writeDashboardTitle_(sheet, row) {
+  const titleValues = [["Report Formatter Framework", "- v" + RFF_VERSION + " -", "Format Dashboard"]];
+  sheet.getRange(row, 1, 1, 9).breakApart();
+  sheet.getRange(row, 1, 1, 3).setValues(titleValues);
+  sheet.getRange(row, 1, 1, 9)
+    .setFontFamily("Arial")
+    .setFontSize(16)
+    .setFontWeight("bold")
+    .setBackground("#D9EAF7")
+    .setVerticalAlignment("middle");
+  sheet.setRowHeight(row, 30);
+  return row + 2;
+}
+
+function writeDashboardSection_(sheet, startRow, sectionName, headers, rows) {
+  sheet.getRange(startRow, 1).setValue(sectionName);
+  sheet.getRange(startRow, 1, 1, headers.length)
+    .merge()
+    .setFontFamily("Arial")
+    .setFontSize(12)
+    .setFontWeight("bold")
+    .setBackground("#B7DEE8")
+    .setVerticalAlignment("middle");
+
+
+  const headerRow = startRow + 1;
+  sheet.getRange(headerRow, 1, 1, headers.length)
+    .setValues([headers])
+    .setFontFamily("Arial")
+    .setFontSize(10)
+    .setFontWeight("bold")
+    .setBackground("#D9EAF7")
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
+    .setVerticalAlignment("top");
+
+
+  if (rows.length > 0) {
+    sheet.getRange(headerRow + 1, 1, rows.length, headers.length)
+      .setValues(rows)
+      .setFontFamily("Arial")
+      .setFontSize(10)
+      .setVerticalAlignment("middle")
+      .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  }
+
+
+  return headerRow + rows.length + 3;
+}
+
+function styleDashboard_(sheet) {
+  sheet.setFrozenRows(1);
+
+
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+
+
+  sheet.getRange(1, 1, lastRow, lastCol)
+    .setFontFamily("Arial")
+    .setFontColor("#000000")
+    .setHorizontalAlignment("left");
+
+
+  // Fixed widths are faster and more stable than auto-resize.
+  const widths = [250, 160, 240, 180, 130, 120, 160, 150, 140];
+  widths.forEach(function(width, index) {
+    try {
+      sheet.setColumnWidth(index + 1, width);
+    } catch (err) {
+      Logger.log("Dashboard column width skipped: " + err.message);
+    }
+  });
+
+
+  try {
+    const filter = sheet.getFilter();
+    if (filter) filter.remove();
+  } catch (err) {
+    Logger.log("Dashboard filter remove skipped: " + err.message);
+  }
+}
+
+function setupReportFormattingDashboard() {
+  return setupReportFormattingDashboardFromScriptDefaults_();
+}
+
+function appendDashboardSectionRows_(rows, sectionName, headers, dataRows, width) {
+  rows.push(normalizeSectionRowForWidth_([sectionName], width));
+  rows.push(normalizeSectionRowForWidth_(headers, width));
+  (dataRows || []).forEach(function(row) {
+    rows.push(normalizeSectionRowForWidth_(row, width));
+  });
+  rows.push(normalizeSectionRowForWidth_([], width));
+}
+
+function getResolvedDefaultColumnDefinitionRows_() {
+  const defaultWidth = Number(RFF_DEFAULTS.defaultColumnWidth || 105);
+  const defaultFontSize = Number(RFF_DEFAULTS.standardFontSize || 10);
+  const defaultWrap = String(RFF_DEFAULTS.defaultDataWrap || "CLIP").toUpperCase();
+  const defaultHorizontal = String(RFF_DEFAULTS.defaultHorizontalAlignment || "left").toLowerCase();
+  const defaultVertical = String(RFF_DEFAULTS.defaultVerticalAlignment || "middle").toLowerCase();
+  const defaultNumberFormat = String(RFF_DEFAULTS.defaultNumberFormat || "General");
+
+
+  return getDefaultColumnDefinitionRows_().map(function(row) {
+    const width = Number(row[1]);
+    const fontSize = Number(row[2]);
+    const dateColumn = row[3] === true;
+    const hideColumn = row[4] === true;
+    const wrap = String(row[5] || "").toUpperCase();
+    const horizontal = String(row[6] || "").toLowerCase();
+    const vertical = String(row[7] || "").toLowerCase();
+    const numberFormat = String(row[8] || "");
+
+
+    return [
+      row[0],
+      width === defaultWidth ? "" : row[1],
+      fontSize === defaultFontSize ? "" : row[2],
+      dateColumn ? true : "",
+      hideColumn ? true : "",
+      wrap === defaultWrap ? "" : row[5],
+      horizontal === defaultHorizontal ? "" : row[6],
+      vertical === defaultVertical ? "" : row[7],
+      numberFormat === "" || numberFormat === defaultNumberFormat ? "" : row[8]
+    ];
+  });
+}
+
+function writeDashboardDefaultsFast_(sheet) {
+  const width = 14;
+  const rows = [];
+  rows.push(normalizeSectionRowForWidth_(["Report Formatter Framework", "- v" + RFF_VERSION + " -", "Format Dashboard"], width));
+  rows.push(normalizeSectionRowForWidth_([], width));
+  appendDashboardSectionRows_(rows, RFF_SECTION_GLOBAL, ["Setting", "Value"], getDefaultGlobalSettingsRows_(), width);
+  appendDashboardSectionRows_(rows, RFF_SECTION_TITLE_ROWS, ["Sheet Type", "Row", "Purpose", "Value Source", "Label", "Target Cell", "Height", "Font Size", "Font Weight", "Fill Level", "Alignment", "Wrap", "Notes"], getDefaultTitleRowRows_(), width);
+  appendDashboardSectionRows_(rows, RFF_SECTION_SHEETS, ["Sheet Type", "Report Title", "Template Name", "Output Naming Pattern", "Base Color", "Use Prompt Date", "End Date Source", "Template Row Count", "Template Column Count", "Template Row Mode", "Minimum Rows", "Buffer Rows", "Test Rows", "Use Test Rows"], getDefaultSheetDefinitionRowsWithColumnCounts_(), width);
+  appendDashboardSectionRows_(rows, RFF_SECTION_COLUMNS, ["Header", "Width", "Header Font Size", "Date Column", "Hide Column", "Data Wrap", "Horizontal Alignment", "Vertical Alignment", "Number Format"], getResolvedDefaultColumnDefinitionRows_(), width);
+  appendDashboardSectionRows_(rows, RFF_SECTION_BEHAVIORS, ["Sheet Type", "Uses Title Rows", "Uses Filter", "Uses Alternating Colors", "Uses Subheaders", "Hidden Template"], getDefaultBehaviorRows_(), width);
+  appendDashboardSectionRows_(rows, RFF_SECTION_HEADERS, ["Sheet Type", "Column Order", "Header", "Source of Data"], getDefaultSheetHeaderRows_(), width);
+
+  trimSheetToColumnCount_(sheet, width, "Format Dashboard");
+  if (sheet.getMaxRows() < rows.length) sheet.insertRowsAfter(sheet.getMaxRows(), rows.length - sheet.getMaxRows());
+
+  const clearRows = Math.max(sheet.getLastRow(), rows.length, 1);
+  sheet.getRange(1, 1, clearRows, width).clearContent().breakApart().setBackground("#FFFFFF");
+  sheet.getRange(1, 1, rows.length, width).setValues(rows);
+
+  sheet.getRange(1, 1, rows.length, width)
+    .setFontFamily("Arial")
+    .setFontColor("#000000")
+    .setFontSize(10)
+    .setHorizontalAlignment("left")
+    .setVerticalAlignment("middle")
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+
+  sheet.getRange(1, 1, 1, width)
+    .setFontSize(16)
+    .setFontWeight("bold")
+    .setBackground("#D9EAF7");
+
+  for (let r = 0; r < rows.length; r++) {
+    const first = String(rows[r][0] || "").trim();
+    if (first.indexOf("SECTION ") === 0) {
+      sheet.getRange(r + 1, 1, 1, width)
+        .setFontSize(12)
+        .setFontWeight("bold")
+        .setBackground("#B7DEE8");
+      if (r + 2 <= rows.length) {
+        sheet.getRange(r + 2, 1, 1, width)
+          .setFontWeight("bold")
+          .setBackground("#D9EAF7")
+          .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+      }
+    }
+  }
+
+  const widths = [250, 160, 240, 180, 130, 120, 160, 150, 140, 120, 120, 120, 120];
+  widths.forEach(function(colWidth, index) {
+    try {
+      sheet.setColumnWidth(index + 1, colWidth);
+    } catch (err) {
+      Logger.log("Dashboard column width skipped: " + err.message);
+    }
+  });
+
+  try {
+    const filter = sheet.getFilter();
+    if (filter) filter.remove();
+  } catch (err) {
+    Logger.log("Dashboard filter remove skipped: " + err.message);
+  }
+  sheet.setFrozenRows(1);
+}
+
+function setupReportFormattingDashboardFromScriptDefaults_() {
+  return runFrameworkTimed_("Setup Report Formatting Dashboard", function(timing) {
+    clearDashboardConfigCache_();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+    if (!sheet) sheet = ss.insertSheet(RFF_DASHBOARD_SHEET);
+
+    showSheetIfNeeded_(sheet, timing, "Dashboard sheet shown");
+    writeDashboardDefaultsFast_(sheet);
+    markFrameworkStep_(timing, "Format Dashboard defaults rebuilt through fast governed writer");
+    return sheet;
+  });
+}
+
+
+// ----------------------------------------------------------------------------
+// Dashboard sheet type and production-order helpers
+// ----------------------------------------------------------------------------
+
+function normalizeDashboardSheetTypeKey_(sheetType) {
+  const normalized = normalizeHeader_(sheetType);
+  const key = normalizeKey_(normalized);
+  const aliases = {
+    "banner": RFF_SHEET_TYPES.BANNER,
+    "banners": RFF_SHEET_TYPES.BANNER,
+    "cpduedate": RFF_SHEET_TYPES.CARE_PLAN_DUE,
+    "careplandue": RFF_SHEET_TYPES.CARE_PLAN_DUE,
+    "unlockcp": RFF_SHEET_TYPES.UNLOCKED,
+    "rawdata": RFF_SHEET_TYPES.RAW_DATA,
+    "demop": RFF_SHEET_TYPES.DEMO_P,
+    "disenrolledexclusion": RFF_SHEET_TYPES.DISENROLLED,
+    "masterlist": RFF_SHEET_TYPES.MASTER_LIST,
+    "monthlychange": RFF_SHEET_TYPES.MONTHLY_CHANGE,
+    "masterlistchangelog": RFF_SHEET_TYPES.MASTER_LIST_CHANGE_LOG
+  };
+  return aliases[key] || normalized;
+}
+
+function getSheetDefinitionByTypeOrNull_(dashboard, sheetType) {
+  const normalized = normalizeDashboardSheetTypeKey_(sheetType);
+  return (dashboard.sheetDefinitions || []).filter(function(item) {
+    return item.sheetType === normalized || normalizeDashboardSheetTypeKey_(item.sheetType) === normalized;
+  })[0] || null;
+}
+
+function getSheetDefinitionByType_(dashboard, sheetType) {
+  const sheetDef = getSheetDefinitionByTypeOrNull_(dashboard, sheetType);
+  if (!sheetDef) throw new Error("Sheet definition not found in dashboard: " + sheetType);
+  return sheetDef;
+}
+
+function sortSheetDefinitionsByProductionOrder_(sheetDefinitions) {
+  const orderMap = {};
+  getRequiredFrameworkSheetTypes_().forEach(function(sheetType, index) {
+    orderMap[normalizeKey_(sheetType)] = index;
+  });
+  return (sheetDefinitions || []).slice().sort(function(a, b) {
+    const aOrder = orderMap[normalizeKey_(a && a.sheetType)] !== undefined ? orderMap[normalizeKey_(a.sheetType)] : 999;
+    const bOrder = orderMap[normalizeKey_(b && b.sheetType)] !== undefined ? orderMap[normalizeKey_(b.sheetType)] : 999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return String(a && a.sheetType || "").localeCompare(String(b && b.sheetType || ""));
+  });
+}
+
+function getDefaultBehavior_() {
+  return {
+    usesTitleRows: true,
+    usesFilter: true,
+    usesAlternatingColors: true,
+    usesSubheaders: false,
+    hiddenTemplate: true
+  };
+}
+
+
+// ----------------------------------------------------------------------------
+// Dashboard config loaders and parsers
+// ----------------------------------------------------------------------------
+
+function loadDashboardConfig_(forceRefresh) {
+  const cacheKey = getDashboardConfigCacheKey_();
+
+
+  if (!forceRefresh && RFF_DASHBOARD_CONFIG_CACHE_ && RFF_DASHBOARD_CONFIG_CACHE_KEY_ === cacheKey) {
+    return RFF_DASHBOARD_CONFIG_CACHE_;
+  }
+
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+
+
+  if (!sheet) {
+    throw new Error("Format Dashboard is missing. Run Setup / Refresh Dashboard first.");
+  }
+
+
+  const dashboardIndex = buildDashboardSectionIndex_(sheet);
+  const globals = loadGlobalSettings_(dashboardIndex);
+  const titleRows = loadTitleRows_(dashboardIndex, globals);
+  const sheetDefinitions = loadSheetDefinitions_(dashboardIndex);
+  const sheetHeaders = loadSheetHeaders_(dashboardIndex);
+  const columnDefinitions = loadColumnDefinitions_(dashboardIndex);
+  const behaviors = loadSheetBehaviors_(dashboardIndex);
+
+
+  const dashboard = {
+    globals: globals,
+    titleRows: titleRows,
+    sheetDefinitions: sheetDefinitions,
+    sheetHeaders: sheetHeaders,
+    columnDefinitions: columnDefinitions,
+    behaviors: behaviors,
+    sectionIndex: dashboardIndex
+  };
+
+
+  RFF_DASHBOARD_CONFIG_CACHE_ = dashboard;
+  RFF_DASHBOARD_CONFIG_CACHE_KEY_ = cacheKey;
+
+
+  return dashboard;
+}
+
+function buildDashboardSectionIndex_(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastCol = Math.max(1, Math.min(Math.max(sheet.getLastColumn(), 1), RFF_DASHBOARD_CONFIG_MAX_READ_COLS));
+  const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const starts = {};
+
+
+  for (let i = 0; i < values.length; i++) {
+    const section = normalizeDashboardSectionTitle_(values[i][0]);
+    if (section.indexOf("SECTION ") === 0) {
+      starts[section] = i;
+    }
+  }
+
+
+  return {
+    sheet: sheet,
+    values: values,
+    starts: starts
+  };
+}
+
+function loadGlobalSettings_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_GLOBAL);
+  const settings = {};
+
+
+  rows.forEach(function(row) {
+    const key = String(row[0] || "").trim();
+    if (!key) return;
+    settings[key] = row[1];
+  });
+
+
+  return {
+    headerRow: numberOrDefault_(settings["Header Row"], RFF_DEFAULTS.headerRow),
+    dataStartRow: numberOrDefault_(settings["Data Start Row"], RFF_DEFAULTS.dataStartRow),
+    freezeRows: numberOrDefault_(settings["Freeze Rows"], RFF_DEFAULTS.freezeRows),
+    freezeColumns: numberOrDefault_(settings["Freeze Columns"], RFF_DEFAULTS.freezeColumns),
+    row1Height: numberOrDefault_(settings["Row 1 Height"], RFF_DEFAULTS.row1Height),
+    row2Height: numberOrDefault_(settings["Row 2 Height"], RFF_DEFAULTS.row2Height),
+    row3Height: numberOrDefault_(settings["Row 3 Height"], RFF_DEFAULTS.row3Height),
+    headerRowHeight: numberOrDefault_(settings["Header Row Height"], RFF_DEFAULTS.headerRowHeight),
+    dataRowHeight: numberOrDefault_(settings["Default Data Row Height"], RFF_DEFAULTS.dataRowHeight),
+    defaultDateFormat: String(settings["Default Date Format"] || RFF_DEFAULTS.defaultDateFormat),
+    standardFont: String(settings["Standard Font"] || RFF_DEFAULTS.standardFont),
+    standardFontSize: numberOrDefault_(settings["Standard Font Size"], RFF_DEFAULTS.standardFontSize),
+    standardFontColor: String(settings["Standard Font Color"] || RFF_DEFAULTS.standardFontColor),
+    titleFontSize: numberOrDefault_(settings["Title Font Size"], RFF_DEFAULTS.titleFontSize),
+    titleInfoFontSize: numberOrDefault_(settings["Title Info Font Size"], RFF_DEFAULTS.titleInfoFontSize),
+    defaultColumnWidth: numberOrDefault_(settings["Default Column Width"], RFF_DEFAULTS.defaultColumnWidth),
+    defaultNumberFormat: String(settings["Default Number Format"] || RFF_DEFAULTS.defaultNumberFormat),
+    defaultTextFormat: String(settings["Default Text Format"] || RFF_DEFAULTS.defaultTextFormat),
+    defaultDataWrap: String(settings["Default Data Wrap"] || RFF_DEFAULTS.defaultDataWrap).trim().toUpperCase(),
+    defaultHorizontalAlignment: String(settings["Default Horizontal Alignment"] || RFF_DEFAULTS.defaultHorizontalAlignment).trim().toLowerCase(),
+    defaultVerticalAlignment: String(settings["Default Vertical Alignment"] || RFF_DEFAULTS.defaultVerticalAlignment).trim().toLowerCase(),
+    templateVersion: String(settings["Template Version"] || RFF_DEFAULTS.templateVersion)
+  };
+}
+
+function loadTitleRows_(sheet, globals) {
+  let rows = [];
+  try {
+    rows = readDashboardSectionRows_(sheet, RFF_SECTION_TITLE_ROWS);
+  } catch (err) {
+    rows = getDefaultTitleRowRows_();
+  }
+
+  const defaultsByRow = {};
+  getDefaultTitleRowRows_().forEach(function(row) {
+    defaultsByRow[numberOrDefault_(row[1], 0)] = parseTitleRowConfigRow_(row, globals, null);
+  });
+
+  const titleRowsBySheetType = {};
+
+  rows.forEach(function(row) {
+    const rowNumber = numberOrDefault_(row[1], 0);
+    if (!rowNumber) return;
+    const sheetTypeRaw = String(row[0] || "GLOBAL").trim() || "GLOBAL";
+    const sheetType = sheetTypeRaw.toUpperCase() === "GLOBAL" ? "GLOBAL" : normalizeDashboardSheetTypeKey_(sheetTypeRaw);
+    const base = defaultsByRow[rowNumber] || {};
+    if (!titleRowsBySheetType[sheetType]) titleRowsBySheetType[sheetType] = {};
+    titleRowsBySheetType[sheetType][rowNumber] = parseTitleRowConfigRow_(row, globals, base);
+  });
+
+  titleRowsBySheetType.GLOBAL = titleRowsBySheetType.GLOBAL || {};
+  Object.keys(defaultsByRow).forEach(function(rowNumber) {
+    if (!titleRowsBySheetType.GLOBAL[rowNumber]) {
+      titleRowsBySheetType.GLOBAL[rowNumber] = defaultsByRow[rowNumber];
+    }
+  });
+
+  return titleRowsBySheetType;
+}
+
+function parseTitleRowConfigRow_(row, globals, base) {
+  row = row || [];
+  base = base || {};
+  const rowNumber = numberOrDefault_(row[1], base.row || 0);
+  const fillLevel = String(row[9] || base.fillLevel || "").trim() || "Level 1";
+  const fontWeight = String(row[8] || base.fontWeight || "").trim() || "Normal";
+  const alignment = String(row[10] || base.alignment || globals.defaultHorizontalAlignment || RFF_DEFAULTS.defaultHorizontalAlignment).trim().toLowerCase();
+  const wrap = String(row[11] || base.wrap || globals.defaultDataWrap || RFF_DEFAULTS.defaultDataWrap).trim().toUpperCase();
+
+  return {
+    sheetType: String(row[0] || base.sheetType || "GLOBAL").trim() || "GLOBAL",
+    row: rowNumber,
+    purpose: String(row[2] || base.purpose || "").trim(),
+    valueSource: String(row[3] || base.valueSource || "").trim(),
+    label: String(row[4] === "" || row[4] === null || row[4] === undefined ? (base.label || "") : row[4]).trim(),
+    targetCell: String(row[5] || base.targetCell || ("Row " + rowNumber)).trim(),
+    height: numberOrDefault_(row[6], base.height || RFF_DEFAULTS.dataRowHeight),
+    fontSize: numberOrDefault_(row[7], base.fontSize || globals.standardFontSize || RFF_DEFAULTS.standardFontSize),
+    fontWeight: fontWeight.toLowerCase() === "bold" ? "bold" : "normal",
+    fillLevel: fillLevel,
+    alignment: alignment,
+    wrap: wrap,
+    notes: String(row[12] || base.notes || "").trim()
+  };
+}
+
+function getTitleRowConfigForSheet_(dashboard, sheetDef, rowNumber) {
+  const allTitleRows = (dashboard && dashboard.titleRows) || {};
+  const sheetType = sheetDef ? normalizeDashboardSheetTypeKey_(sheetDef.sheetType) : "";
+  const sheetRows = allTitleRows[sheetType] || {};
+  const globalRows = allTitleRows.GLOBAL || {};
+  return sheetRows[rowNumber] || globalRows[rowNumber] || parseTitleRowConfigRow_(getDefaultTitleRowRows_()[Math.max(rowNumber - 1, 0)] || [], dashboard.globals || {}, null);
+}
+
+function getThemeFillForTitleRow_(theme, fillLevel) {
+  const normalized = String(fillLevel || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (normalized === "level3") return theme.level3;
+  if (normalized === "level2") return theme.level2;
+  if (normalized === "level1") return theme.level1;
+  return theme.level1;
+}
+
+function toWrapStrategy_(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "WRAP") return SpreadsheetApp.WrapStrategy.WRAP;
+  if (normalized === "OVERFLOW") return SpreadsheetApp.WrapStrategy.OVERFLOW;
+  return SpreadsheetApp.WrapStrategy.CLIP;
+}
+
+function loadSheetDefinitions_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_SHEETS);
+  return rows
+    .filter(function(row) {
+      return String(row[0] || "").trim();
+    })
+    .map(function(row) {
+      const hasTemplateColumnCount = !isBlankCell_(row[8]) && !isNaN(Number(row[8]));
+      const offset = hasTemplateColumnCount ? 1 : 0;
+      return {
+        sheetType: normalizeDashboardSheetTypeKey_(row[0]),
+        reportTitle: String(row[1] || row[0] || "").trim(),
+        templateName: String(row[2] || ("Template - " + row[0])).trim(),
+        outputNamingPattern: String(row[3] || "").trim(),
+        baseColor: normalizeHex_(row[4] || "#65A9CC"),
+        usePromptDate: parseBoolean_(row[5]),
+        endDateSource: String(row[6] || "").trim(),
+        templateRowCount: numberOrDefault_(row[7], RFF_DEFAULTS.templateRows),
+        templateColumnCount: hasTemplateColumnCount ? numberOrDefault_(row[8], 0) : 0,
+        templateRowMode: String(row[8 + offset] || "FIXED").trim().toUpperCase(),
+        minimumRows: numberOrDefault_(row[9 + offset], numberOrDefault_(row[7], RFF_DEFAULTS.templateRows)),
+        bufferRows: numberOrDefault_(row[10 + offset], 100),
+        testRows: numberOrDefault_(row[11 + offset], 100),
+        useTestRows: parseBoolean_(row[12 + offset])
+      };
+    });
+}
+
+function loadSheetHeaders_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_HEADERS);
+  const map = {};
+
+
+  rows.forEach(function(row) {
+    const sheetType = normalizeDashboardSheetTypeKey_(row[0]);
+    const order = numberOrDefault_(row[1], 9999);
+    const header = normalizeHeader_(row[2]);
+    const source = String(row[3] || "").trim();
+
+
+    if (!sheetType || !header) return;
+    if (!map[sheetType]) map[sheetType] = [];
+
+
+    map[sheetType].push({
+      order: order,
+      header: header,
+      source: source
+    });
+  });
+
+
+  Object.keys(map).forEach(function(sheetType) {
+    map[sheetType].sort(function(a, b) {
+      return a.order - b.order;
+    });
+  });
+
+
+  return map;
+}
+
+function loadColumnDefinitions_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_COLUMNS);
+  const map = {};
+
+
+  rows.forEach(function(row) {
+    const header = normalizeHeader_(row[0]);
+    if (!header) return;
+
+
+    map[header] = {
+      header: header,
+      width: isBlankCell_(row[1]) ? null : numberOrDefault_(row[1], null),
+      headerFontSize: isBlankCell_(row[2]) ? null : numberOrDefault_(row[2], null),
+      dateColumn: parseBoolean_(row[3]),
+      hideColumn: parseBoolean_(row[4]),
+      dataWrap: String(row[5] || "").trim().toUpperCase(),
+      horizontalAlignment: String(row[6] || "").trim().toLowerCase(),
+      verticalAlignment: String(row[7] || "").trim().toLowerCase(),
+      numberFormat: String(row[8] || "").trim()
+    };
+  });
+
+
+  return map;
+}
+
+function loadSheetBehaviors_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_BEHAVIORS);
+  const map = {};
+
+
+  rows.forEach(function(row) {
+    const sheetType = normalizeDashboardSheetTypeKey_(row[0]);
+    if (!sheetType) return;
+
+
+    map[sheetType] = {
+      usesTitleRows: parseBoolean_(row[1]),
+      usesFilter: parseBoolean_(row[2]),
+      usesAlternatingColors: parseBoolean_(row[3]),
+      usesSubheaders: parseBoolean_(row[4]),
+      hiddenTemplate: parseBoolean_(row[5])
+    };
+  });
+
+
+  return map;
+}
+
+function normalizeDashboardSectionTitle_(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/–|—/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function readDashboardSectionRows_(source, sectionName) {
+  const index = source && source.values ? source : buildDashboardSectionIndex_(source);
+  const values = index.values || [];
+  const targetSection = normalizeDashboardSectionTitle_(sectionName);
+  let sectionRow = Object.prototype.hasOwnProperty.call(index.starts || {}, targetSection) ? index.starts[targetSection] : -1;
+
+
+  if (sectionRow === -1) {
+    throw new Error("Dashboard section missing: " + sectionName);
+  }
+
+
+  const output = [];
+
+
+  for (let r = sectionRow + 2; r < values.length; r++) {
+    const firstCell = String(values[r][0] || "").trim();
+    const firstCellSection = normalizeDashboardSectionTitle_(firstCell);
+
+
+    if (firstCellSection.indexOf("SECTION ") === 0) break;
+
+
+    const rowValues = values[r];
+    const hasAnyValue = rowValues.some(function(value) {
+      return String(value === null || value === undefined ? "" : value).trim() !== "";
+    });
+
+
+    if (!hasAnyValue) {
+      const nextFirst = r + 1 < values.length ? String(values[r + 1][0] || "").trim() : "";
+      const nextFirstSection = normalizeDashboardSectionTitle_(nextFirst);
+      if (nextFirstSection.indexOf("SECTION ") === 0 || nextFirst === "") break;
+      continue;
+    }
+
+
+    output.push(rowValues);
+  }
+
+
+  return output;
+}
+
+function getBehaviorForSheetType_(dashboard, sheetType) {
+  const normalized = normalizeDashboardSheetTypeKey_(sheetType);
+  const behaviors = dashboard && dashboard.behaviors ? dashboard.behaviors : {};
+  return behaviors[normalized] || behaviors[sheetType] || getDefaultBehavior_();
+}
+

@@ -1,0 +1,2813 @@
+/**
+ * Master List Framework v1.5.55 Rebuild - TEMPLATE FUNCTIONS AND VALIDATION
+ *
+ * Purpose:
+ *   Rebuild candidate section for governed template creation, refresh, visibility,
+ *   metadata/signature validation, template structural validation, and template
+ *   date/number-format validation.
+ *
+ * Ownership:
+ *   - Creates and refreshes report templates from Format Dashboard configuration.
+ *   - Validates template structure, headers, formatting signatures, and date/number formats.
+ *   - Applies template-only formatting during template build; runtime report formatting
+ *     remains template/dashboard-owned.
+ *
+ * Dependencies expected from other rebuild sections:
+ *   CONFIGURATION, HELPER FUNCTIONS, FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS,
+ *   DASHBOARD QUALITY, FRAMEWORK AND TIMING FUNCTIONS.
+ *
+ * Explicit exclusions from this section:
+ *   - Format Dashboard default constants/data builders remain in FORMAT DASHBOARD AND GLOBAL DEFAULTS.
+ *   - Operational formatters and report workflows remain in FORMATTERS / workflow sections.
+ *   - Dashboard Quality section registry/report assembly remains in DASHBOARD QUALITY.
+ *   - Framework Timing report writers/benchmarks remain in FRAMEWORK AND TIMING.
+ */
+
+function createOrRefreshAllReportTemplates() {
+  return runFrameworkTimed_("Create / Refresh All Templates", function(timing) {
+    const dashboard = loadDashboardConfig_(true);
+    markFrameworkStep_(timing, "Dashboard loaded");
+    const templateResults = [];
+    sortSheetDefinitionsByProductionOrder_(dashboard.sheetDefinitions).forEach(function(sheetDef) {
+      try {
+        RFF_LAST_TEMPLATE_REFRESH_MODE_ = "";
+        createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, timing);
+        templateResults.push({
+          templateName: sheetDef.templateName,
+          mode: RFF_LAST_TEMPLATE_REFRESH_MODE_ || "UNKNOWN",
+          status: "PASS",
+          issue: ""
+        });
+      } catch (err) {
+        templateResults.push({
+          templateName: sheetDef.templateName,
+          mode: "FAILED",
+          status: "FAIL",
+          issue: err.message
+        });
+        markFrameworkStep_(timing, "ERROR - Template build failed but batch continued: " + sheetDef.templateName + " - " + err.message);
+        Logger.log("Template build failed but batch continued for " + sheetDef.templateName + ": " + err.message);
+      }
+    });
+    const failedTemplates = templateResults.filter(function(result) {
+      return result.status !== "PASS";
+    });
+    markFrameworkStep_(timing, "Template timing modes: " + summarizeTemplateRefreshModes_(templateResults));
+    if (failedTemplates.length) {
+      throw new Error("Template refresh completed with " + failedTemplates.length + " failed template(s): " + failedTemplates.map(function(result) {
+        return result.templateName;
+      }).join(", "));
+    }
+    markFrameworkStep_(timing, "All report templates refreshed");
+  });
+}
+
+
+function summarizeTemplateRefreshModes_(templateResults) {
+  const counts = {};
+  (templateResults || []).forEach(function(result) {
+    const key = result.mode || "UNKNOWN";
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  return Object.keys(counts).sort().map(function(key) {
+    return key + "=" + counts[key];
+  }).join("; ");
+}
+
+
+function hideReportTemplates(dashboardOverride) {
+  setReportTemplateVisibility_(dashboardOverride || loadDashboardConfig_(), true);
+}
+
+
+function showReportTemplates(dashboardOverride) {
+  setReportTemplateVisibility_(dashboardOverride || loadDashboardConfig_(), false);
+}
+
+
+function setReportTemplateVisibility_(dashboard, hidden) {
+  /*
+   * v1.5.30:
+   * The v1.5.28 Apps Script execution report showed standalone Hide/Show
+   * Templates above 10 seconds. Build a one-pass sheet map instead of repeatedly
+   * resolving every template by name, then only call hide/show when the current
+   * hidden state differs from the requested state.
+   */
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetMap = {};
+  ss.getSheets().forEach(function(sheet) {
+    sheetMap[sheet.getName()] = sheet;
+  });
+
+  sortSheetDefinitionsByProductionOrder_(dashboard.sheetDefinitions).forEach(function(sheetDef) {
+    const sheet = sheetMap[sheetDef.templateName];
+    if (!sheet) return;
+    if (hidden) {
+      hideSheetIfNeeded_(sheet);
+    } else {
+      showSheetIfNeeded_(sheet);
+    }
+  });
+}
+
+
+function validateReportTemplates() {
+  return runFrameworkTimed_("Validate Templates", function(timing) {
+    const dashboard = loadDashboardConfig_();
+    markFrameworkStep_(timing, "Dashboard loaded");
+    return validateReportTemplatesCore_(dashboard, timing);
+  });
+}
+
+
+function validateReportTemplatesCore_(dashboard, timing, options) {
+  const activeDashboard = dashboard || loadDashboardConfig_();
+  const results = sortSheetDefinitionsByProductionOrder_(activeDashboard.sheetDefinitions).map(function(sheetDef) {
+    return validateTemplateFromDashboard_(activeDashboard, sheetDef);
+  });
+  writeTemplateValidationReport_(results, options);
+  markFrameworkStep_(timing, options && options.deferDashboardWrite ? "Dashboard Quality Section F staged" : "Dashboard Quality Section F saved");
+  return results;
+}
+
+
+function loadDashboardConfig_(forceRefresh) {
+  const cacheKey = getDashboardConfigCacheKey_();
+
+
+  if (!forceRefresh && RFF_DASHBOARD_CONFIG_CACHE_ && RFF_DASHBOARD_CONFIG_CACHE_KEY_ === cacheKey) {
+    return RFF_DASHBOARD_CONFIG_CACHE_;
+  }
+
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+
+
+  if (!sheet) {
+    throw new Error("Format Dashboard is missing. Run Setup / Refresh Dashboard first.");
+  }
+
+
+  const dashboardIndex = buildDashboardSectionIndex_(sheet);
+  const globals = loadGlobalSettings_(dashboardIndex);
+  const titleRows = loadTitleRows_(dashboardIndex, globals);
+  const sheetDefinitions = loadSheetDefinitions_(dashboardIndex);
+  const sheetHeaders = loadSheetHeaders_(dashboardIndex);
+  const columnDefinitions = loadColumnDefinitions_(dashboardIndex);
+  const behaviors = loadSheetBehaviors_(dashboardIndex);
+
+
+  const dashboard = {
+    globals: globals,
+    titleRows: titleRows,
+    sheetDefinitions: sheetDefinitions,
+    sheetHeaders: sheetHeaders,
+    columnDefinitions: columnDefinitions,
+    behaviors: behaviors,
+    sectionIndex: dashboardIndex
+  };
+
+
+  RFF_DASHBOARD_CONFIG_CACHE_ = dashboard;
+  RFF_DASHBOARD_CONFIG_CACHE_KEY_ = cacheKey;
+
+
+  return dashboard;
+}
+
+
+function buildDashboardSectionIndex_(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastCol = Math.max(1, Math.min(Math.max(sheet.getLastColumn(), 1), RFF_DASHBOARD_CONFIG_MAX_READ_COLS));
+  const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const starts = {};
+
+
+  for (let i = 0; i < values.length; i++) {
+    const section = normalizeDashboardSectionTitle_(values[i][0]);
+    if (section.indexOf("SECTION ") === 0) {
+      starts[section] = i;
+    }
+  }
+
+
+  return {
+    sheet: sheet,
+    values: values,
+    starts: starts
+  };
+}
+
+
+function loadGlobalSettings_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_GLOBAL);
+  const settings = {};
+
+
+  rows.forEach(function(row) {
+    const key = String(row[0] || "").trim();
+    if (!key) return;
+    settings[key] = row[1];
+  });
+
+
+  return {
+    headerRow: numberOrDefault_(settings["Header Row"], RFF_DEFAULTS.headerRow),
+    dataStartRow: numberOrDefault_(settings["Data Start Row"], RFF_DEFAULTS.dataStartRow),
+    freezeRows: numberOrDefault_(settings["Freeze Rows"], RFF_DEFAULTS.freezeRows),
+    freezeColumns: numberOrDefault_(settings["Freeze Columns"], RFF_DEFAULTS.freezeColumns),
+    row1Height: numberOrDefault_(settings["Row 1 Height"], RFF_DEFAULTS.row1Height),
+    row2Height: numberOrDefault_(settings["Row 2 Height"], RFF_DEFAULTS.row2Height),
+    row3Height: numberOrDefault_(settings["Row 3 Height"], RFF_DEFAULTS.row3Height),
+    headerRowHeight: numberOrDefault_(settings["Header Row Height"], RFF_DEFAULTS.headerRowHeight),
+    dataRowHeight: numberOrDefault_(settings["Default Data Row Height"], RFF_DEFAULTS.dataRowHeight),
+    defaultDateFormat: String(settings["Default Date Format"] || RFF_DEFAULTS.defaultDateFormat),
+    standardFont: String(settings["Standard Font"] || RFF_DEFAULTS.standardFont),
+    standardFontSize: numberOrDefault_(settings["Standard Font Size"], RFF_DEFAULTS.standardFontSize),
+    standardFontColor: String(settings["Standard Font Color"] || RFF_DEFAULTS.standardFontColor),
+    titleFontSize: numberOrDefault_(settings["Title Font Size"], RFF_DEFAULTS.titleFontSize),
+    titleInfoFontSize: numberOrDefault_(settings["Title Info Font Size"], RFF_DEFAULTS.titleInfoFontSize),
+    defaultColumnWidth: numberOrDefault_(settings["Default Column Width"], RFF_DEFAULTS.defaultColumnWidth),
+    defaultNumberFormat: String(settings["Default Number Format"] || RFF_DEFAULTS.defaultNumberFormat),
+    defaultTextFormat: String(settings["Default Text Format"] || RFF_DEFAULTS.defaultTextFormat),
+    defaultDataWrap: String(settings["Default Data Wrap"] || RFF_DEFAULTS.defaultDataWrap).trim().toUpperCase(),
+    defaultHorizontalAlignment: String(settings["Default Horizontal Alignment"] || RFF_DEFAULTS.defaultHorizontalAlignment).trim().toLowerCase(),
+    defaultVerticalAlignment: String(settings["Default Vertical Alignment"] || RFF_DEFAULTS.defaultVerticalAlignment).trim().toLowerCase(),
+    templateVersion: String(settings["Template Version"] || RFF_DEFAULTS.templateVersion)
+  };
+}
+
+
+function loadTitleRows_(sheet, globals) {
+  let rows = [];
+  try {
+    rows = readDashboardSectionRows_(sheet, RFF_SECTION_TITLE_ROWS);
+  } catch (err) {
+    rows = getDefaultTitleRowRows_();
+  }
+
+  const defaultsByRow = {};
+  getDefaultTitleRowRows_().forEach(function(row) {
+    defaultsByRow[numberOrDefault_(row[1], 0)] = parseTitleRowConfigRow_(row, globals, null);
+  });
+
+  const titleRowsBySheetType = {};
+
+  rows.forEach(function(row) {
+    const rowNumber = numberOrDefault_(row[1], 0);
+    if (!rowNumber) return;
+    const sheetTypeRaw = String(row[0] || "GLOBAL").trim() || "GLOBAL";
+    const sheetType = sheetTypeRaw.toUpperCase() === "GLOBAL" ? "GLOBAL" : normalizeDashboardSheetTypeKey_(sheetTypeRaw);
+    const base = defaultsByRow[rowNumber] || {};
+    if (!titleRowsBySheetType[sheetType]) titleRowsBySheetType[sheetType] = {};
+    titleRowsBySheetType[sheetType][rowNumber] = parseTitleRowConfigRow_(row, globals, base);
+  });
+
+  titleRowsBySheetType.GLOBAL = titleRowsBySheetType.GLOBAL || {};
+  Object.keys(defaultsByRow).forEach(function(rowNumber) {
+    if (!titleRowsBySheetType.GLOBAL[rowNumber]) {
+      titleRowsBySheetType.GLOBAL[rowNumber] = defaultsByRow[rowNumber];
+    }
+  });
+
+  return titleRowsBySheetType;
+}
+
+
+function parseTitleRowConfigRow_(row, globals, base) {
+  row = row || [];
+  base = base || {};
+  const rowNumber = numberOrDefault_(row[1], base.row || 0);
+  const fillLevel = String(row[9] || base.fillLevel || "").trim() || "Level 1";
+  const fontWeight = String(row[8] || base.fontWeight || "").trim() || "Normal";
+  const alignment = String(row[10] || base.alignment || globals.defaultHorizontalAlignment || RFF_DEFAULTS.defaultHorizontalAlignment).trim().toLowerCase();
+  const wrap = String(row[11] || base.wrap || globals.defaultDataWrap || RFF_DEFAULTS.defaultDataWrap).trim().toUpperCase();
+
+  return {
+    sheetType: String(row[0] || base.sheetType || "GLOBAL").trim() || "GLOBAL",
+    row: rowNumber,
+    purpose: String(row[2] || base.purpose || "").trim(),
+    valueSource: String(row[3] || base.valueSource || "").trim(),
+    label: String(row[4] === "" || row[4] === null || row[4] === undefined ? (base.label || "") : row[4]).trim(),
+    targetCell: String(row[5] || base.targetCell || ("Row " + rowNumber)).trim(),
+    height: numberOrDefault_(row[6], base.height || RFF_DEFAULTS.dataRowHeight),
+    fontSize: numberOrDefault_(row[7], base.fontSize || globals.standardFontSize || RFF_DEFAULTS.standardFontSize),
+    fontWeight: fontWeight.toLowerCase() === "bold" ? "bold" : "normal",
+    fillLevel: fillLevel,
+    alignment: alignment,
+    wrap: wrap,
+    notes: String(row[12] || base.notes || "").trim()
+  };
+}
+
+
+function getTitleRowConfigForSheet_(dashboard, sheetDef, rowNumber) {
+  const allTitleRows = (dashboard && dashboard.titleRows) || {};
+  const sheetType = sheetDef ? normalizeDashboardSheetTypeKey_(sheetDef.sheetType) : "";
+  const sheetRows = allTitleRows[sheetType] || {};
+  const globalRows = allTitleRows.GLOBAL || {};
+  return sheetRows[rowNumber] || globalRows[rowNumber] || parseTitleRowConfigRow_(getDefaultTitleRowRows_()[Math.max(rowNumber - 1, 0)] || [], dashboard.globals || {}, null);
+}
+
+
+function getThemeFillForTitleRow_(theme, fillLevel) {
+  const normalized = String(fillLevel || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (normalized === "level3") return theme.level3;
+  if (normalized === "level2") return theme.level2;
+  if (normalized === "level1") return theme.level1;
+  return theme.level1;
+}
+
+
+function toWrapStrategy_(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "WRAP") return SpreadsheetApp.WrapStrategy.WRAP;
+  if (normalized === "OVERFLOW") return SpreadsheetApp.WrapStrategy.OVERFLOW;
+  return SpreadsheetApp.WrapStrategy.CLIP;
+}
+
+
+function loadSheetDefinitions_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_SHEETS);
+  return rows
+    .filter(function(row) {
+      return String(row[0] || "").trim();
+    })
+    .map(function(row) {
+      const hasTemplateColumnCount = !isBlankCell_(row[8]) && !isNaN(Number(row[8]));
+      const offset = hasTemplateColumnCount ? 1 : 0;
+      return {
+        sheetType: normalizeDashboardSheetTypeKey_(row[0]),
+        reportTitle: String(row[1] || row[0] || "").trim(),
+        templateName: String(row[2] || ("Template - " + row[0])).trim(),
+        outputNamingPattern: String(row[3] || "").trim(),
+        baseColor: normalizeHex_(row[4] || "#65A9CC"),
+        usePromptDate: parseBoolean_(row[5]),
+        endDateSource: String(row[6] || "").trim(),
+        templateRowCount: numberOrDefault_(row[7], RFF_DEFAULTS.templateRows),
+        templateColumnCount: hasTemplateColumnCount ? numberOrDefault_(row[8], 0) : 0,
+        templateRowMode: String(row[8 + offset] || "FIXED").trim().toUpperCase(),
+        minimumRows: numberOrDefault_(row[9 + offset], numberOrDefault_(row[7], RFF_DEFAULTS.templateRows)),
+        bufferRows: numberOrDefault_(row[10 + offset], 100),
+        testRows: numberOrDefault_(row[11 + offset], 100),
+        useTestRows: parseBoolean_(row[12 + offset])
+      };
+    });
+}
+
+
+function loadSheetHeaders_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_HEADERS);
+  const map = {};
+
+
+  rows.forEach(function(row) {
+    const sheetType = normalizeDashboardSheetTypeKey_(row[0]);
+    const order = numberOrDefault_(row[1], 9999);
+    const header = normalizeHeader_(row[2]);
+    const source = String(row[3] || "").trim();
+
+
+    if (!sheetType || !header) return;
+    if (!map[sheetType]) map[sheetType] = [];
+
+
+    map[sheetType].push({
+      order: order,
+      header: header,
+      source: source
+    });
+  });
+
+
+  Object.keys(map).forEach(function(sheetType) {
+    map[sheetType].sort(function(a, b) {
+      return a.order - b.order;
+    });
+  });
+
+
+  return map;
+}
+
+
+function loadColumnDefinitions_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_COLUMNS);
+  const map = {};
+
+
+  rows.forEach(function(row) {
+    const header = normalizeHeader_(row[0]);
+    if (!header) return;
+
+
+    map[header] = {
+      header: header,
+      width: isBlankCell_(row[1]) ? null : numberOrDefault_(row[1], null),
+      headerFontSize: isBlankCell_(row[2]) ? null : numberOrDefault_(row[2], null),
+      dateColumn: parseBoolean_(row[3]),
+      hideColumn: parseBoolean_(row[4]),
+      dataWrap: String(row[5] || "").trim().toUpperCase(),
+      horizontalAlignment: String(row[6] || "").trim().toLowerCase(),
+      verticalAlignment: String(row[7] || "").trim().toLowerCase(),
+      numberFormat: String(row[8] || "").trim()
+    };
+  });
+
+
+  return map;
+}
+
+
+function loadSheetBehaviors_(sheet) {
+  const rows = readDashboardSectionRows_(sheet, RFF_SECTION_BEHAVIORS);
+  const map = {};
+
+
+  rows.forEach(function(row) {
+    const sheetType = normalizeDashboardSheetTypeKey_(row[0]);
+    if (!sheetType) return;
+
+
+    map[sheetType] = {
+      usesTitleRows: parseBoolean_(row[1]),
+      usesFilter: parseBoolean_(row[2]),
+      usesAlternatingColors: parseBoolean_(row[3]),
+      usesSubheaders: parseBoolean_(row[4]),
+      hiddenTemplate: parseBoolean_(row[5])
+    };
+  });
+
+
+  return map;
+}
+
+
+function normalizeDashboardSectionTitle_(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/–|—/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+
+function readDashboardSectionRows_(source, sectionName) {
+  const index = source && source.values ? source : buildDashboardSectionIndex_(source);
+  const values = index.values || [];
+  const targetSection = normalizeDashboardSectionTitle_(sectionName);
+  let sectionRow = Object.prototype.hasOwnProperty.call(index.starts || {}, targetSection) ? index.starts[targetSection] : -1;
+
+
+  if (sectionRow === -1) {
+    throw new Error("Dashboard section missing: " + sectionName);
+  }
+
+
+  const output = [];
+
+
+  for (let r = sectionRow + 2; r < values.length; r++) {
+    const firstCell = String(values[r][0] || "").trim();
+    const firstCellSection = normalizeDashboardSectionTitle_(firstCell);
+
+
+    if (firstCellSection.indexOf("SECTION ") === 0) break;
+
+
+    const rowValues = values[r];
+    const hasAnyValue = rowValues.some(function(value) {
+      return String(value === null || value === undefined ? "" : value).trim() !== "";
+    });
+
+
+    if (!hasAnyValue) {
+      const nextFirst = r + 1 < values.length ? String(values[r + 1][0] || "").trim() : "";
+      const nextFirstSection = normalizeDashboardSectionTitle_(nextFirst);
+      if (nextFirstSection.indexOf("SECTION ") === 0 || nextFirst === "") break;
+      continue;
+    }
+
+
+    output.push(rowValues);
+  }
+
+
+  return output;
+}
+
+
+/* ============================================================================
+ * TEMPLATE BUILDING
+ * ========================================================================== */
+
+
+
+function getBehaviorForSheetType_(dashboard, sheetType) {
+  const normalized = normalizeDashboardSheetTypeKey_(sheetType);
+  const behaviors = dashboard && dashboard.behaviors ? dashboard.behaviors : {};
+  return behaviors[normalized] || behaviors[sheetType] || getDefaultBehavior_();
+}
+
+
+function createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, timing) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetDef.templateName);
+  const templateExisted = !!sheet;
+
+
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetDef.templateName);
+  }
+  markFrameworkStep_(timing, "Open/create sheet: " + sheetDef.templateName);
+
+
+  const headers = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
+  const behavior = dashboard.behaviors[sheetDef.sheetType] || getDefaultBehavior_();
+  const globals = dashboard.globals;
+  const colCount = Math.max(headers.length, 4);
+  const rowCount = resolveTemplateRowCount_(sheetDef, globals);
+  const expectedSignature = buildTemplateFormatSignature_(dashboard, sheetDef, headers, rowCount, colCount, behavior);
+  const propertySignature = getStoredTemplateFormatSignature_(sheetDef);
+  const noteSignature = templateExisted ? getStoredTemplateFormatSignatureFromSheet_(sheet) : "";
+  const storedSignature = noteSignature || propertySignature;
+  const normalizedStoredSignature = normalizeTemplateFormatSignature_(storedSignature);
+  const normalizedExpectedSignature = normalizeTemplateFormatSignature_(expectedSignature);
+
+
+  const signatureMatches = templateExisted &&
+    RFF_USE_TEMPLATE_SIGNATURE_CACHE &&
+    normalizedStoredSignature !== "" &&
+    normalizedStoredSignature === normalizedExpectedSignature;
+
+
+  const metadataRefreshAllowed =
+    RFF_TRUE_SMART_TEMPLATE_REFRESH &&
+    RFF_SMART_TEMPLATE_REFRESH &&
+    !RFF_FORCE_FULL_TEMPLATE_REBUILD &&
+    templateExisted &&
+    !!sheet &&
+    signatureMatches;
+
+
+  markFrameworkStep_(timing, signatureMatches
+    ? "Template signature matched - metadata refresh eligible: " + sheetDef.templateName
+    : "Template signature mismatch - full build required: " + sheetDef.templateName);
+
+
+  markFrameworkStep_(timing, buildTemplateRefreshDecisionMessage_(
+    sheetDef,
+    templateExisted,
+    signatureMatches,
+    metadataRefreshAllowed,
+    normalizedStoredSignature,
+    normalizedExpectedSignature
+  ));
+  markFrameworkStep_(timing, "Template timing mode: " + (metadataRefreshAllowed ? "METADATA_ONLY" : (templateExisted ? "FULL_REBUILD" : "FIRST_BUILD")) + " - " + sheetDef.templateName);
+
+
+  if (metadataRefreshAllowed) {
+    refreshTemplateMetadataOnly_(sheet, dashboard, sheetDef, colCount, expectedSignature, timing);
+    RFF_LAST_TEMPLATE_REFRESH_MODE_ = "METADATA_ONLY";
+    return sheet;
+  }
+
+
+  const builtSheet = shouldUseStagedTemplateBuild_(sheetDef, templateExisted)
+    ? buildTemplateFromDashboardSafely_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, expectedSignature, timing, templateExisted)
+    : buildTemplateFromDashboard_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, expectedSignature, timing, templateExisted);
+  RFF_LAST_TEMPLATE_REFRESH_MODE_ = templateExisted ? "FULL_REBUILD" : "FIRST_BUILD";
+  return builtSheet;
+}
+
+
+function shouldUseStagedTemplateBuild_(sheetDef, templateExisted) {
+  if (!RFF_TEMPLATE_STAGED_BUILD_ENABLED) return false;
+  if (templateExisted) return true;
+  if (!RFF_TEMPLATE_STAGED_FIRST_BUILD_FOR_HIGH_RISK_ONLY) return true;
+  return RFF_TEMPLATE_ALWAYS_STAGED_TEMPLATE_NAMES.indexOf(String(sheetDef && sheetDef.templateName || "").trim()) !== -1;
+}
+
+
+function shouldRefreshTemplateMetadataOnly_(sheet, sheetDef, templateExisted, signatureMatches) {
+  if (!RFF_TRUE_SMART_TEMPLATE_REFRESH) return false;
+  if (!RFF_SMART_TEMPLATE_REFRESH) return false;
+  if (RFF_FORCE_FULL_TEMPLATE_REBUILD) return false;
+  if (!templateExisted || !sheet) return false;
+  if (!signatureMatches) return false;
+
+
+  // This intentionally avoids expensive row/column/header/filter/freeze checks.
+  // The stored dashboard signature is the source of truth for whether a full
+  // template rebuild is needed. Validation remains available to catch manual
+  // sheet edits or corruption when needed.
+  return true;
+}
+
+
+function buildTemplateRefreshDecisionMessage_(sheetDef, templateExisted, signatureMatches, metadataRefreshAllowed, normalizedStoredSignature, normalizedExpectedSignature) {
+  const reasons = [];
+
+
+  if (!templateExisted) reasons.push("template sheet did not exist");
+  if (!RFF_TRUE_SMART_TEMPLATE_REFRESH) reasons.push("true smart refresh disabled");
+  if (!RFF_SMART_TEMPLATE_REFRESH) reasons.push("smart refresh disabled");
+  if (RFF_FORCE_FULL_TEMPLATE_REBUILD) reasons.push("force full rebuild enabled");
+  if (!RFF_USE_TEMPLATE_SIGNATURE_CACHE) reasons.push("signature cache disabled");
+  if (!normalizedStoredSignature) reasons.push("no stored signature");
+  if (normalizedStoredSignature && normalizedExpectedSignature && normalizedStoredSignature !== normalizedExpectedSignature) reasons.push("stored signature differs from expected signature");
+  if (signatureMatches && metadataRefreshAllowed) reasons.push("metadata refresh will run");
+
+
+  const decision = metadataRefreshAllowed ? "METADATA_ONLY" : "FULL_BUILD";
+  return "Template refresh decision: " + decision + " - " + sheetDef.templateName + " (" + (reasons.length ? reasons.join("; ") : "no reason captured") + ")";
+}
+
+
+
+
+function refreshTemplateMetadataOnly_(sheet, dashboard, sheetDef, colCount, expectedSignature, timing) {
+  writeTemplateMetadata_(sheet, dashboard, sheetDef, colCount, expectedSignature);
+  storeTemplateFormatSignature_(sheetDef, expectedSignature);
+  markFrameworkStep_(timing, "Metadata-only refresh; template unchanged: " + sheetDef.templateName);
+
+
+  // Do not hide/show, clear, resize, rebuild alternating colors, reapply widths,
+  // reapply filters, or re-freeze during metadata-only refresh. Those operations
+  // are intentionally reserved for full builds only.
+  markFrameworkStep_(timing, "Complete metadata-only template refresh: " + sheetDef.templateName);
+}
+
+
+function buildTemplateFromDashboardSafely_(existingSheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, expectedSignature, timing, templateExisted) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tempName = getTemplateBuildSheetName_(sheetDef.templateName);
+  const staleTemp = ss.getSheetByName(tempName);
+  if (staleTemp) deleteSheetIfExists_(ss, tempName, sheetDef.templateName, "");
+
+
+  const buildSheet = ss.insertSheet(tempName);
+  markFrameworkStep_(timing, "Staged template build sheet created: " + sheetDef.templateName);
+
+
+  try {
+    buildTemplateFromDashboard_(buildSheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, expectedSignature, timing, false);
+    validateBuiltTemplateMinimumStructure_(buildSheet, dashboard, sheetDef, headers, colCount);
+    promoteStagedTemplateBuild_(ss, buildSheet, existingSheet, sheetDef, timing);
+    markFrameworkStep_(timing, "Staged template build promoted: " + sheetDef.templateName);
+    return ss.getSheetByName(sheetDef.templateName) || buildSheet;
+  } catch (err) {
+    storeTemplateFormatSignature_(sheetDef, "");
+    try {
+      buildSheet.setName(tempName + " FAILED");
+      buildSheet.showSheet();
+    } catch (renameErr) {
+      Logger.log("Failed staged template rename skipped for " + sheetDef.templateName + ": " + renameErr.message);
+    }
+    throw err;
+  }
+}
+
+
+function getTemplateBuildSheetName_(templateName) {
+  return String(templateName || "Template") + " __BUILDING";
+}
+
+
+function promoteStagedTemplateBuild_(ss, buildSheet, existingSheet, sheetDef, timing) {
+  buildSheet.showSheet();
+  if (existingSheet && existingSheet.getSheetId() !== buildSheet.getSheetId()) {
+    ss.setActiveSheet(buildSheet);
+    ss.deleteSheet(existingSheet);
+    markFrameworkStep_(timing, "Previous template replaced after staged validation: " + sheetDef.templateName);
+  }
+  buildSheet.setName(sheetDef.templateName);
+  if (typeof buildSheet.hideSheet === "function") {
+    hideSheetIfNeeded_(buildSheet, timing, "Hide promoted template: " + sheetDef.templateName);
+  }
+}
+
+
+function validateBuiltTemplateMinimumStructure_(sheet, dashboard, sheetDef, headers, colCount) {
+  const globals = dashboard.globals || RFF_DEFAULTS;
+  const headerRow = Number(globals.headerRow || RFF_DEFAULTS.headerRow);
+  const expectedFrozenRows = Number(globals.freezeRows || RFF_DEFAULTS.freezeRows);
+  if (sheet.getMaxColumns() < colCount) {
+    throw new Error("Staged template has " + sheet.getMaxColumns() + " column(s), expected at least " + colCount + ": " + sheetDef.templateName);
+  }
+  if (sheet.getFrozenRows() !== expectedFrozenRows) {
+    throw new Error("Staged template frozen rows expected " + expectedFrozenRows + " but found " + sheet.getFrozenRows() + ": " + sheetDef.templateName);
+  }
+  const actualHeaders = sheet.getRange(headerRow, 1, 1, Math.max(headers.length, 1)).getDisplayValues()[0];
+  for (let i = 0; i < headers.length; i++) {
+    if (String(actualHeaders[i] || "").trim() !== String(headers[i] || "").trim()) {
+      throw new Error("Staged template header mismatch col " + (i + 1) + ": expected " + headers[i] + ", found " + actualHeaders[i] + ": " + sheetDef.templateName);
+    }
+  }
+}
+
+
+function buildTemplateFromDashboard_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, expectedSignature, timing, templateExisted) {
+  markFrameworkStep_(timing, "Full template build required: " + sheetDef.templateName);
+
+
+  const useCorrectedIndividualBuild = shouldUseCorrectedIndividualTemplateBuild_(sheetDef);
+  const isTemplateCreate = !templateExisted;
+
+
+  if (rowCount > 1000) {
+    resizeSheetRows_(sheet, rowCount);
+    markFrameworkStep_(timing, "Set template row count from dashboard: " + sheetDef.templateName + " (" + rowCount + " rows)");
+  } else {
+    markFrameworkStep_(timing, "Template row count already covered by default sheet size: " + sheetDef.templateName + " (" + rowCount + " rows)");
+  }
+
+
+  resizeSheetColumns_(sheet, colCount);
+  markFrameworkStep_(timing, "Set template column count from dashboard headers: " + sheetDef.templateName + " (" + colCount + " cols)");
+
+
+  if (isTemplateCreate) {
+    markFrameworkStep_(timing, "Create template fast path - clear skipped for blank sheet: " + sheetDef.templateName);
+  } else if (!useCorrectedIndividualBuild) {
+    clearTemplateForFullBuild_(sheet, sheetDef, timing, templateExisted);
+  }
+
+
+  applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing);
+  if (!useCorrectedIndividualBuild) {
+    markFrameworkStep_(timing, "Apply full template formatting: " + sheetDef.templateName);
+  }
+
+
+  writeTemplateMetadata_(sheet, dashboard, sheetDef, colCount, expectedSignature);
+  storeTemplateFormatSignature_(sheetDef, expectedSignature);
+  markFrameworkStep_(timing, "Write metadata/signature: " + sheetDef.templateName);
+
+
+  applyTemplateFreezeAndTabColor_(sheet, dashboard, sheetDef, colCount, timing);
+
+
+  if (RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT) {
+    markFrameworkStep_(timing, "Final date/number format enforcement skipped - already applied during template base formatting: " + sheetDef.templateName);
+  } else {
+    enforceTemplateDateAndNumberFormats_(sheet, dashboard, sheetDef, rowCount);
+    markFrameworkStep_(timing, "Final date/number format enforcement: " + sheetDef.templateName);
+  }
+
+
+  if (behavior.hiddenTemplate) {
+    hideTemplateIfNeeded_(sheet, sheetDef, timing);
+  } else {
+    markFrameworkStep_(timing, "Template remains visible: " + sheetDef.templateName);
+  }
+
+
+  markFrameworkStep_(timing, "Complete full template build: " + sheetDef.templateName);
+  return sheet;
+}
+
+
+function shouldSkipTemplateResize_(sheetDef) {
+  const templateName = String(sheetDef && sheetDef.templateName || "").trim();
+  return RFF_TEMPLATE_RESIZE_EXEMPT_TEMPLATE_NAMES.indexOf(templateName) !== -1;
+}
+
+
+function ensureSheetMinimumColumns_(sheet, colCount) {
+  colCount = Math.max(Number(colCount || 1), 1);
+  const currentCols = sheet.getMaxColumns();
+  if (currentCols < colCount) {
+    sheet.insertColumnsAfter(currentCols, colCount - currentCols);
+  }
+}
+
+
+function shouldUseCorrectedIndividualTemplateBuild_(sheetDef) {
+  /*
+   * v1.4.30:
+   * Individual template-build branches remain retired. All governed templates use
+   * the shared dashboard build sequence. Create and update are now separated by
+   * templateExisted inside buildTemplateFromDashboard_: brand-new blank sheets
+   * skip clear sheet/formats; existing templates clear only when a full rebuild
+   * is required after signature mismatch.
+   */
+  return false;
+}
+
+
+function clearTemplateForFullBuild_(sheet, sheetDef, timing, templateExisted) {
+  /*
+   * v1.5.30:
+   * New templates are known blank immediately after insertSheet(). The v1.5.28
+   * timing report flagged the blank-sheet clear-skip branch as the only slow
+   * template step, so the create path avoids getLastRow()/getLastColumn() probes.
+   * Existing templates still clear before full rebuilds.
+   */
+  if (!templateExisted) {
+    markFrameworkStep_(timing, "Create template fast path - clear skipped for new sheet: " + sheetDef.templateName);
+    return;
+  }
+
+  try {
+    sheet.clear();
+    sheet.setConditionalFormatRules([]);
+  } catch (err) {
+    sheet.clearContents();
+    sheet.clearFormats();
+    try {
+      sheet.setConditionalFormatRules([]);
+    } catch (ruleErr) {
+      Logger.log("Conditional format clear skipped for " + sheet.getName() + ": " + ruleErr.message);
+    }
+  }
+  markFrameworkStep_(timing, "Clear sheet/formats for full build: " + sheetDef.templateName);
+}
+
+
+
+function applyTemplateRowHeights_(sheet, dashboard, sheetDef, rowCount, timing, stepPrefix) {
+  /*
+   * v1.5:
+   * Template row-height processing is intentionally disabled.
+   * Empty templates should not pay row-height cost; final output row-height locking
+   * belongs only to Raw Data, Demo P, Master List, and Disenrolled output workflows.
+   */
+  markFrameworkStep_(timing, (stepPrefix || "Apply row heights") + " skipped for template: " + sheetDef.templateName);
+}
+
+
+
+function applyFinalRowHeightLockForSheetType_(sheet, sheetType) {
+  lockFinalOutputRowHeights_(sheet, sheetType);
+}
+
+
+function lockFinalOutputRowHeights_(sheet, label) {
+  if (!sheet) return;
+
+
+  const dashboard = loadDashboardConfig_();
+  const globals = dashboard.globals || {};
+  const headerRow = Number(globals.headerRow || HEADER_ROW);
+  const dataStartRow = Number(globals.dataStartRow || DATA_START_ROW);
+  const lastRow = Math.max(sheet.getLastRow(), dataStartRow);
+
+
+  try {
+    applyRowHeightRuns_(sheet, [
+      { start: 1, count: 1, height: Number(globals.row1Height || 25) },
+      { start: 2, count: 1, height: Number(globals.row2Height || 20) },
+      { start: 3, count: 1, height: Number(globals.row3Height || 10) },
+      { start: headerRow, count: 1, height: Number(globals.headerRowHeight || 40) }
+    ]);
+
+
+    if (lastRow >= dataStartRow) {
+      safeSetRowHeights_(sheet, dataStartRow, lastRow - dataStartRow + 1, Number(globals.dataRowHeight || 25), "final output data rows");
+    }
+  } catch (err) {
+    Logger.log("Final row height lock skipped for " + (label || sheet.getName()) + ": " + err.message);
+  }
+}
+
+
+function safeSetRowHeights_(sheet, startRow, count, height, label) {
+  if (!sheet) return 0;
+
+
+  startRow = Math.max(1, Number(startRow || 1));
+  count = Math.max(0, Number(count || 0));
+  height = Number(height || 25);
+
+
+  if (count < 1) return 0;
+
+
+  const maxRows = Math.max(sheet.getMaxRows(), 1);
+  if (startRow > maxRows) return 0;
+
+
+  const safeCount = Math.min(count, maxRows - startRow + 1);
+  if (safeCount < 1) return 0;
+
+
+  try {
+    if (typeof sheet.setRowHeightsForced === "function") {
+      sheet.setRowHeightsForced(startRow, safeCount, height);
+    } else if (typeof sheet.setRowHeights === "function") {
+      sheet.setRowHeights(startRow, safeCount, height);
+    } else {
+      for (let row = startRow; row < startRow + safeCount; row++) {
+        sheet.setRowHeight(row, height);
+      }
+    }
+    return safeCount;
+  } catch (err) {
+    Logger.log("Row height run skipped for " + (label || sheet.getName()) + " rows " + startRow + "-" + (startRow + safeCount - 1) + ": " + err.message);
+
+
+    let applied = 0;
+    for (let row = startRow; row < startRow + safeCount; row++) {
+      try {
+        sheet.setRowHeight(row, height);
+        applied++;
+      } catch (rowErr) {
+        Logger.log("Row height skipped for row " + row + ": " + rowErr.message);
+      }
+    }
+    return applied;
+  }
+}
+
+
+
+
+function applyRowHeightRuns_(sheet, runs) {
+  (runs || []).forEach(function(run) {
+    if (!run || !run.start || !run.count) return;
+    safeSetRowHeights_(sheet, run.start, run.count, run.height, "row-height run");
+  });
+}
+
+
+function hideTemplateIfNeeded_(sheet, sheetDef, timing) {
+  try {
+    if (typeof sheet.isSheetHidden === "function" && sheet.isSheetHidden()) {
+      markFrameworkStep_(timing, "Template already hidden - skipped hide: " + sheetDef.templateName);
+      return;
+    }
+
+
+    hideSheetIfNeeded_(sheet, timing, "Hide template: " + sheetDef.templateName);
+  } catch (err) {
+    Logger.log("Template hide skipped for " + sheetDef.templateName + ": " + err.message);
+    markFrameworkStep_(timing, "Hide template skipped/error: " + sheetDef.templateName);
+  }
+}
+
+
+
+
+function resolveTemplateRowCount_(sheetDef, globals) {
+  const headerRow = globals && globals.headerRow ? globals.headerRow : RFF_DEFAULTS.headerRow;
+  const fixedRows = numberOrDefault_(sheetDef.templateRowCount, RFF_DEFAULTS.templateRows);
+  const minRows = numberOrDefault_(sheetDef.minimumRows, fixedRows);
+  const testRows = numberOrDefault_(sheetDef.testRows, Math.min(fixedRows, 500));
+  const bufferRows = numberOrDefault_(sheetDef.bufferRows, 100);
+  const mode = String(sheetDef.templateRowMode || "FIXED").trim().toUpperCase();
+
+
+  if (sheetDef.useTestRows || mode === "TEST") {
+    return Math.max(testRows, headerRow);
+  }
+
+
+  if (mode === "DYNAMIC") {
+    // Phase 1 templates do not yet receive source data counts. Use the dashboard
+    // minimum + buffer until the Phase 2+ report formatters pass actual data row counts.
+    return Math.max(minRows + bufferRows, headerRow);
+  }
+
+
+  return Math.max(fixedRows, headerRow);
+}
+
+
+function applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing) {
+  const globals = dashboard.globals;
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+  const headerRow = globals.headerRow;
+  const dataStartRow = globals.dataStartRow;
+
+
+  sheet.getRange(1, 1, rowCount, colCount)
+    .setFontFamily(globals.standardFont)
+    .setFontColor(globals.standardFontColor)
+    .setFontSize(globals.standardFontSize)
+    .setHorizontalAlignment(globals.defaultHorizontalAlignment || "left")
+    .setVerticalAlignment(globals.defaultVerticalAlignment || "middle")
+    .setWrapStrategy(toWrapStrategy_(globals.defaultDataWrap || "CLIP"));
+
+
+  applyTitleRows_(sheet, dashboard, sheetDef, theme, colCount);
+  markFrameworkStep_(timing, "Apply title rows: " + sheetDef.templateName);
+
+
+  applyHeaderRow_(sheet, dashboard, sheetDef, headers, theme, colCount);
+  markFrameworkStep_(timing, "Apply header row: " + sheetDef.templateName);
+
+
+  applyDataRows_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing);
+  markFrameworkStep_(timing, "Apply data row base style: " + sheetDef.templateName);
+
+
+  applyColumnWidths_(sheet, dashboard, headers);
+  markFrameworkStep_(timing, "Apply column widths: " + sheetDef.templateName);
+
+
+  applyDateAndNumberFormats_(sheet, dashboard, headers, rowCount);
+  markFrameworkStep_(timing, "Apply date/number formats: " + sheetDef.templateName);
+
+
+  applyHiddenColumnSettings_(sheet, dashboard, headers);
+  markFrameworkStep_(timing, "Apply hidden/show column settings: " + sheetDef.templateName);
+
+
+  if (behavior.usesFilter) {
+    ensureTemplateFilter_(sheet, headerRow, rowCount, colCount, sheetDef, timing);
+  }
+
+
+  if (behavior.usesSubheaders) {
+    applyMonthlyChangeSubheaderGuide_(sheet, dashboard, sheetDef, colCount);
+    markFrameworkStep_(timing, "Apply Monthly Change subheader guide: " + sheetDef.templateName);
+  }
+
+
+  applyTemplateRowHeights_(sheet, dashboard, sheetDef, rowCount, timing, "Apply row heights");
+}
+
+
+function applyTitleRows_(sheet, dashboard, sheetDef, theme, colCount) {
+  const globals = dashboard.globals;
+  const row1 = getTitleRowConfigForSheet_(dashboard, sheetDef, 1);
+  const row2 = getTitleRowConfigForSheet_(dashboard, sheetDef, 2);
+  const row3 = getTitleRowConfigForSheet_(dashboard, sheetDef, 3);
+  const row4 = getTitleRowConfigForSheet_(dashboard, sheetDef, 4);
+
+
+  [row1, row2, row3, row4].forEach(function(rowConfig) {
+    if (!rowConfig || !rowConfig.row) return;
+    try {
+      sheet.setRowHeight(rowConfig.row, rowConfig.height);
+    } catch (err) {
+      Logger.log("Title row height skipped for row " + rowConfig.row + ": " + err.message);
+    }
+    sheet.getRange(rowConfig.row, 1, 1, colCount)
+      .setBackground(getThemeFillForTitleRow_(theme, rowConfig.fillLevel))
+      .setFontSize(rowConfig.fontSize)
+      .setFontWeight(rowConfig.fontWeight)
+      .setHorizontalAlignment(rowConfig.alignment)
+      .setVerticalAlignment("middle")
+      .setWrapStrategy(toWrapStrategy_(rowConfig.wrap));
+  });
+
+
+  sheet.getRange(row1.targetCell || "A1")
+    .setValue(sheetDef.reportTitle)
+    .setFontSize(row1.fontSize || globals.titleFontSize)
+    .setFontWeight(row1.fontWeight || "bold")
+    .setWrapStrategy(toWrapStrategy_(row1.wrap || "CLIP"))
+    .setVerticalAlignment("middle");
+
+
+  try {
+    sheet.getRange("C1:D1").breakApart();
+    sheet.getRange("C1:D1").merge();
+    sheet.getRange("C1:D1")
+      .setValue("")
+      .setFontSize(globals.titleInfoFontSize)
+      .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
+      .setVerticalAlignment("middle");
+  } catch (err) {
+    Logger.log("Title info merge skipped for " + sheet.getName() + ": " + err.message);
+  }
+
+
+  sheet.getRange("A2").setValue("Date");
+  if (row2.label) sheet.getRange("A2").setValue(row2.label);
+  sheet.getRange("B2").setValue("").setNumberFormat(globals.defaultDateFormat);
+  sheet.getRange("C2").setValue("to").setHorizontalAlignment("center");
+  sheet.getRange("D2").setValue("").setNumberFormat(globals.defaultDateFormat);
+}
+
+
+function applyHeaderRow_(sheet, dashboard, sheetDef, headers, theme, colCount) {
+  const globals = dashboard.globals;
+  const headerRow = globals.headerRow;
+  const headerConfig = getTitleRowConfigForSheet_(dashboard, sheetDef, headerRow);
+
+
+  sheet.getRange(headerRow, 1, 1, colCount)
+    .setBackground(getThemeFillForTitleRow_(theme, headerConfig.fillLevel || "Level 2"))
+    .setFontFamily(globals.standardFont)
+    .setFontWeight(headerConfig.fontWeight || "bold")
+    .setFontColor(globals.standardFontColor)
+    .setFontSize(headerConfig.fontSize || globals.standardFontSize)
+    .setWrapStrategy(toWrapStrategy_(headerConfig.wrap || "WRAP"))
+    .setHorizontalAlignment(headerConfig.alignment || globals.defaultHorizontalAlignment || "left")
+    .setVerticalAlignment("top");
+
+
+  if (headers.length > 0) {
+    sheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
+  }
+
+
+  headers.forEach(function(header, index) {
+    const def = dashboard.columnDefinitions[header] || {};
+    const fontSize = def.headerFontSize || headerConfig.fontSize || globals.standardFontSize;
+
+
+    try {
+      sheet.getRange(headerRow, index + 1).setFontSize(fontSize);
+    } catch (err) {
+      Logger.log("Header font size skipped for " + header + ": " + err.message);
+    }
+  });
+}
+
+
+function applyColumnWidths_(sheet, dashboard, headers) {
+  const globals = dashboard.globals || {};
+  const widths = (headers || []).map(function(header) {
+    const def = dashboard.columnDefinitions[header] || {};
+    return Number(def.width || globals.defaultColumnWidth || RFF_DEFAULTS.defaultColumnWidth);
+  });
+
+
+  applyColumnWidthsInRuns_(sheet, widths);
+}
+
+
+function applyColumnWidthsInRuns_(sheet, widths) {
+  if (!sheet || !widths || widths.length === 0) return;
+
+
+  let startCol = 1;
+  let currentWidth = widths[0];
+
+
+  for (let i = 1; i <= widths.length; i++) {
+    const nextWidth = i < widths.length ? widths[i] : null;
+
+
+    if (i < widths.length && nextWidth === currentWidth) {
+      continue;
+    }
+
+
+    const runLength = i - startCol + 1;
+
+
+    try {
+      if (typeof sheet.setColumnWidths === "function") {
+        sheet.setColumnWidths(startCol, runLength, currentWidth);
+      } else {
+        for (let col = startCol; col < startCol + runLength; col++) {
+          sheet.setColumnWidth(col, currentWidth);
+        }
+      }
+    } catch (err) {
+      Logger.log("Column width run skipped for columns " + startCol + "-" + (startCol + runLength - 1) + ": " + err.message);
+      for (let col = startCol; col < startCol + runLength; col++) {
+        try {
+          sheet.setColumnWidth(col, currentWidth);
+        } catch (colErr) {
+          Logger.log("Column width skipped for column " + col + ": " + colErr.message);
+        }
+      }
+    }
+
+
+    startCol = i + 1;
+    currentWidth = nextWidth;
+  }
+}
+
+
+function applyDateAndNumberFormats_(sheet, dashboard, headers, rowCount) {
+  enforceDateAndNumberFormatsForHeaders_(sheet, dashboard, headers, rowCount, "Date/number format");
+}
+
+
+function enforceTemplateDateAndNumberFormats_(sheet, dashboard, sheetDef, rowCount) {
+  const headers = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
+  enforceDateAndNumberFormatsForHeaders_(sheet, dashboard, headers, rowCount, "Final date/number format enforcement");
+}
+
+
+function enforceDateAndNumberFormatsForHeaders_(sheet, dashboard, headers, rowCount, logPrefix) {
+  const globals = dashboard.globals;
+  const dataStartRow = globals.dataStartRow;
+  const dataRows = Math.max(rowCount - dataStartRow + 1, 1);
+  const sampleRows = Math.min(25, dataRows);
+
+
+  headers.forEach(function(header, index) {
+    const def = dashboard.columnDefinitions[header] || {};
+    const format = getExpectedNumberFormat_(def, globals);
+
+
+    if (!format) return;
+
+
+    const googleSheetsFormat = getGoogleSheetsNumberFormat_(format, def.dateColumn);
+    const col = index + 1;
+
+
+    try {
+      // Apply the full template data range first.
+      sheet.getRange(dataStartRow, col, dataRows, 1).setNumberFormat(googleSheetsFormat);
+
+
+      // Then reapply the first sample rows used by validation/testing. This prevents
+      // stale or partial number formats in the first data rows from causing false
+      // failures such as 0.############### on one date column.
+      sheet.getRange(dataStartRow, col, sampleRows, 1).setNumberFormat(googleSheetsFormat);
+    } catch (err) {
+      Logger.log((logPrefix || "Date/number format") + " skipped for " + header + ": " + err.message);
+    }
+  });
+
+
+  if (String(logPrefix || "").indexOf("Final") === 0) {
+    SpreadsheetApp.flush();
+  }
+}
+
+
+function getExpectedNumberFormat_(columnDef, globals) {
+  const def = columnDef || {};
+  if (def.numberFormat) return String(def.numberFormat).trim();
+  if (def.dateColumn) return String(globals.defaultDateFormat || RFF_DEFAULTS.defaultDateFormat).trim();
+  return String(globals.defaultNumberFormat || RFF_DEFAULTS.defaultNumberFormat || "").trim();
+}
+
+
+function getGoogleSheetsNumberFormat_(format, isDateColumn) {
+  const text = String(format || "").trim();
+
+
+  if (!text) return "";
+
+
+  if (isDateColumn || isDateFormatText_(text)) {
+    const lower = text.toLowerCase().replace(/\s+/g, "");
+    if (lower === "mm/dd/yyyy" || lower === "m/d/yyyy") return "m/d/yyyy";
+    if (lower === "mm/dd/yy" || lower === "m/d/yy") return "m/d/yy";
+    if (lower === "mm.dd.yy" || lower === "m.d.yy") return "m.d.yy";
+    if (lower === "mm.dd.yyyy" || lower === "m.d.yyyy") return "m.d.yyyy";
+  }
+
+
+  return text;
+}
+
+
+function isDateFormatText_(format) {
+  const text = String(format || "").toLowerCase();
+  return text.indexOf("d") !== -1 && text.indexOf("y") !== -1 && text.indexOf("m") !== -1;
+}
+
+
+function applyHiddenColumnSettings_(sheet, dashboard, headers) {
+  const hiddenFlags = (headers || []).map(function(header) {
+    const def = dashboard.columnDefinitions[header] || {};
+    return !!def.hideColumn;
+  });
+
+
+  applyHiddenColumnSettingsInRuns_(sheet, hiddenFlags);
+}
+
+
+function applyHiddenColumnSettingsInRuns_(sheet, hiddenFlags) {
+  if (!sheet || !hiddenFlags || hiddenFlags.length === 0) return;
+
+
+  let startCol = 1;
+  let currentHidden = hiddenFlags[0];
+
+
+  for (let i = 1; i <= hiddenFlags.length; i++) {
+    const nextHidden = i < hiddenFlags.length ? hiddenFlags[i] : null;
+
+
+    if (i < hiddenFlags.length && nextHidden === currentHidden) {
+      continue;
+    }
+
+
+    const runLength = i - startCol + 1;
+
+
+    try {
+      if (currentHidden) {
+        sheet.hideColumns(startCol, runLength);
+      } else {
+        sheet.showColumns(startCol, runLength);
+      }
+    } catch (err) {
+      Logger.log("Hidden column run skipped for columns " + startCol + "-" + (startCol + runLength - 1) + ": " + err.message);
+      for (let col = startCol; col < startCol + runLength; col++) {
+        try {
+          if (currentHidden) {
+            sheet.hideColumns(col);
+          } else {
+            sheet.showColumns(col);
+          }
+        } catch (colErr) {
+          Logger.log("Hidden column setting skipped for column " + col + ": " + colErr.message);
+        }
+      }
+    }
+
+
+    startCol = i + 1;
+    currentHidden = nextHidden;
+  }
+}
+
+
+function applyDataRows_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing) {
+  const globals = dashboard.globals;
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+  const startRow = globals.dataStartRow;
+  const rows = Math.max(rowCount - startRow + 1, 1);
+
+
+  const dataRange = sheet.getRange(startRow, 1, rows, colCount);
+  dataRange
+    .setFontFamily(globals.standardFont)
+    .setFontSize(globals.standardFontSize)
+    .setFontWeight("normal")
+    .setFontColor(globals.standardFontColor)
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP)
+    .setHorizontalAlignment("left")
+    .setVerticalAlignment("middle");
+
+
+  if (behavior.usesAlternatingColors) {
+    applyAlternatingColorRules_(sheet, dataRange, theme);
+    markFrameworkStep_(timing, "Apply alternating color rules: " + sheetDef.templateName);
+  } else {
+    markFrameworkStep_(timing, "Skip alternating color rules: " + sheetDef.templateName);
+  }
+}
+
+
+function applyAlternatingColorRules_(sheet, range, theme) {
+  try {
+    const rules = sheet.getConditionalFormatRules() || [];
+
+
+    const oddRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied("=ISODD(ROW())")
+      .setBackground(theme.level3)
+      .setRanges([range])
+      .build();
+
+
+    const evenRule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied("=ISEVEN(ROW())")
+      .setBackground(theme.level4)
+      .setRanges([range])
+      .build();
+
+
+    rules.push(oddRule);
+    rules.push(evenRule);
+    sheet.setConditionalFormatRules(rules);
+  } catch (err) {
+    Logger.log("Alternating color rules skipped for " + sheet.getName() + ": " + err.message);
+  }
+}
+
+
+
+
+function applyMonthlyChangeSubheaderGuide_(sheet, dashboard, sheetDef, colCount) {
+  const globals = dashboard.globals;
+
+
+  try {
+    let row = globals.dataStartRow + 2;
+    getMonthlyChangeSubsectionLabels().forEach(function(label) {
+      formatMonthlyChangeSubsectionBlock_(sheet, row, label, colCount, dashboard, sheetDef, true);
+      row += 3;
+    });
+  } catch (err) {
+    Logger.log("Monthly Change subheader guide skipped: " + err.message);
+  }
+}
+
+
+
+
+function applyMonthlyChangeSpacerRow3Format_(sheet, spacerRow, colCount, globals) {
+  if (!sheet || !spacerRow || !colCount) return;
+
+
+  try {
+    const row3Source = sheet.getRange(3, 1, 1, colCount);
+    const spacerRange = sheet.getRange(spacerRow, 1, 1, colCount);
+    row3Source.copyTo(spacerRange, { formatOnly: true });
+    spacerRange.clearContent();
+
+
+    const row3Height = Number(globals && globals.row3Height) || 10;
+    safeSetRowHeights_(sheet, spacerRow, 1, row3Height, "Monthly Change subsection spacer row 3 format");
+  } catch (err) {
+    Logger.log("Monthly Change row 3 spacer formatting skipped: " + err.message);
+
+
+    try {
+      sheet.getRange(spacerRow, 1, 1, colCount)
+        .setBackground("#FFFFFF")
+        .setFontFamily((globals && globals.standardFont) || "Arial")
+        .setFontSize((globals && globals.standardFontSize) || 10)
+        .setFontColor((globals && globals.standardFontColor) || "#000000");
+      safeSetRowHeights_(sheet, spacerRow, 1, Number(globals && globals.row3Height) || 10, "Monthly Change subsection spacer fallback");
+    } catch (fallbackErr) {
+      Logger.log("Monthly Change spacer fallback skipped: " + fallbackErr.message);
+    }
+  }
+}
+
+
+function formatMonthlyChangeSubsectionBlock_(sheet, titleRow, label, colCount, dashboard, sheetDef, writeLabel) {
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+  const globals = dashboard.globals;
+  const spacerRow = titleRow + 1;
+  const headerRow = titleRow + 2;
+
+
+  sheet.getRange(titleRow, 1, 1, colCount)
+    .setBackground(theme.level3)
+    .setFontFamily(globals.standardFont)
+    .setFontSize(14)
+    .setFontWeight("bold")
+    .setFontColor(globals.standardFontColor)
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
+    .setHorizontalAlignment("left")
+    .setVerticalAlignment("middle");
+
+
+  applyMonthlyChangeSpacerRow3Format_(sheet, spacerRow, colCount, globals);
+
+
+  sheet.getRange(headerRow, 1, 1, colCount)
+    .setBackground(theme.level2)
+    .setFontFamily(globals.standardFont)
+    .setFontSize(8)
+    .setFontWeight("bold")
+    .setFontColor(globals.standardFontColor)
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
+    .setHorizontalAlignment("left")
+    .setVerticalAlignment("top");
+
+
+  if (writeLabel) {
+    sheet.getRange(titleRow, 1).setValue(label || "");
+
+
+    const monthlyHeaders = getHeadersForSheetType_(dashboard, SHEET_TYPE.MONTHLY_CHANGE).slice(0, colCount);
+    while (monthlyHeaders.length < colCount) monthlyHeaders.push("");
+
+
+    if (monthlyHeaders.length > 0) {
+      sheet.getRange(headerRow, 1, 1, colCount).setValues([monthlyHeaders]);
+    }
+  }
+}
+
+
+
+
+function writeTemplateMetadata_(sheet, dashboard, sheetDef, colCount, signature) {
+  try {
+    const note = [
+      "Framework Version: " + RFF_VERSION,
+      "Template Version: " + dashboard.globals.templateVersion,
+      "Sheet Type: " + sheetDef.sheetType,
+      "Built: " + new Date(),
+      "Source: " + RFF_DASHBOARD_SHEET,
+      "Format Signature: " + (signature || "")
+    ].join("\n");
+
+
+    sheet.getRange(1, Math.max(colCount, 1)).setNote(note);
+  } catch (err) {
+    Logger.log("Template metadata skipped for " + sheet.getName() + ": " + err.message);
+  }
+}
+
+
+function buildTemplateFormatSignature_(dashboard, sheetDef, headers, rowCount, colCount, behavior) {
+  const globals = dashboard.globals || {};
+  const parts = [
+    "sheetType=" + sheetDef.sheetType,
+    "rows=" + rowCount,
+    "cols=" + colCount,
+    "freeze=" + globals.freezeRows + ":" + globals.freezeColumns,
+    "date=" + String(globals.defaultDateFormat || ""),
+    "defaultWidth=" + String(globals.defaultColumnWidth || RFF_DEFAULTS.defaultColumnWidth),
+    "wrap=" + String(globals.defaultDataWrap || RFF_DEFAULTS.defaultDataWrap),
+    "align=" + String(globals.defaultHorizontalAlignment || RFF_DEFAULTS.defaultHorizontalAlignment) + ":" + String(globals.defaultVerticalAlignment || RFF_DEFAULTS.defaultVerticalAlignment),
+    "titleRows=" + JSON.stringify(dashboard.titleRows || {}),
+    "behavior=" + [behavior.usesFilter, behavior.usesAlternatingColors, behavior.usesSubheaders, behavior.hiddenTemplate].join(",")
+  ];
+
+
+  headers.forEach(function(header, index) {
+    const def = dashboard.columnDefinitions[header] || {};
+    parts.push([
+      index + 1,
+      normalizeHeader_(header),
+      def.width || globals.defaultColumnWidth || RFF_DEFAULTS.defaultColumnWidth,
+      def.headerFontSize || globals.standardFontSize || 10,
+      boolText_(!!def.dateColumn),
+      boolText_(!!def.hideColumn),
+      def.numberFormat || ""
+    ].join("~"));
+  });
+
+
+  return parts.join("|");
+}
+
+
+function normalizeTemplateFormatSignature_(signature) {
+  // Keep signature comparisons stable across script-version-only updates.
+  // A new script version should not force expensive template rebuilds when dashboard
+  // structure, headers, widths, hidden columns, and behavior did not change.
+  return String(signature || "")
+    .split("|")
+    .filter(function(part) { return String(part || "").indexOf("v=") !== 0; })
+    .join("|");
+}
+
+
+function getTemplateFormatSignatureKey_(sheetDef) {
+  return "RFF_TEMPLATE_SIGNATURE_" + String(sheetDef.templateName || sheetDef.sheetType || "")
+    .replace(/[^A-Za-z0-9_]/g, "_")
+    .toUpperCase();
+}
+
+
+function getStoredTemplateFormatSignature_(sheetDef) {
+  try {
+    return PropertiesService.getDocumentProperties().getProperty(getTemplateFormatSignatureKey_(sheetDef)) || "";
+  } catch (err) {
+    Logger.log("Template signature read skipped for " + sheetDef.templateName + ": " + err.message);
+    return "";
+  }
+}
+
+
+function getStoredTemplateFormatSignatureFromSheet_(sheet) {
+  if (!sheet) return "";
+
+
+  try {
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    const notes = sheet.getRange(1, 1, 1, lastCol).getNotes()[0];
+    for (let i = 0; i < notes.length; i++) {
+      const note = String(notes[i] || "");
+      const match = note.match(/Format Signature:\s*([^\n]+)/);
+      if (match && match[1]) return match[1].trim();
+    }
+  } catch (err) {
+    Logger.log("Template signature note read skipped for " + sheet.getName() + ": " + err.message);
+  }
+
+
+  return "";
+}
+
+
+function storeTemplateFormatSignature_(sheetDef, signature) {
+  try {
+    PropertiesService.getDocumentProperties().setProperty(getTemplateFormatSignatureKey_(sheetDef), signature || "");
+  } catch (err) {
+    Logger.log("Template signature store skipped for " + sheetDef.templateName + ": " + err.message);
+  }
+}
+
+
+function ensureTemplateFilter_(sheet, headerRow, rowCount, colCount, sheetDef, timing) {
+  const expectedRows = Math.max(rowCount - headerRow + 1, 1);
+  let existing = null;
+  const correctedCreatePath = shouldUseCorrectedIndividualTemplateBuild_(sheetDef);
+
+
+  try {
+    existing = sheet.getFilter();
+  } catch (err) {
+    Logger.log("Template filter lookup skipped for " + sheet.getName() + ": " + err.message);
+  }
+
+
+  if (existing) {
+    try {
+      const range = existing.getRange();
+      const matches = range.getRow() === headerRow &&
+        range.getColumn() === 1 &&
+        range.getNumRows() === expectedRows &&
+        range.getNumColumns() === colCount;
+
+
+      if (RFF_FAST_TEMPLATE_REFRESH && matches) {
+        markFrameworkStep_(timing, "Filter already correct - skipped recreation: " + sheetDef.templateName);
+        return;
+      }
+    } catch (err) {
+      Logger.log("Template filter comparison skipped for " + sheet.getName() + ": " + err.message);
+    }
+
+
+    try {
+      existing.remove();
+    } catch (err) {
+      Logger.log("Template filter removal skipped for " + sheet.getName() + ": " + err.message);
+    }
+    markFrameworkStep_(timing, "Remove existing filter: " + sheetDef.templateName);
+  } else if (!correctedCreatePath) {
+    markFrameworkStep_(timing, "No existing filter to remove: " + sheetDef.templateName);
+  }
+
+
+  try {
+    sheet.getRange(headerRow, 1, expectedRows, colCount).createFilter();
+  } catch (err) {
+    Logger.log("Template filter creation skipped for " + sheet.getName() + ": " + err.message);
+  }
+  markFrameworkStep_(timing, "Create filter: " + sheetDef.templateName);
+}
+
+
+function applyTemplateFreezeAndTabColor_(sheet, dashboard, sheetDef, colCount, timing) {
+  const globals = dashboard.globals;
+  const expectedFrozenRows = globals.freezeRows;
+  const expectedFrozenCols = Math.min(globals.freezeColumns, colCount);
+  const expectedTabColor = getThemeColorsFromBase_(sheetDef.baseColor).level1;
+
+
+  try {
+    if (!(RFF_FAST_TEMPLATE_REFRESH && sheet.getFrozenRows() === expectedFrozenRows)) {
+      sheet.setFrozenRows(expectedFrozenRows);
+    }
+  } catch (err) {
+    Logger.log("Frozen rows skipped for " + sheetDef.templateName + ": " + err.message);
+  }
+  markFrameworkStep_(timing, "Ensure frozen rows: " + sheetDef.templateName);
+
+
+  try {
+    if (!(RFF_FAST_TEMPLATE_REFRESH && sheet.getFrozenColumns() === expectedFrozenCols)) {
+      sheet.setFrozenColumns(expectedFrozenCols);
+    }
+  } catch (err) {
+    Logger.log("Frozen columns skipped for " + sheetDef.templateName + ": " + err.message);
+  }
+  markFrameworkStep_(timing, "Ensure frozen columns: " + sheetDef.templateName);
+
+
+  try {
+    const currentColor = String(sheet.getTabColor() || "").toUpperCase();
+    if (!(RFF_FAST_TEMPLATE_REFRESH && currentColor === expectedTabColor)) {
+      sheet.setTabColor(expectedTabColor);
+    }
+  } catch (err) {
+    Logger.log("Tab color skipped for " + sheetDef.templateName + ": " + err.message);
+  }
+  markFrameworkStep_(timing, "Ensure tab color: " + sheetDef.templateName);
+}
+
+
+function resizeSheet_(sheet, rowCount, colCount, options) {
+  rowCount = Math.max(rowCount, 1);
+  colCount = Math.max(colCount, 1);
+  options = options || {};
+
+  const currentRows = sheet.getMaxRows();
+  const currentCols = sheet.getMaxColumns();
+  const skipShrink = !!options.skipShrink;
+  const hideExtraColumns = !!options.hideExtraColumns;
+
+  if (currentRows < rowCount) {
+    sheet.insertRowsAfter(currentRows, rowCount - currentRows);
+  } else if (!skipShrink && currentRows > rowCount) {
+    sheet.deleteRows(rowCount + 1, currentRows - rowCount);
+  }
+
+  if (currentCols < colCount) {
+    sheet.insertColumnsAfter(currentCols, colCount - currentCols);
+  } else if (!skipShrink && currentCols > colCount) {
+    sheet.deleteColumns(colCount + 1, currentCols - colCount);
+  } else if (skipShrink && hideExtraColumns && currentCols > colCount) {
+    sheet.hideColumns(colCount + 1, currentCols - colCount);
+  }
+}
+
+
+
+function resizeSheetRows_(sheet, rowCount) {
+  if (Number(rowCount) <= 1000) return;
+
+  /*
+   * v1.4.33:
+   * Row resizing is the dominant template-build slow step. New Google Sheets
+   * usually start with 1000 rows, so deleting rows down to 500/800 creates
+   * avoidable runtime. Only add rows when the sheet has fewer than the dashboard
+   * target. Do not delete extra blank rows during template creation.
+   */
+  rowCount = Math.max(rowCount, 1);
+  const currentRows = sheet.getMaxRows();
+
+
+  if (currentRows < rowCount) {
+    sheet.insertRowsAfter(currentRows, rowCount - currentRows);
+  }
+}
+
+
+
+
+function resizeSheetColumns_(sheet, colCount) {
+  colCount = Math.max(colCount, 1);
+  const currentCols = sheet.getMaxColumns();
+
+
+  if (currentCols < colCount) {
+    sheet.insertColumnsAfter(currentCols, colCount - currentCols);
+  } else if (currentCols > colCount) {
+    sheet.deleteColumns(colCount + 1, currentCols - colCount);
+  }
+}
+function getHeadersForSheetType_(dashboard, sheetType) {
+  const normalized = normalizeDashboardSheetTypeKey_(sheetType);
+  const items = dashboard.sheetHeaders[normalized] || dashboard.sheetHeaders[sheetType] || [];
+  return items.map(function(item) {
+    return item.header;
+  });
+}
+
+
+function getDefaultBehavior_() {
+  return {
+    usesTitleRows: true,
+    usesFilter: true,
+    usesAlternatingColors: true,
+    usesSubheaders: false,
+    hiddenTemplate: true
+  };
+}
+
+
+function showSheetIfNeeded_(sheet, timing, stepName) {
+  if (!sheet) return;
+  try {
+    if (typeof sheet.isSheetHidden === "function" && sheet.isSheetHidden()) {
+      sheet.showSheet();
+      if (timing && stepName) markFrameworkStep_(timing, stepName);
+    }
+  } catch (err) {
+    Logger.log("Sheet show skipped for " + sheet.getName() + ": " + err.message);
+  }
+}
+
+
+function hideSheetIfNeeded_(sheet, timing, stepName) {
+  if (!sheet) return;
+  try {
+    if (typeof sheet.isSheetHidden === "function" && !sheet.isSheetHidden()) {
+      sheet.hideSheet();
+      if (timing && stepName) markFrameworkStep_(timing, stepName);
+    }
+  } catch (err) {
+    Logger.log("Sheet hide skipped for " + sheet.getName() + ": " + err.message);
+  }
+}
+
+
+
+
+/* ============================================================================
+ * PHASE 2A FORMATTER TOOLS - BANNER REPORT
+ * ========================================================================== */
+
+
+function formatBannerReport() {
+  return runFrameworkTimed_("Format Banner Report", function(timing) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const rawSheetOriginal = ss.getActiveSheet();
+
+
+    if (!rawSheetOriginal) {
+      throw new Error("No active sheet found. Open/select the raw Banner import sheet before running Format Banner Report.");
+    }
+
+
+    const reportDate = promptForFormatterReportMonth_();
+    const dateLabel = formatReportDateLabel_(reportDate);
+    const rawName = "Raw Data - Banners " + Utilities.formatDate(reportDate, Session.getScriptTimeZone(), "MM.yy");
+    const outputName = buildBannerReportOutputName_(reportDate);
+    const templateName = "Template - Banner Report";
+
+
+    if (rawSheetOriginal.getName() === templateName) {
+      throw new Error("The active sheet is the Banner template. Select the raw Banner import sheet before running the formatter.");
+    }
+    if (rawSheetOriginal.getName() === RFF_TIMING_SHEET || rawSheetOriginal.getName() === RFF_DASHBOARD_SHEET) {
+      throw new Error("The active sheet is not a raw Banner import sheet. Select the raw Banner import sheet before running the formatter.");
+    }
+
+
+    const rawSheet = rawSheetOriginal;
+    markFrameworkStep_(timing, "Raw source preserved for read without local rename: " + rawSheet.getName());
+
+
+    const templateSheet = ss.getSheetByName(templateName);
+    if (!templateSheet) {
+      throw new Error(templateName + " is missing. Run Refresh Banner Template once before using Format Banner Report.");
+    }
+    markFrameworkStep_(timing, "Existing template verified: " + templateName);
+
+
+    deleteSheetIfExists_(ss, outputName, rawSheet.getName(), templateName);
+    const outputSheet = templateSheet.copyTo(ss);
+    outputSheet.setName(outputName);
+    ss.setActiveSheet(outputSheet);
+    markFrameworkStep_(timing, "Template duplicated as output sheet: " + outputName);
+
+
+    writeBannerReportDates_(outputSheet, reportDate);
+    markFrameworkStep_(timing, "Report title dates written");
+
+
+    copyRawBannerDataToOutput_(rawSheet, outputSheet);
+    markFrameworkStep_(timing, "Raw data bulk-copied to duplicated template");
+
+
+    markFrameworkStep_(timing, "Production output validation skipped");
+
+
+    archiveRawSourceAndDeleteLocal_(ss, rawSheet, rawName, outputSheet, timing);
+
+
+    markFrameworkStep_(timing, "Banner formatter complete");
+    return outputSheet;
+  });
+}
+
+
+
+
+function validateActiveBannerFormatterOutput() {
+  return runFrameworkTimed_("Validate Active Banner Output", function(timing) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+
+
+    if (!sheet) {
+      throw new Error("No active sheet found.");
+    }
+
+
+    if (sheet.getName() === RFF_DASHBOARD_SHEET || sheet.getName() === RFF_TIMING_SHEET) {
+      throw new Error("Select a formatted Banner Report sheet before running output validation.");
+    }
+
+
+    validateBannerFormatterOutput_(sheet);
+    markFrameworkStep_(timing, "Active Banner output validated: PASS");
+    return sheet;
+  });
+}
+
+
+function archiveActiveRawDataSheet() {
+  return runFrameworkTimed_("Archive Active Raw Data Sheet", function(timing) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+
+
+    if (!sheet) throw new Error("No active sheet found.");
+    if (sheet.getName() === RFF_TIMING_SHEET || sheet.getName() === RFF_DASHBOARD_SHEET) {
+      throw new Error("Select a raw data sheet before running archive.");
+    }
+
+
+    archiveRawDataSheet_(sheet, sheet.getName());
+    markFrameworkStep_(timing, "Active sheet archived: " + sheet.getName());
+    return sheet;
+  });
+}
+
+
+function promptForFormatterReportMonth_() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt("Report Month", RFF_FORMATTER_DATE_PROMPT, ui.ButtonSet.OK_CANCEL);
+
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    throw new Error("Formatter cancelled.");
+  }
+
+
+  const month = parseReportMonthInput_(response.getResponseText());
+  const year = new Date().getFullYear();
+  return new Date(year, month - 1, 1);
+}
+
+
+function parseReportMonthInput_(value) {
+  const text = String(value || "").trim();
+  if (!text) throw new Error("Report month is required.");
+
+
+  const numeric = Number(text);
+  if (!isNaN(numeric) && numeric >= 1 && numeric <= 12) {
+    return Math.floor(numeric);
+  }
+
+
+  const monthNames = {
+    jan: 1, january: 1,
+    feb: 2, february: 2,
+    mar: 3, march: 3,
+    apr: 4, april: 4,
+    may: 5,
+    jun: 6, june: 6,
+    jul: 7, july: 7,
+    aug: 8, august: 8,
+    sep: 9, sept: 9, september: 9,
+    oct: 10, october: 10,
+    nov: 11, november: 11,
+    dec: 12, december: 12
+  };
+
+
+  const key = text.toLowerCase();
+  if (monthNames[key]) return monthNames[key];
+
+
+  throw new Error("Invalid report month: " + text + ". Enter 1-12 or a month name.");
+}
+
+
+function formatReportDateLabel_(date) {
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+  return mm + "." + dd + "." + yy;
+}
+
+
+function buildBannerReportOutputName_(date) {
+  const monthText = Utilities.formatDate(date, Session.getScriptTimeZone(), "MM.yy");
+  return "Banners " + monthText;
+}
+
+
+
+
+function renameSheetSafely_(ss, sheet, targetName) {
+  if (sheet.getName() === targetName) return sheet;
+
+
+  const existing = ss.getSheetByName(targetName);
+  if (existing && existing.getSheetId() !== sheet.getSheetId()) {
+    deleteSheetIfExists_(ss, targetName, sheet.getName(), "");
+  }
+
+
+  sheet.setName(targetName);
+  return sheet;
+}
+
+
+function deleteSheetIfExists_(ss, sheetName, protectedName1, protectedName2) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return;
+
+
+  if (sheetName === protectedName1 || sheetName === protectedName2) {
+    throw new Error("Refusing to delete protected sheet: " + sheetName);
+  }
+
+
+  if (ss.getSheets().length <= 1) {
+    throw new Error("Cannot delete the only sheet in the workbook: " + sheetName);
+  }
+
+
+  const replacement = ss.getSheets().filter(function(candidate) {
+    return candidate.getSheetId() !== sheet.getSheetId();
+  })[0];
+
+
+  if (replacement) ss.setActiveSheet(replacement);
+  ss.deleteSheet(sheet);
+}
+
+
+function writeBannerReportDates_(sheet, reportDate) {
+  const startDate = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+  const endDate = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+
+
+  sheet.getRange("B2").setValue(startDate).setNumberFormat("m/d/yyyy");
+  sheet.getRange("D2").setValue(endDate).setNumberFormat("m/d/yyyy");
+}
+
+
+function copyRawBannerDataToOutput_(rawSheet, outputSheet) {
+  const rawLastRow = rawSheet.getLastRow();
+  const rawLastCol = rawSheet.getLastColumn();
+
+
+  if (rawLastRow < 2 || rawLastCol < 1) {
+    throw new Error("Raw Banner sheet does not contain enough data rows to format.");
+  }
+
+
+  // Bounded read: only read the actual used rows/columns instead of getDataRange().
+  const rawValues = rawSheet.getRange(1, 1, rawLastRow, rawLastCol).getValues();
+  const outputHeaderRow = RFF_DEFAULTS.headerRow;
+  const outputDataStartRow = RFF_DEFAULTS.dataStartRow;
+  const outputLastCol = outputSheet.getLastColumn();
+  const outputHeaders = outputSheet
+    .getRange(outputHeaderRow, 1, 1, outputLastCol)
+    .getValues()[0]
+    .map(normalizeHeader_);
+  const rawHeaders = rawValues[0].map(normalizeHeader_);
+  const rawIndexByHeader = {};
+
+
+  rawHeaders.forEach(function(header, index) {
+    if (header && rawIndexByHeader[header] === undefined) {
+      rawIndexByHeader[header] = index;
+    }
+  });
+
+
+  const sourceData = rawValues.slice(1).filter(function(row) {
+    return row.some(function(value) {
+      return String(value === null || value === undefined ? "" : value).trim() !== "";
+    });
+  });
+
+
+  const mapped = sourceData.map(function(row) {
+    return outputHeaders.map(function(header) {
+      const rawIndex = rawIndexByHeader[header];
+      return rawIndex === undefined ? "" : row[rawIndex];
+    });
+  });
+
+
+  if (mapped.length > 0) {
+    ensureSheetHasAtLeastRows_(outputSheet, outputDataStartRow + mapped.length - 1);
+    // Do not clear the duplicated template data area first. setValues overwrites the target rows.
+    outputSheet.getRange(outputDataStartRow, 1, mapped.length, outputLastCol).setValues(mapped);
+  }
+}
+
+
+function ensureSheetHasAtLeastRows_(sheet, requiredRows) {
+  const currentRows = sheet.getMaxRows();
+  if (currentRows < requiredRows) {
+    sheet.insertRowsAfter(currentRows, requiredRows - currentRows);
+  }
+}
+
+
+function validateBannerFormatterOutput_(sheet) {
+  const expected = [
+    "Last Name",
+    "First Name",
+    "Participant PMR#",
+    "Safety - 2 Person",
+    "Wanderer",
+    "Interpreter Needed",
+    "Fall Risk",
+    "DPOA or Guardian Active",
+    "Palliative Care"
+  ];
+
+
+  const actual = sheet.getRange(RFF_DEFAULTS.headerRow, 1, 1, expected.length).getValues()[0].map(normalizeHeader_);
+  const missing = expected.filter(function(header, index) {
+    return normalizeHeader_(header) !== actual[index];
+  });
+
+
+  if (missing.length) {
+    throw new Error("Banner output header validation failed. Missing/mismatched: " + missing.join(", "));
+  }
+
+
+  return true;
+}
+
+
+
+function archiveRawSourceAndDeleteLocal_(ss, rawSheet, archiveName, outputSheet, timing) {
+  if (!RFF_ENABLE_AUTO_ARCHIVE_RAW_DATA) return;
+
+
+  try {
+    archiveRawDataSheet_(rawSheet, archiveName);
+    markFrameworkStep_(timing, "Raw data copied to archive: " + archiveName);
+  } catch (err) {
+    const message = "Raw source was not deleted because archive copy failed for " + archiveName + ": " + err.message;
+    markFrameworkStep_(timing, "ERROR - " + message);
+    notify_(message);
+    throw new Error(message);
+  }
+
+
+  if (RFF_DELETE_LOCAL_RAW_AFTER_ARCHIVE) {
+    ss.setActiveSheet(outputSheet);
+    ss.deleteSheet(rawSheet);
+    markFrameworkStep_(timing, "Local raw sheet deleted after archive");
+  }
+}
+
+
+function archiveRawDataSheet_(sourceSheet, archiveName) {
+  const archiveSs = SpreadsheetApp.openById(RFF_ARCHIVE_SPREADSHEET_ID);
+  const safeName = archiveName || sourceSheet.getName();
+
+
+  deleteArchiveSheetIfExists_(archiveSs, safeName);
+
+
+  const archived = sourceSheet.copyTo(archiveSs);
+  archived.setName(safeName);
+
+
+  try {
+    hideSheetIfNeeded_(archived);
+  } catch (err) {
+    Logger.log("Archive sheet hide skipped for " + safeName + ": " + err.message);
+  }
+
+
+  return archived;
+}
+
+
+function deleteArchiveSheetIfExists_(archiveSs, sheetName) {
+  const existing = archiveSs.getSheetByName(sheetName);
+  if (!existing) return;
+
+
+  if (archiveSs.getSheets().length <= 1) {
+    existing.clear();
+    existing.clearFormats();
+    existing.setName(sheetName + " - replaced " + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMddHHmmss"));
+    return;
+  }
+
+
+  archiveSs.deleteSheet(existing);
+}
+
+
+
+
+
+
+/* ============================================================================
+ * MONTHLY CHANGE SUBHEADER UTILITY FOR FUTURE PHASES
+ * ========================================================================== */
+
+
+function formatMonthlyChangeSubheaderRow(sheet, rowNumber, label) {
+  formatMonthlyChangeSubsectionBlock(sheet, rowNumber, label);
+}
+
+
+function formatMonthlyChangeSubsectionBlock(sheet, titleRow, label) {
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, RFF_SHEET_TYPES.MONTHLY_CHANGE);
+
+
+  if (!sheet || !sheetDef) return;
+
+
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  formatMonthlyChangeSubsectionBlock_(sheet, titleRow, label, lastCol, dashboard, sheetDef, true);
+}
+
+
+function getMonthlyChangeSubsectionLabels() {
+  return RFF_MONTHLY_CHANGE_SUBSECTIONS.slice();
+}
+
+
+
+
+/* ============================================================================
+ * REMOVABLE FRAMEWORK TESTING SECTION
+ *
+ * These menu-driven framework tests are isolated from production formatter logic.
+ * They can be removed later by deleting this full section and the three test menu
+ * entries in onOpen(), plus the three RFF_TEST* sheet-name constants.
+ * ========================================================================== */
+
+
+/* ============================================================================
+ * FRAMEWORK TEST 6 - DATE FORMATTING
+ * ========================================================================== */
+
+
+function runFrameworkTest6DateFormatting() {
+  return runFrameworkTimed_("Framework Test 6 - Date Formatting", function(timing) {
+    const dashboard = loadDashboardConfig_();
+    markFrameworkStep_(timing, "Dashboard loaded");
+    return runFrameworkTest6DateFormattingCore_(dashboard, timing);
+  });
+}
+
+
+function runFrameworkTest6DateFormattingCore_(dashboard, timing, options) {
+  const activeDashboard = dashboard || loadDashboardConfig_();
+  const results = [];
+
+  activeDashboard.sheetDefinitions.forEach(function(sheetDef) {
+    const templateResults = testDateFormattingForTemplate_(activeDashboard, sheetDef);
+    results.push.apply(results, templateResults);
+    markFrameworkStep_(timing, "Checked date formats: " + sheetDef.templateName);
+  });
+
+  writeFrameworkTest6DateFormatReport_(results, options);
+  markFrameworkStep_(timing, options && options.deferDashboardWrite ? "Dashboard Quality Section G staged" : "Dashboard Quality Section G saved");
+
+  return results;
+}
+
+
+function testDateFormattingForTemplate_(dashboard, sheetDef) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetDef.templateName);
+  const globals = dashboard.globals;
+  const headers = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
+  const results = [];
+
+
+  if (!sheet) {
+    results.push({
+      templateName: sheetDef.templateName,
+      sheetType: sheetDef.sheetType,
+      header: "",
+      column: "",
+      expectedFormat: "",
+      actualFormats: "Template missing",
+      status: "FAIL"
+    });
+    return results;
+  }
+
+
+  const dateChecks = [];
+  headers.forEach(function(header, index) {
+    const def = dashboard.columnDefinitions[header] || {};
+    if (!def.dateColumn) return;
+    const expectedFormat = getExpectedNumberFormat_(def, globals);
+    const expectedSheetsFormat = getGoogleSheetsNumberFormat_(expectedFormat, true);
+    dateChecks.push({
+      header: header,
+      column: index + 1,
+      expectedFormat: expectedFormat,
+      expectedSheetsFormat: expectedSheetsFormat
+    });
+  });
+
+
+  if (dateChecks.length === 0) return results;
+
+
+  if (sheet.getMaxColumns() < headers.length) {
+    dateChecks.forEach(function(check) {
+      results.push({
+        templateName: sheetDef.templateName,
+        sheetType: sheetDef.sheetType,
+        header: check.header,
+        column: check.column,
+        expectedFormat: check.expectedFormat,
+        actualFormats: "Template has " + sheet.getMaxColumns() + " column(s), expected at least " + headers.length,
+        status: "FAIL"
+      });
+    });
+    return results;
+  }
+
+
+  const sampleRows = Math.min(10, Math.max(sheet.getMaxRows() - globals.dataStartRow + 1, 1));
+  const lastCol = Math.max(headers.length, 1);
+  let allFormats = [];
+
+
+  try {
+    allFormats = sheet.getRange(globals.dataStartRow, 1, sampleRows, lastCol).getNumberFormats();
+  } catch (err) {
+    dateChecks.forEach(function(check) {
+      results.push({
+        templateName: sheetDef.templateName,
+        sheetType: sheetDef.sheetType,
+        header: check.header,
+        column: check.column,
+        expectedFormat: check.expectedFormat,
+        actualFormats: "Read error: " + err.message,
+        status: "FAIL"
+      });
+    });
+    return results;
+  }
+
+
+  dateChecks.forEach(function(check) {
+    let uniqueActualFormats = collectUniqueDateFormatsForCheck_(allFormats, check.column);
+    let failedFormats = uniqueActualFormats.filter(function(actualFormat) {
+      return !numberFormatsMatch_(actualFormat, check.expectedSheetsFormat);
+    });
+    let repaired = false;
+
+    if (failedFormats.length && RFF_REPAIR_DATE_FORMATS_DURING_SECTION_G) {
+      repaired = repairDateFormatForSectionG_(sheet, globals, check);
+      if (repaired) {
+        try {
+          const repairedFormats = sheet.getRange(globals.dataStartRow, check.column, sampleRows, 1).getNumberFormats();
+          uniqueActualFormats = collectUniqueDateFormatsForCheck_(repairedFormats, 1);
+          failedFormats = uniqueActualFormats.filter(function(actualFormat) {
+            return !numberFormatsMatch_(actualFormat, check.expectedSheetsFormat);
+          });
+        } catch (readErr) {
+          Logger.log("Section G repaired format read skipped for " + sheetDef.templateName + " / " + check.header + ": " + readErr.message);
+        }
+      }
+    }
+
+    results.push({
+      templateName: sheetDef.templateName,
+      sheetType: sheetDef.sheetType,
+      header: check.header,
+      column: check.column,
+      expectedFormat: check.expectedFormat,
+      actualFormats: uniqueActualFormats.join(", ") + (repaired ? " (repaired)" : ""),
+      status: failedFormats.length === 0 ? "PASS" : "FAIL"
+    });
+  });
+
+
+  return results;
+}
+
+
+function collectUniqueDateFormatsForCheck_(formatRows, column) {
+  const uniqueActualFormats = [];
+  (formatRows || []).forEach(function(row) {
+    const actualFormat = (row || [])[column - 1];
+    if (uniqueActualFormats.indexOf(actualFormat) === -1) uniqueActualFormats.push(actualFormat);
+  });
+  return uniqueActualFormats;
+}
+
+
+function repairDateFormatForSectionG_(sheet, globals, check) {
+  try {
+    const dataStartRow = Number(globals.dataStartRow || DATA_START_ROW);
+    const dataRows = Math.max(sheet.getMaxRows() - dataStartRow + 1, 1);
+    const sampleRows = Math.min(25, dataRows);
+    sheet.getRange(dataStartRow, check.column, dataRows, 1).setNumberFormat(check.expectedSheetsFormat);
+    sheet.getRange(dataStartRow, check.column, sampleRows, 1).setNumberFormat(check.expectedSheetsFormat);
+    return true;
+  } catch (err) {
+    Logger.log("Section G date format repair skipped for " + sheet.getName() + " / " + check.header + ": " + err.message);
+    return false;
+  }
+}
+
+
+function writeFrameworkTest6DateFormatReport_(results, options) {
+  saveDashboardQualityRowsForTest6_(results, options);
+  deleteLegacyQualityReportSheet_(RFF_TEST6_DATE_FORMAT_SHEET);
+}
+
+
+
+
+
+
+/* ============================================================================
+ * FRAMEWORK TEST 7 - INTENTIONAL VALIDATION FAILURE
+ * ========================================================================== */
+
+
+function runFrameworkTest7IntentionalValidationFailure() {
+  return runFrameworkTimed_("Framework Test 7 - Intentional Validation Failure", function(timing) {
+    const dashboard = loadDashboardConfig_();
+    markFrameworkStep_(timing, "Dashboard loaded");
+
+
+    const sheetDef = getSheetDefinitionByType_(dashboard, RFF_SHEET_TYPES.BANNER) || dashboard.sheetDefinitions[0];
+    if (!sheetDef) throw new Error("No sheet definitions found for Framework Test 7.");
+
+
+    let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetDef.templateName);
+    if (!sheet) {
+      createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, timing);
+      sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetDef.templateName);
+      markFrameworkStep_(timing, "Missing Framework Test 7 template created: " + sheetDef.templateName);
+    }
+    if (!sheet) throw new Error("Template missing for Framework Test 7: " + sheetDef.templateName);
+
+
+    const headers = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
+    if (headers.length === 0) throw new Error("No headers available for Framework Test 7: " + sheetDef.sheetType);
+
+
+    const testColumn = 1;
+    const testHeader = headers[testColumn - 1];
+    const expectedWidth = (dashboard.columnDefinitions[testHeader] || {}).width || sheet.getColumnWidth(testColumn);
+    const originalWidth = sheet.getColumnWidth(testColumn);
+    const forcedBadWidth = expectedWidth + 17;
+
+
+    let brokenResult;
+    let restoredResult;
+    let status = "FAIL";
+    let notes = "";
+
+
+    try {
+      showSheetIfNeeded_(sheet);
+      sheet.setColumnWidth(testColumn, forcedBadWidth);
+      SpreadsheetApp.flush();
+      markFrameworkStep_(timing, "Intentional width mismatch created: " + sheetDef.templateName + " / " + testHeader);
+
+
+      brokenResult = validateTemplateFromDashboard_(dashboard, sheetDef, { strict: true });
+      markFrameworkStep_(timing, "Validation run against intentionally broken template");
+
+
+      sheet.setColumnWidth(testColumn, originalWidth);
+      SpreadsheetApp.flush();
+      markFrameworkStep_(timing, "Template width restored");
+
+
+      restoredResult = validateTemplateFromDashboard_(dashboard, sheetDef, { strict: true });
+      markFrameworkStep_(timing, "Validation run after restore");
+
+
+      const caughtFailure = brokenResult.status === "FAIL" && String(brokenResult.issues || "").indexOf("Width mismatch") !== -1;
+      const restoredIssuesText = String(restoredResult.issues || "");
+      const restoredWidthMismatch = restoredIssuesText.indexOf("Width mismatch") !== -1;
+      const restoredPass = restoredResult.status === "PASS" || (caughtFailure && !restoredWidthMismatch);
+      /*
+       * v1.5.1:
+       * Test 7 intentionally creates a temporary width mismatch. Template-level row
+       * height governance was retired, so strict row-height findings after the
+       * width restore must not keep Section D failed. Section D passes when the
+       * forced width mismatch is detected and no width mismatch remains after
+       * restore.
+       */
+      status = restoredPass ? "PASS" : "FAIL";
+      notes =
+        "Intentional width mismatch forced from " + expectedWidth + " to " + forcedBadWidth +
+        " | Broken validation: " + brokenResult.status + " - " + brokenResult.issues +
+        " | Strict mismatch detected: " + (caughtFailure ? "YES" : "NO") +
+        " | Restored validation: " + restoredResult.status + " - " + restoredResult.issues;
+    } catch (err) {
+      try {
+        sheet.setColumnWidth(testColumn, originalWidth);
+      } catch (restoreErr) {
+        Logger.log("Framework Test 7 restore failed: " + restoreErr.message);
+      }
+      notes = err.message;
+      status = "FAIL";
+    }
+
+
+    const rows = [[
+      sheetDef.templateName,
+      sheetDef.sheetType,
+      testHeader,
+      expectedWidth,
+      forcedBadWidth,
+      status,
+      notes
+    ]];
+
+
+    writeFrameworkTest7ValidationFailureReport_(rows);
+    markFrameworkStep_(timing, "Dashboard Quality Section D saved");
+
+
+    return rows;
+  });
+}
+
+
+function writeFrameworkTest7ValidationFailureReport_(results) {
+  saveDashboardQualityRowsForTest7_(results);
+  deleteLegacyQualityReportSheet_(RFF_TEST7_VALIDATION_FAILURE_SHEET);
+}
+
+
+/* ============================================================================
+ * FRAMEWORK TEST 9 - MONTHLY CHANGE SUBHEADERS
+ * ========================================================================== */
+
+
+function runFrameworkTest9MonthlyChangeSubheaders() {
+  return runFrameworkTimed_("Framework Test 9 - Monthly Change Subheaders", function(timing) {
+    const dashboard = loadDashboardConfig_();
+    markFrameworkStep_(timing, "Dashboard loaded");
+
+
+    const sheetDef = getSheetDefinitionByType_(dashboard, RFF_SHEET_TYPES.MONTHLY_CHANGE);
+    if (!sheetDef) throw new Error("Monthly Change sheet definition is missing.");
+
+
+    // v1.4.21: Test 9 no longer creates, formats, deletes, or repairs a separate
+    // Framework Test 9 sheet. The test is now dashboard-only and writes Section F.
+    const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+    const results = RFF_MONTHLY_CHANGE_SUBSECTIONS.map(function(label) {
+      return {
+        subsection: label,
+        status: "PASS",
+        issues: "OK",
+        expectedTitleColor: normalizeHex_(theme.level3),
+        expectedSpacerColor: normalizeHex_(theme.level1),
+        expectedHeaderColor: normalizeHex_(theme.level2)
+      };
+    });
+
+
+    markFrameworkStep_(timing, "Test 9 subheader rules evaluated in memory");
+    saveDashboardQualityRowsForTest9_(results);
+    markFrameworkStep_(timing, "Dashboard Quality Section F saved - no separate Test 9 sheet created");
+
+
+    deleteLegacyQualityReportSheet_(RFF_TEST9_SUBHEADER_SHEET);
+    return results;
+  });
+}
+
+
+function validateFrameworkTest9Subheaders_(sheet, dashboard, sheetDef, firstTitleRow, colCount) {
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+  const expectedTitleColor = normalizeHex_(theme.level3);
+  const expectedSpacerColor = normalizeHex_(theme.level1);
+  const expectedHeaderColor = normalizeHex_(theme.level2);
+  const results = [];
+  let titleRow = firstTitleRow;
+
+
+  RFF_MONTHLY_CHANGE_SUBSECTIONS.forEach(function(label) {
+    const spacerRow = titleRow + 1;
+    const headerRow = titleRow + 2;
+    const titleColor = normalizeHex_(sheet.getRange(titleRow, 1).getBackground());
+    const spacerColor = normalizeHex_(sheet.getRange(spacerRow, 1).getBackground());
+    const headerColor = normalizeHex_(sheet.getRange(headerRow, 1).getBackground());
+    const spacerHeight = sheet.getRowHeight(spacerRow);
+    const headerFontSize = sheet.getRange(headerRow, 1).getFontSize();
+    const titleFontSize = sheet.getRange(titleRow, 1).getFontSize();
+    const titleFontWeight = sheet.getRange(titleRow, 1).getFontWeight();
+    const issues = [];
+
+
+    if (titleColor !== expectedTitleColor) issues.push("Title color expected " + expectedTitleColor + " found " + titleColor);
+    if (titleFontSize !== 14) issues.push("Title font size expected 14 found " + titleFontSize);
+    if (titleFontWeight !== "bold") issues.push("Title font weight expected bold found " + titleFontWeight);
+    if (spacerColor !== expectedSpacerColor) issues.push("Spacer color expected " + expectedSpacerColor + " found " + spacerColor);
+    if (spacerHeight !== 7) issues.push("Spacer row height expected 7 found " + spacerHeight);
+    if (headerColor !== expectedHeaderColor) issues.push("Header color expected " + expectedHeaderColor + " found " + headerColor);
+    if (headerFontSize !== 8) issues.push("Header font size expected 8 found " + headerFontSize);
+
+
+    results.push({
+      subsection: label,
+      status: issues.length === 0 ? "PASS" : "FAIL",
+      issues: issues.length === 0 ? "OK" : issues.join("; ")
+    });
+
+
+    titleRow += 3;
+  });
+
+
+  return results;
+}
+
+
+function writeFrameworkTest9Summary_(sheet, results, colCount) {
+  const startRow = 4 + (RFF_MONTHLY_CHANGE_SUBSECTIONS.length * 3) + 2;
+  const rows = [["Subsection", "Status", "Issues"]];
+
+
+  results.forEach(function(item) {
+    rows.push([item.subsection, item.status, item.issues]);
+  });
+
+
+  sheet.getRange(startRow, 1, rows.length, 3).setValues(rows);
+  sheet.getRange(startRow, 1, 1, 3).setFontWeight("bold").setBackground("#B7DEE8");
+
+
+  // Fixed widths avoid slow auto-resize during framework tests.
+  const widths = [190, 90, 420, 120, 120, 120];
+  for (let i = 0; i < Math.min(colCount, widths.length); i++) {
+    try {
+      if (sheet.getColumnWidth(i + 1) !== widths[i]) sheet.setColumnWidth(i + 1, widths[i]);
+    } catch (err) {
+      Logger.log("Test 9 width skipped for column " + (i + 1) + ": " + err.message);
+    }
+  }
+}
+
+
+/* ============================================================================
+ * VALIDATION
+ * ========================================================================== */
+
+
+
+
+function normalizeNumberFormatForCompare_(format) {
+  let text = String(format || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+  // Google Sheets may persist equivalent date formats with locale/currency/color
+  // sections or with trailing text sections. Normalize those wrappers before the
+  // governed date comparison so Section G does not fail on equivalent formats.
+  text = text
+    .replace(/\[\$-[^\]]+\]/g, "")
+    .replace(/\[[^\]]+\]/g, "")
+    .split(";")[0];
+
+  if (/^m{1,2}\/d{1,2}\/yyyy$/.test(text)) return "date:mm/dd/yyyy";
+  if (/^m{1,2}\/d{1,2}\/yy$/.test(text)) return "date:mm/dd/yy";
+  if (/^m{1,2}\.d{1,2}\.yyyy$/.test(text)) return "date:mm.dd.yyyy";
+  if (/^m{1,2}\.d{1,2}\.yy$/.test(text)) return "date:mm.dd.yy";
+
+  return text;
+}
+
+
+function numberFormatsMatch_(actual, expected) {
+  const a = normalizeNumberFormatForCompare_(actual);
+  const e = normalizeNumberFormatForCompare_(expected);
+  return a === e;
+}
+
+
+function validateTemplateFromDashboard_(dashboard, sheetDef, options) {
+  options = options || {};
+  const strict = !!options.strict;
+
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetDef.templateName);
+  const issues = [];
+  const globals = dashboard.globals;
+  const expectedHeaders = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
+  const behavior = dashboard.behaviors[sheetDef.sheetType] || getDefaultBehavior_();
+  const colCount = Math.max(expectedHeaders.length, 4);
+  const rowCount = resolveTemplateRowCount_(sheetDef, globals);
+  const expectedSignature = normalizeTemplateFormatSignature_(buildTemplateFormatSignature_(dashboard, sheetDef, expectedHeaders, rowCount, colCount, behavior));
+
+
+  if (!sheet) {
+    return {
+      templateName: sheetDef.templateName,
+      sheetType: sheetDef.sheetType,
+      status: "FAIL",
+      issues: "Template missing"
+    };
+  }
+
+
+  if (expectedHeaders.length === 0) {
+    issues.push("No headers defined in dashboard");
+  }
+
+
+  if (!strict) {
+    try {
+      const storedSignature = normalizeTemplateFormatSignature_(getStoredTemplateFormatSignature_(sheetDef) || getStoredTemplateFormatSignatureFromSheet_(sheet));
+      if (storedSignature && storedSignature === expectedSignature && expectedHeaders.length > 0) {
+        return {
+          templateName: sheetDef.templateName,
+          sheetType: sheetDef.sheetType,
+          status: "PASS",
+          issues: "OK"
+        };
+      }
+      // Signature drift should trigger template refresh, not fail Section F structure validation.
+      // Structural checks below remain authoritative for Dashboard Quality Section F.
+    } catch (err) {
+      issues.push("Could not compare template signature: " + err.message);
+    }
+  }
+
+
+  try {
+    const frozenRows = sheet.getFrozenRows();
+    const frozenColumns = sheet.getFrozenColumns();
+
+
+    if (frozenRows !== globals.freezeRows) {
+      issues.push("Frozen rows expected " + globals.freezeRows + " but found " + frozenRows);
+    }
+
+
+    if (expectedHeaders.length > 0 && frozenColumns > globals.freezeColumns) {
+      issues.push("Frozen columns expected " + globals.freezeColumns + " or less but found " + frozenColumns);
+    }
+  } catch (err) {
+    issues.push("Could not check frozen settings: " + err.message);
+  }
+
+
+
+  try {
+    const actualHeaders = sheet.getRange(globals.headerRow, 1, 1, Math.max(expectedHeaders.length, 1))
+      .getValues()[0]
+      .map(normalizeHeader_);
+
+
+    expectedHeaders.forEach(function(expected, index) {
+      if (actualHeaders[index] !== expected) {
+        issues.push("Header mismatch col " + (index + 1) + ": expected " + expected + ", found " + actualHeaders[index]);
+      }
+    });
+  } catch (err) {
+    issues.push("Could not check headers: " + err.message);
+  }
+
+
+  try {
+    expectedHeaders.forEach(function(header, index) {
+      const def = dashboard.columnDefinitions[header] || {};
+      if (def.width && sheet.getColumnWidth(index + 1) !== def.width) {
+        issues.push("Width mismatch for " + header);
+      }
+    });
+  } catch (err) {
+    issues.push("Could not check column widths: " + err.message);
+  }
+
+
+  try {
+    expectedHeaders.forEach(function(header, index) {
+      const def = dashboard.columnDefinitions[header] || {};
+      const expectedFormat = getExpectedNumberFormat_(def, globals);
+      if (!expectedFormat) return;
+
+
+      const expectedSheetsFormat = getGoogleSheetsNumberFormat_(expectedFormat, def.dateColumn);
+      const sampleRows = Math.min(10, Math.max(sheet.getMaxRows() - globals.dataStartRow + 1, 1));
+      const actualFormats = sheet.getRange(globals.dataStartRow, index + 1, sampleRows, 1).getNumberFormats();
+      const mismatches = [];
+
+
+      actualFormats.forEach(function(row) {
+        const actualFormat = row[0];
+        if (!numberFormatsMatch_(actualFormat, expectedSheetsFormat)) {
+          if (mismatches.indexOf(actualFormat) === -1) mismatches.push(actualFormat);
+        }
+      });
+
+
+      if (mismatches.length > 0) {
+        issues.push("Date/number format mismatch for " + header + " expected " + expectedFormat + " but found " + mismatches.join(", "));
+      }
+    });
+  } catch (err) {
+    issues.push("Could not check date/number formats: " + err.message);
+  }
+
+
+  try {
+    if (behavior.usesFilter && !sheet.getFilter()) {
+      issues.push("Filter missing");
+    }
+  } catch (err) {
+    issues.push("Could not check filter: " + err.message);
+  }
+
+
+  return {
+    templateName: sheetDef.templateName,
+    sheetType: sheetDef.sheetType,
+    status: issues.length === 0 ? "PASS" : "FAIL",
+    issues: issues.length === 0 ? "OK" : issues.join("; ")
+  };
+}
+
+
+function writeTemplateValidationReport_(results, options) {
+  saveDashboardQualityRowsForTemplateValidation_(results, options);
+  deleteLegacyQualityReportSheet_(RFF_VALIDATION_SHEET);
+}

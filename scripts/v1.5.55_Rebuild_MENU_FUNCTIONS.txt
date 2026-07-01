@@ -22,6 +22,12 @@
 // This registry documents every callback used by onOpen(). It is validation metadata;
 // callback implementations belong to their owner sections, not this menu section.
 const ML_MENU_CALLBACKS = Object.freeze({
+  startUp: Object.freeze([
+    "setupSystemSheets",
+    "setupReportFormattingDashboardFromScriptDefaults_",
+    "runDashboardQualityStartUp",
+    "createOrRefreshAllReportTemplates",
+    "runDashboardQualityValidateTemplates"
   setup: Object.freeze([
     "setupSystemSheets",
     "setupReportFormattingDashboardFromScriptDefaults_",
@@ -47,6 +53,9 @@ const ML_MENU_CALLBACKS = Object.freeze({
     "buildMonthlyChangeReportFromDemoP",
     "runUpdateMasterListMergeAudit"
   ]),
+  workflowQuality: Object.freeze([
+    "runDashboardQualityFull"
+  ]),
   sheetManagement: Object.freeze([
     "hideReportTemplates",
     "showReportTemplates",
@@ -61,6 +70,12 @@ const ML_MENU_CALLBACKS = Object.freeze({
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
+  const startUpMenu = ui.createMenu("Start-Up")
+    .addItem("Set up System Sheets", "setupSystemSheets")
+    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
+    .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
+    .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
+    .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates");
   const setupMenu = ui.createMenu("Setup")
     .addItem("Set up System Sheets", "setupSystemSheets")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
@@ -89,6 +104,8 @@ function onOpen() {
   const workflowMenu = ui.createMenu("Workflow")
     .addSubMenu(workflowFormatMenu)
     .addSubMenu(workflowCreateMenu)
+    .addSubMenu(workflowUpdateMenu)
+    .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
     .addSubMenu(workflowUpdateMenu);
 
   const templateManagementMenu = ui.createMenu("Templates")
@@ -104,6 +121,7 @@ function onOpen() {
     .addSubMenu(systemSheetMenu);
 
   ui.createMenu("Master List Tools")
+    .addSubMenu(startUpMenu)
     .addSubMenu(setupMenu)
     .addSubMenu(qualityMenu)
     .addSubMenu(workflowMenu)

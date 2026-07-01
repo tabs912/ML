@@ -45,7 +45,7 @@
  */
 
 
-const MASTER_LIST_MERGE_ML_VERSION = "1.5.54";
+const MASTER_LIST_MERGE_ML_VERSION = "1.5.53";
 const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
 const RFF_DASHBOARD_CONFIG_MAX_READ_COLS = 13;
 const RFF_ARCHIVE_SPREADSHEET_ID = "1Gmx1KC-pZw0U_DS5pBmlhrQm84C19R5hzdqzy4vR87o";
@@ -19738,7 +19738,7 @@ function getRequiredFrameworkDashboardFunctionNames_() {
 
 
 /**
- * v1.5.54 Dashboard Quality Section N
+ * v1.5.53 Dashboard Quality Section N
  * Workflow & Synchronization Verification
  *
  * Purpose:
