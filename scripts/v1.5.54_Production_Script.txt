@@ -1,51 +1,5 @@
-/**
- * Master List Framework v1.5.50 - Code.gs - Formatter Cleanup and Dashboard Overrides
- *
- * Purpose:
- * - Preserve v26.9.5 production business logic.
- * - Use the v3.2.2 dashboard/template engine for dashboard-controlled formatting on all report templates.
- * - Remove the v3.4.2 Master-List-only template appearance that produced the incorrect purple title block.
- * - v1.4.22 removes the final Dashboard Quality full rebuild from Run All Framework Tests.
- * - v1.4.22 converts Care Plan Due and Unlocked Care Plan output to the Banner-style template-copy pattern.
- * - v1.4.26 corrects Dashboard Quality Section timing: Health Check duration now uses Timing Report Total Seconds, and Section J skips Timing Report header rows.
- * - v1.4.28 removes the standalone Template Header Audit menu item; Dashboard Quality remains the audit owner.
- * - v1.4.28 writes actual Monthly Change subsection headers and hardens row-height locking.
- * - v1.4.28 unhides PMR # through Dashboard Column Definitions.
- * - v1.4.30 skips clear sheet/formats on brand-new template creates and keeps clear only for update rebuilds.
- * - v1.4.30 optimizes Dashboard Quality section writes to avoid row deletion/section shifting bottlenecks.
- * - v1.5.5 restores v1.4.23 Demo P / Care Plan sync governance, realigns Section K, and adds Section M workflow verification.
- * - v1.5.21 aligns Format Dashboard default Template Version/title output with the governed v1.5.6 dashboard settings while preserving the v1.5.21 script release version.
- * - v1.5.22 restored fixed-position Dashboard Quality section blocks; v1.5.35+ supersedes this with dynamic report sections that grow/shrink safely.
- * - v1.5.23 aligns Dashboard Quality Start Up/Validate/Workflow routing with Sections A-E, F-G, and H-O while preserving Dashboard Quality sheet formatting.
- * - v1.5.28 consolidates Dashboard Quality corrective highlighting into the batched section-style pass to remove an extra full-report background read/write bottleneck.
- * - v1.5.27 aligns Format Dashboard row 1 with governed report title rows: Report Formatter Framework | - vX.X.X - | Format Dashboard.
- * - v1.5.26 repairs remaining Dashboard Quality/Framework Timing bottlenecks by removing nested timed Section F/G runs, reusing the loaded dashboard, and keeping report styling/report writes consolidated.
- * - v1.5.42 applies Priority 1-4 repairs for Section G date-format integrity, first-build template resize cost, Dashboard Quality Validate Templates, and Dashboard Quality Start Up A-E bottlenecks.
- * - v1.5.41 repairs Format Dashboard version display, restores dashboard-template output creation, corrects first-build template sizing/format coverage, and extends copied template formatting for large outputs.
- * - v1.5.40 repairs runtime workflow blockers, aligns Care Plan sheet-type lookups, applies ERROR severity to runtime timing, and skips unchanged Dashboard Quality section rewrites.
- * - v1.5.39 defines the Banner formatter report-month prompt, forces timed runtime errors to CRITICAL, and reduces Dashboard Quality/template refresh bottlenecks without renaming the release artifact.
- * - v1.5.38 fixes Framework Timing benchmark status/issue detection, adds template build-mode notes, and reports Dashboard Quality completeness as PARTIAL when sections are not run.
- * - v1.5.37 summarizes Framework Timing from the latest run per process, removes duplicate Dashboard Quality post-write style passes, and labels unrun Dashboard Quality sections explicitly.
- * - v1.5.36 completes report performance cleanup by scoping Framework Timing styling, avoiding Dashboard Quality full-range style passes in targeted paths, and removing stale fixed-block artifacts.
- * - v1.5.35 moves Framework Timing Section C to the final report section, restores dynamic report sections that grow/shrink safely, and scopes report styling to changed sections.
- * - v1.5.34 rebuilds the prior performance patch as clean full-script artifacts, adds single-pass Dashboard Quality section bounds for multi-section writes, and preserves fixed-section guardrails.
- * - v1.5.33 stabilizes Dashboard Quality and Framework Timing writes with fixed-section updates, dashboard section indexing, scoped styling, and current-version alignment.
- * - v1.5.25 creates a new governed production script for Dashboard Quality/Framework Timing bottleneck fixes, defers repeated report styling, and removes premature timing-report rewrites.
- * - v1.5.24 promotes the next production script, archives v1.5.23 under scripts per Section 16 production naming guidance, and restores the governed menu from spec/Menu Specifications.pdf.
- *
- * v1.4.24 update:
- * - Rebuilds Format Dashboard Section C - Sheet Headers from Appendix C/current mapping.
- * - Removes runtime column add/remove behavior from processing helpers.
- * - Keeps column additions/removals governed by Dashboard Section C only.
- *
- * Protected rule:
- * - Formatting ownership belongs to the Format Dashboard/template engine.
- * - Business processing remains owned by v26.9.5.
- * - v1.2.1 preserves dashboard-only runtime formatting, keeps template signature refresh decisions, keeps faster full-template builds, and adds dashboard-cache plus fast validation from the business logic layer; formatting is allowed only in dashboard/template/framework-report writers.
- */
 
-
-const MASTER_LIST_MERGE_ML_VERSION = "1.5.52";
+const MASTER_LIST_MERGE_ML_VERSION = "1.5.54";
 const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
 const RFF_DASHBOARD_CONFIG_MAX_READ_COLS = 13;
 const RFF_ARCHIVE_SPREADSHEET_ID = "1Gmx1KC-pZw0U_DS5pBmlhrQm84C19R5hzdqzy4vR87o";
@@ -4372,7 +4326,7 @@ function appendDisenrolledPMRBlocksToExclusion_(sourceSheet, sourceHeaders, rows
     sheet.getRange(DATA_START_ROW, 1, rowsToWrite.length, width).setValues(rowsToWrite);
   }
 
-  applyFinalRowHeightLock_(sheet, 25);
+  lockFinalOutputRowHeights_(sheet, SHEET_TYPE.DISENROLLED_EXCLUSION);
 
   try {
     sheet.getRange("A1").setNote(
@@ -4781,7 +4735,7 @@ function formatCarePlanDueOrUnlockedFromDashboard_(sheetType, promptTitle, endDa
 
     try {
       outputSheet.getRange("A1").setValue(sheetDef.reportTitle || sheetType);
-      if (titleInfoText) outputSheet.getRange("A3").setValue(titleInfoText);
+      if (titleInfoText) outputSheet.getRange("C1").setValue(titleInfoText);
     } catch (err) {
       Logger.log("Could not write " + sheetType + " title info: " + err.message);
     }
@@ -16636,7 +16590,7 @@ function runFrameworkTest9MonthlyChangeSubheaders() {
 
 
     // v1.4.21: Test 9 no longer creates, formats, deletes, or repairs a separate
-    // Framework Test 9 sheet. The test is now dashboard-only and writes Section D.
+    // Framework Test 9 sheet. The test is now dashboard-only and writes Section F.
     const theme = getThemeColorsFromBase_(sheetDef.baseColor);
     const results = RFF_MONTHLY_CHANGE_SUBSECTIONS.map(function(label) {
       return {
@@ -16652,7 +16606,7 @@ function runFrameworkTest9MonthlyChangeSubheaders() {
 
     markFrameworkStep_(timing, "Test 9 subheader rules evaluated in memory");
     saveDashboardQualityRowsForTest9_(results);
-    markFrameworkStep_(timing, "Dashboard Quality Section E saved - no separate Test 9 sheet created");
+    markFrameworkStep_(timing, "Dashboard Quality Section F saved - no separate Test 9 sheet created");
 
 
     deleteLegacyQualityReportSheet_(RFF_TEST9_SUBHEADER_SHEET);
@@ -17586,12 +17540,11 @@ function runDashboardQualityFull() {
     runDashboardQualitySectionIfDue_("Summary", "Section K Summary", updateDashboardQualitySummarySection_, timing);
     runDashboardQualitySectionIfDue_(RFF_PERFORMANCE_SUMMARY_KEY, "Section L Performance Summary", runDashboardQualityPerformanceSummary_, timing);
     runDashboardQualitySectionIfDue_(RFF_MASTER_LIST_HEALTH_KEY, "Section M Master List Health Check", runDashboardQualityMasterListHealthCheck_, timing);
-    runDashboardQualitySectionIfDue_(RFF_CP_SYNC_DIAGNOSTICS_KEY, "Section N Care Plan Sync Diagnostics", runDashboardQualityCarePlanSyncDiagnostics_, timing);
-    runDashboardQualitySectionIfDue_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, "Section O Workflow & Synchronization Verification", runDashboardQualityWorkflowSyncVerification_, timing);
+    runDashboardQualitySectionIfDue_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, "Section N Workflow & Synchronization Verification", runDashboardQualityWorkflowSyncVerification_, timing);
 
     styleDashboardQualityReport_(ensureDashboardQualityReportSheet_());
     writeCombinedFrameworkTimingReport_();
-    markFrameworkStep_(timing, "Dashboard Quality Sections H-O updated");
+    markFrameworkStep_(timing, "Dashboard Quality Sections H-N updated");
   });
 }
 
@@ -17674,8 +17627,7 @@ const RFF_DASHBOARD_QUALITY_SECTIONS = [
   { key: "Summary", title: "SECTION K - SUMMARY" },
   { key: RFF_PERFORMANCE_SUMMARY_KEY, title: "SECTION L - PERFORMANCE SUMMARY" },
   { key: RFF_MASTER_LIST_HEALTH_KEY, title: "SECTION M - MASTER LIST HEALTH CHECK" },
-  { key: RFF_CP_SYNC_DIAGNOSTICS_KEY, title: "SECTION N - CARE PLAN SYNC DIAGNOSTICS" },
-  { key: RFF_WORKFLOW_SYNC_VERIFICATION_KEY, title: "SECTION O - WORKFLOW & SYNCHRONIZATION VERIFICATION" }
+  { key: RFF_WORKFLOW_SYNC_VERIFICATION_KEY, title: "SECTION N - WORKFLOW & SYNCHRONIZATION VERIFICATION" }
 ];
 
 const RFF_DASHBOARD_QUALITY_COL_WIDTHS = [250, 325, 225, 200, 150, 100, null];
@@ -17730,7 +17682,6 @@ function getDefaultDashboardQualityDetailHeader_(section) {
   if (title.indexOf("SECTION L - ") === 0) return ["Process", "Runtime", "Status", "Quality Notes", "", "", ""];
   if (title.indexOf("SECTION M - ") === 0) return ["Validation Item", "Status", "Issue", "Quality Notes", "", "", ""];
   if (title.indexOf("SECTION N - ") === 0) return ["Sync Check", "Status", "Issue", "Quality Notes", "", "", ""];
-  if (title.indexOf("SECTION O - ") === 0) return ["Workflow Check", "Status", "Issue", "Quality Notes", "", "", ""];
 
   return ["Item", "Status", "Issue", "Quality Notes", "", "", ""];
 }
@@ -17755,7 +17706,7 @@ function collectExistingDashboardQualitySectionBlocks_(sheet) {
 
 function getDashboardQualityNotRunMessage_(section) {
   const title = String(section && section.title || "");
-  if (/SECTION [H-O] - /.test(title)) return "Run Dashboard Quality Workflow to populate this section.";
+  if (/SECTION [H-N] - /.test(title)) return "Run Dashboard Quality Workflow to populate this section.";
   if (/SECTION [A-E] - /.test(title)) return "Run Dashboard Quality Start Up to populate this section.";
   if (/SECTION [F-G] - /.test(title)) return "Run Dashboard Quality Validate Templates to populate this section.";
   return "Run the assigned Dashboard Quality workflow to populate this section.";
@@ -18357,11 +18308,11 @@ function saveDashboardQualityRowsForTest7_(results) {
 
 
 function saveDashboardQualityRowsForTest9_(results) {
-  const rows = [["Subsection", "Status", "Issues"]];
+  const rows = [["Template Name", "Sheet Type", "Status", "Issues"]];
   (results || []).forEach(function(item) {
-    rows.push([item.subsection || "", item.status || "", item.issues || ""]);
+    rows.push(["Monthly Change Subheaders", item.subsection || "", item.status || "", item.issues || ""]);
   });
-  saveDashboardQualitySectionRows_(RFF_TEST9_SUBHEADER_SHEET, rows);
+  saveDashboardQualitySectionRows_(RFF_VALIDATION_SHEET, rows);
 }
 
 
@@ -18907,7 +18858,6 @@ function appendCombinedDashboardSignOffRows_(rows) {
   const templateValidation = getLiveTemplateValidationStatus_();
   const frameworkHealth = getLiveFrameworkHealthStatus_();
   const masterHealth = getStoredSectionStatusAndNotes_(RFF_MASTER_LIST_HEALTH_KEY, 2);
-  const cpDiagnostics = getStoredSectionStatusAndNotes_(RFF_CP_SYNC_DIAGNOSTICS_KEY, 2);
   const workflowVerification = getStoredSectionStatusAndNotes_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, 2);
 
 
@@ -18916,11 +18866,8 @@ function appendCombinedDashboardSignOffRows_(rows) {
   rows.push(["Dashboard Integrity", dashboardAudit.status, dashboardAudit.notes]);
   rows.push(["Template Validation", templateValidation.status, templateValidation.notes]);
   rows.push(["Date Formatting", getReportOverallStatus_(RFF_TEST6_DATE_FORMAT_SHEET, 7), getReportFailureNotes_(RFF_TEST6_DATE_FORMAT_SHEET, 7)]);
-  rows.push(["Intentional Validation Failure", getReportOverallStatus_(RFF_TEST7_VALIDATION_FAILURE_SHEET, 7), getReportFailureNotes_(RFF_TEST7_VALIDATION_FAILURE_SHEET, 7)]);
-  rows.push(["Monthly Change Subheaders", getReportOverallStatus_(RFF_TEST9_SUBHEADER_SHEET, 4), getReportFailureNotes_(RFF_TEST9_SUBHEADER_SHEET, 4)]);
   rows.push(["Framework Health Check", frameworkHealth.status, frameworkHealth.notes]);
   rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes]);
-  rows.push(["Care Plan Sync Diagnostics", cpDiagnostics.status, cpDiagnostics.notes]);
   rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes]);
 }
 
@@ -19101,7 +19048,7 @@ function appendDashboardAuditDashboardRows_(rows) {
 
 function appendFrameworkHealthCheckDashboardRows_(rows) {
   rows.push([""]);
-  rows.push(["SECTION G - FRAMEWORK HEALTH CHECK"]);
+  rows.push(["SECTION I - FRAMEWORK HEALTH CHECK"]);
   const stored = getDashboardQualitySectionRows_(RFF_HEALTH_CHECK_SHEET);
   if (!stored.length) {
     rows.push(["Area", "Item", "Status", "Quality Notes"]);
@@ -19116,7 +19063,7 @@ function appendFrameworkHealthCheckDashboardRows_(rows) {
 
 function appendMasterListHealthCheckDashboardRows_(rows) {
   rows.push([""]);
-  rows.push(["SECTION K - MASTER LIST HEALTH CHECK"]);
+  rows.push(["SECTION M - MASTER LIST HEALTH CHECK"]);
   const stored = getDashboardQualitySectionRows_(RFF_MASTER_LIST_HEALTH_KEY);
   if (!stored.length) {
     rows.push(["Check", "Status", "Count", "Quality Notes"]);
@@ -19129,11 +19076,10 @@ function appendMasterListHealthCheckDashboardRows_(rows) {
 
 function appendCarePlanSyncDiagnosticsDashboardRows_(rows) {
   rows.push([""]);
-  rows.push(["SECTION L - CARE PLAN SYNC DIAGNOSTICS"]);
+  rows.push(["SECTION N - CARE PLAN SYNC DIAGNOSTICS"]);
   const stored = getDashboardQualitySectionRows_(RFF_CP_SYNC_DIAGNOSTICS_KEY);
   if (!stored.length) {
     rows.push(["Check", "Status", "Count/Value", "Quality Notes"]);
-    rows.push(["Care Plan Sync Diagnostics", "MISSING", 0, "Run Dashboard Quality Full after workflow processing"]);
     return;
   }
   stored.forEach(function(row) { rows.push(row); });
@@ -19174,7 +19120,6 @@ function buildFrameworkSummaryRows_() {
   const frameworkHealth = getStoredSectionStatusAndNotes_(RFF_HEALTH_CHECK_SHEET, 2);
   const performance = getStoredSectionStatusAndNotes_(RFF_PERFORMANCE_SUMMARY_KEY, 3);
   const masterHealth = getStoredSectionStatusAndNotes_(RFF_MASTER_LIST_HEALTH_KEY, 2);
-  const cpDiagnostics = getStoredSectionStatusAndNotes_(RFF_CP_SYNC_DIAGNOSTICS_KEY, 2);
   const workflowVerification = getStoredSectionStatusAndNotes_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, 2);
 
   rows.push(["Dashboard Global Inputs", dashboardGlobal.status, dashboardGlobal.notes, "Dashboard Quality Report Section A"]);
@@ -19188,8 +19133,7 @@ function buildFrameworkSummaryRows_() {
   rows.push(["Framework Health Check", frameworkHealth.status, frameworkHealth.notes, "Dashboard Quality Report Section I"]);
   rows.push(["Performance Summary", performance.status, performance.notes, "Dashboard Quality Report Section L"]);
   rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes, "Dashboard Quality Report Section M"]);
-  rows.push(["Care Plan Sync Diagnostics", cpDiagnostics.status, cpDiagnostics.notes, "Dashboard Quality Report Section N"]);
-  rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes, "Dashboard Quality Report Section O"]);
+  rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes, "Dashboard Quality Report Section N"]);
 
   const anyFail = rows.some(function(r) { return r[1] === "FAIL"; });
   const anyNotRun = rows.some(function(r) { return r[1] === "MISSING" || r[1] === "NOT RUN"; });
@@ -19748,7 +19692,7 @@ function getRequiredFrameworkDashboardFunctionNames_() {
 
 
 /**
- * v1.5.23 Dashboard Quality Section O
+ * v1.5.54 Dashboard Quality Section N
  * Workflow & Synchronization Verification
  *
  * Purpose:
@@ -19768,7 +19712,7 @@ function runDashboardQualityWorkflowSyncVerification_() {
   return runFrameworkTimed_("Workflow & Synchronization Verification", function(timing) {
     const rows = collectWorkflowSyncVerificationRows_();
     saveDashboardQualitySectionRows_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, rows);
-    markFrameworkStep_(timing, "Dashboard Quality Section O saved");
+    markFrameworkStep_(timing, "Dashboard Quality Section N saved");
     return rows;
   });
 }
