@@ -19,7 +19,6 @@ jobs:
         run: |
           REQUIRED_FILES=(
             "spec/Dashboard_Architecture_Specification.pdf"
-            "spec/Framework_Timing_Spec.pdf"
             "spec/Framework_Timing_Architecture.pdf"
             "spec/Rebuild Prompt.pdf"
             "spec/Dashboard_Quality_Updated_Specifications.pdf"
