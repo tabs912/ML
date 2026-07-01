@@ -18,3 +18,9 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Archive and report files - managed in ML-Archive repo
+.codexignore/Archive/
+.codexignore/Reports/
+Report/
+Governance/
