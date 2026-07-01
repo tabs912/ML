@@ -113,7 +113,25 @@ If the diff exceeds 25 files or 2000 lines:
 - Clean the diff
 - Split the work into phases
 ---
+Temporary Branch Policy
 
+Allowed persistent branches:
+- main
+- work
+
+Temporary branches:
+- codex
+- codex/*
+- backup/*
+- Push-Script-Here
+
+must be deleted immediately after:
+- merge
+- PR creation
+- file extraction
+- task completion
+
+Do not retain temporary branches between Codex sessions.
 # Governing Authority
 
 Review in this order:
