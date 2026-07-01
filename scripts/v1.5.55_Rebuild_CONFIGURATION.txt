@@ -1,0 +1,147 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - CONFIGURATION Section
+ *
+ * Scope:
+ * - Bootstrap/release constants only.
+ * - Cross-section identifiers required before dashboard/template/runtime sections load.
+ * - Fallback row constants retained only for bootstrap compatibility.
+ *
+ * Ownership boundaries:
+ * - Format Dashboard owns template defaults, sheet definitions, headers, columns, behaviors, row heights, and formatting defaults.
+ * - Dashboard Quality owns Dashboard Quality section registries, section titles, widths, shell definitions, summary, and signoff constants.
+ * - Framework Timing owns timing section registries, benchmarks, severities, timing shell definitions, and recommendations.
+ * - Business workflow sections own workflow-specific column lists and processing rules.
+ */
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// -----------------------------------------------------------------------------
+// Release metadata
+// -----------------------------------------------------------------------------
+const MASTER_LIST_MERGE_ML_VERSION = "1.5.55";
+const MASTER_LIST_MERGE_REBUILD_SECTION = "CONFIGURATION";
+const MASTER_LIST_MERGE_BASELINE_VERSION = "1.5.54";
+
+// -----------------------------------------------------------------------------
+// Shared user prompts / runtime feature flags
+// -----------------------------------------------------------------------------
+const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
+const RFF_DASHBOARD_CONFIG_MAX_READ_COLS = 13;
+const RFF_ARCHIVE_SPREADSHEET_ID = "1Gmx1KC-pZw0U_DS5pBmlhrQm84C19R5hzdqzy4vR87o";
+const RFF_ENABLE_AUTO_ARCHIVE_RAW_DATA = true;
+const RFF_DELETE_LOCAL_RAW_AFTER_ARCHIVE = true;
+const RFF_TEMPLATE_FIRST_BUILD_SHRINK_TO_TARGET = false;
+const RFF_OUTPUT_EXTEND_TEMPLATE_FORMATTING = true;
+const RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT = false;
+const RFF_REPAIR_DATE_FORMATS_DURING_SECTION_G = true;
+
+// -----------------------------------------------------------------------------
+// Bootstrap row constants
+// -----------------------------------------------------------------------------
+// Fallback only. Runtime sheet/header ownership belongs to Format Dashboard.
+const HEADER_ROW = 4;
+const DATA_START_ROW = 5;
+
+// Fallback cleanup constants. Runtime row/column formatting is dashboard/template-owned.
+const FORMAT_ALLOWED_EMPTY_COLUMNS = 2;
+const FORMAT_DELETE_BLANK_ROWS_AFTER = 400;
+
+// -----------------------------------------------------------------------------
+// Governed sheet type identifiers
+// -----------------------------------------------------------------------------
+const SHEET_TYPE = Object.freeze({
+  RAW_DATA: "Raw Data",
+  CARE_PLAN_DUE: "CP Due Date",
+  UNLOCKED: "Unlock CP",
+  BANNER: "Banners",
+  DEMO_P: "Demo P",
+  MASTER_LIST: "Master List",
+  MONTHLY_CHANGE: "Monthly Change",
+  MASTER_LIST_CHANGE_LOG: "Master List Change Log",
+  DISENROLLED_EXCLUSION: "Disenrolled Exclusion"
+});
+
+// -----------------------------------------------------------------------------
+// Governed monthly sheet prefixes / canonical sheet names
+// -----------------------------------------------------------------------------
+const MASTER_LIST_PREFIX = "Master List";
+const DEMO_P_PREFIX = "Demo P";
+const BANNER_PREFIX = "Banners";
+const BANNER_REPORT_ALT_PREFIX = "Banner Report";
+const UNLOCKED_PREFIX = "Unlock CP";
+const CARE_PLAN_DUE_PREFIX = "CP Due Date";
+const CARE_PLAN_DUE_DATE_ALT_PREFIX = "Care Plan Due Date Report";
+const MONTHLY_CHANGE_REPORT_PREFIX = "Monthly Change";
+
+const DISENROLLED_EXCLUSION_SHEET = "Disenrolled Exclusion List";
+const INDEX_SHEET = "Index";
+const MASTER_LIST_CHANGE_LOG_SHEET = "Master List Change Log";
+const MASTER_LIST_TEMPLATE_SHEET = "Master List Template";
+const DEMO_P_TEMPLATE_SHEET = "Demo P Template";
+const FORMAT_DEMO_P_TIMING_SHEET = "Format Demo P Timing";
+
+// -----------------------------------------------------------------------------
+// Protected/system sheet names shared across sections
+// -----------------------------------------------------------------------------
+const SYSTEM_SHEETS_TO_HIDE = Object.freeze([
+  DISENROLLED_EXCLUSION_SHEET,
+  MASTER_LIST_CHANGE_LOG_SHEET,
+  "Master List Health Check",
+  "Care Plan Sync Diagnostics",
+  "Monthly Change Validation",
+  "Update Master List Timing",
+  "Create Master List Timing",
+  FORMAT_DEMO_P_TIMING_SHEET
+]);
+
+// -----------------------------------------------------------------------------
+// Shared date display formats
+// -----------------------------------------------------------------------------
+// Sheet-specific date/number formatting remains owned by Format Dashboard/Templates.
+const DATE_DISPLAY_FORMAT = "mm/dd/yyyy";
+const DATE_SHEET_FORMAT = "MM.yy";
+
+// -----------------------------------------------------------------------------
+// Shared date semantic headers
+// -----------------------------------------------------------------------------
+// This is a semantic list used by processing/validation. Display formatting still belongs to Dashboard/Templates.
+const GLOBAL_DATE_FORMAT_HEADERS = Object.freeze([
+  "AD1 - Phone Valid Dates From",
+  "AD1 - Phone Valid Dates To",
+  "AD2 - Phone Valid Dates From",
+  "AD2 - Phone Valid Dates To",
+  "AD3 - Phone Valid Dates From",
+  "AD3 - Phone Valid Dates To",
+  "Capitation Date",
+  "Care Plan Start Date",
+  "Date of Birth",
+  "Date of Death",
+  "Disenrollment Date",
+  "Disenrollment Effective Date",
+  "Enrollment Date",
+  "IDT Meeting Date",
+  "Last Care Plan",
+  "Next Care Plan Due",
+  "Master List Update Month"
+]);
+
+// -----------------------------------------------------------------------------
+// CP title-info migration source cells
+// -----------------------------------------------------------------------------
+// Target placement is owned by the CP formatter/template workflow; source cleanup list is shared configuration.
+const TITLE_INFO_MOVE_CELLS = Object.freeze({
+  [SHEET_TYPE.CARE_PLAN_DUE]: ["A2", "C2", "A3", "C3", "D3", "E3"],
+  [SHEET_TYPE.UNLOCKED]: ["A2", "A3", "B3", "C3", "D2", "E2", "F2", "G2"]
+});
+
+// -----------------------------------------------------------------------------
+// Explicitly excluded from CONFIGURATION rebuild section
+// -----------------------------------------------------------------------------
+// - COLUMN_FORMATS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS.
+// - SHEET_BASE_COLORS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS.
+// - RFF_DEFAULTS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS / TEMPLATE FUNCTIONS AND VALIDATION.
+// - RFF_DASHBOARD_QUALITY_SECTIONS and DQ widths/styles: move to DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS.
+// - Framework Timing section registry, severities, benchmarks: move to FRAMEWORK AND TIMING FUNCTIONS.
+// - Workflow-specific hidden columns and sync lists: move to owning workflow/sync section.

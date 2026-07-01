@@ -1,0 +1,873 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - CONFIGURATION Section
+ *
+ * Scope:
+ * - Bootstrap/release constants only.
+ * - Cross-section identifiers required before dashboard/template/runtime sections load.
+ * - Fallback row constants retained only for bootstrap compatibility.
+ *
+ * Ownership boundaries:
+ * - Format Dashboard owns template defaults, sheet definitions, headers, columns, behaviors, row heights, and formatting defaults.
+ * - Dashboard Quality owns Dashboard Quality section registries, section titles, widths, shell definitions, summary, and signoff constants.
+ * - Framework Timing owns timing section registries, benchmarks, severities, timing shell definitions, and recommendations.
+ * - Business workflow sections own workflow-specific column lists and processing rules.
+ */
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// -----------------------------------------------------------------------------
+// Release metadata
+// -----------------------------------------------------------------------------
+const MASTER_LIST_MERGE_ML_VERSION = "1.5.55";
+const MASTER_LIST_MERGE_REBUILD_SECTION = "CONFIGURATION";
+const MASTER_LIST_MERGE_BASELINE_VERSION = "1.5.54";
+
+// -----------------------------------------------------------------------------
+// Shared user prompts / runtime feature flags
+// -----------------------------------------------------------------------------
+const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
+const RFF_DASHBOARD_CONFIG_MAX_READ_COLS = 13;
+const RFF_ARCHIVE_SPREADSHEET_ID = "1Gmx1KC-pZw0U_DS5pBmlhrQm84C19R5hzdqzy4vR87o";
+const RFF_ENABLE_AUTO_ARCHIVE_RAW_DATA = true;
+const RFF_DELETE_LOCAL_RAW_AFTER_ARCHIVE = true;
+const RFF_TEMPLATE_FIRST_BUILD_SHRINK_TO_TARGET = false;
+const RFF_OUTPUT_EXTEND_TEMPLATE_FORMATTING = true;
+const RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT = false;
+const RFF_REPAIR_DATE_FORMATS_DURING_SECTION_G = true;
+
+// -----------------------------------------------------------------------------
+// Bootstrap row constants
+// -----------------------------------------------------------------------------
+// Fallback only. Runtime sheet/header ownership belongs to Format Dashboard.
+const HEADER_ROW = 4;
+const DATA_START_ROW = 5;
+
+// Fallback cleanup constants. Runtime row/column formatting is dashboard/template-owned.
+const FORMAT_ALLOWED_EMPTY_COLUMNS = 2;
+const FORMAT_DELETE_BLANK_ROWS_AFTER = 400;
+
+// -----------------------------------------------------------------------------
+// Governed sheet type identifiers
+// -----------------------------------------------------------------------------
+const SHEET_TYPE = Object.freeze({
+  RAW_DATA: "Raw Data",
+  CARE_PLAN_DUE: "CP Due Date",
+  UNLOCKED: "Unlock CP",
+  BANNER: "Banners",
+  DEMO_P: "Demo P",
+  MASTER_LIST: "Master List",
+  MONTHLY_CHANGE: "Monthly Change",
+  MASTER_LIST_CHANGE_LOG: "Master List Change Log",
+  DISENROLLED_EXCLUSION: "Disenrolled Exclusion"
+});
+
+// -----------------------------------------------------------------------------
+// Governed monthly sheet prefixes / canonical sheet names
+// -----------------------------------------------------------------------------
+const MASTER_LIST_PREFIX = "Master List";
+const DEMO_P_PREFIX = "Demo P";
+const BANNER_PREFIX = "Banners";
+const BANNER_REPORT_ALT_PREFIX = "Banner Report";
+const UNLOCKED_PREFIX = "Unlock CP";
+const CARE_PLAN_DUE_PREFIX = "CP Due Date";
+const CARE_PLAN_DUE_DATE_ALT_PREFIX = "Care Plan Due Date Report";
+const MONTHLY_CHANGE_REPORT_PREFIX = "Monthly Change";
+
+const DISENROLLED_EXCLUSION_SHEET = "Disenrolled Exclusion List";
+const INDEX_SHEET = "Index";
+const MASTER_LIST_CHANGE_LOG_SHEET = "Master List Change Log";
+const MASTER_LIST_TEMPLATE_SHEET = "Master List Template";
+const DEMO_P_TEMPLATE_SHEET = "Demo P Template";
+const FORMAT_DEMO_P_TIMING_SHEET = "Format Demo P Timing";
+
+// -----------------------------------------------------------------------------
+// Protected/system sheet names shared across sections
+// -----------------------------------------------------------------------------
+const SYSTEM_SHEETS_TO_HIDE = Object.freeze([
+  DISENROLLED_EXCLUSION_SHEET,
+  MASTER_LIST_CHANGE_LOG_SHEET,
+  "Master List Health Check",
+  "Care Plan Sync Diagnostics",
+  "Monthly Change Validation",
+  "Update Master List Timing",
+  "Create Master List Timing",
+  FORMAT_DEMO_P_TIMING_SHEET
+]);
+
+// -----------------------------------------------------------------------------
+// Shared date display formats
+// -----------------------------------------------------------------------------
+// Sheet-specific date/number formatting remains owned by Format Dashboard/Templates.
+const DATE_DISPLAY_FORMAT = "mm/dd/yyyy";
+const DATE_SHEET_FORMAT = "MM.yy";
+
+// -----------------------------------------------------------------------------
+// Shared date semantic headers
+// -----------------------------------------------------------------------------
+// This is a semantic list used by processing/validation. Display formatting still belongs to Dashboard/Templates.
+const GLOBAL_DATE_FORMAT_HEADERS = Object.freeze([
+  "AD1 - Phone Valid Dates From",
+  "AD1 - Phone Valid Dates To",
+  "AD2 - Phone Valid Dates From",
+  "AD2 - Phone Valid Dates To",
+  "AD3 - Phone Valid Dates From",
+  "AD3 - Phone Valid Dates To",
+  "Capitation Date",
+  "Care Plan Start Date",
+  "Date of Birth",
+  "Date of Death",
+  "Disenrollment Date",
+  "Disenrollment Effective Date",
+  "Enrollment Date",
+  "IDT Meeting Date",
+  "Last Care Plan",
+  "Next Care Plan Due",
+  "Master List Update Month"
+]);
+
+// -----------------------------------------------------------------------------
+// CP title-info migration source cells
+// -----------------------------------------------------------------------------
+// Target placement is owned by the CP formatter/template workflow; source cleanup list is shared configuration.
+const TITLE_INFO_MOVE_CELLS = Object.freeze({
+  [SHEET_TYPE.CARE_PLAN_DUE]: ["A2", "C2", "A3", "C3", "D3", "E3"],
+  [SHEET_TYPE.UNLOCKED]: ["A2", "A3", "B3", "C3", "D2", "E2", "F2", "G2"]
+});
+
+// -----------------------------------------------------------------------------
+// Explicitly excluded from CONFIGURATION rebuild section
+// -----------------------------------------------------------------------------
+// - COLUMN_FORMATS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS.
+// - SHEET_BASE_COLORS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS.
+// - RFF_DEFAULTS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS / TEMPLATE FUNCTIONS AND VALIDATION.
+// - RFF_DASHBOARD_QUALITY_SECTIONS and DQ widths/styles: move to DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS.
+// - Framework Timing section registry, severities, benchmarks: move to FRAMEWORK AND TIMING FUNCTIONS.
+// - Workflow-specific hidden columns and sync lists: move to owning workflow/sync section.
+
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - HELPER FUNCTIONS Section
+ *
+ * Depends on: v1.5.55 CONFIGURATION rebuild section.
+ * Purpose: shared low-level helpers only. Section-owned helpers are separated into review holding sections.
+ *
+ * Rebuild rule:
+ * - Carry-forward helpers are shared and active in v1.5.54 static analysis.
+ * - Review helpers remain isolated until menu, trigger, button, manual IDE, and section ownership checks are complete.
+ * - No helper in this file should own Dashboard formatting, Dashboard Quality layout, Framework Timing layout, or business workflow policy.
+ */
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+
+// ----------------------------------------------------------------------------
+// Notification / UI Helpers
+// ----------------------------------------------------------------------------
+
+function notify_(message) {
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast(String(message), "Master List Tools", 5);
+  } catch (err) {
+    Logger.log(message);
+  }
+}
+
+
+// ----------------------------------------------------------------------------
+// Date / Month Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function coerceToValidDate_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return isReasonableReportDate_(value) ? value : null;
+  }
+
+
+  if (value === null || value === undefined || value === "") return null;
+
+
+  if (typeof value === "number") {
+    if (value < 30000) return null;
+    return spreadsheetSerialDateToLocalDate_(value);
+  }
+
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+
+  const match = text.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/);
+  if (match) {
+    const month = Number(match[1]) - 1;
+    const day = Number(match[2]);
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+
+
+    const d = new Date(year, month, day);
+    if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return null;
+    return isReasonableReportDate_(d) ? d : null;
+  }
+
+
+  const d = new Date(text);
+  return !isNaN(d.getTime()) && isReasonableReportDate_(d) ? d : null;
+}
+
+function spreadsheetSerialDateToLocalDate_(serialValue) {
+  if (serialValue === null || serialValue === undefined || serialValue === "") return null;
+
+
+  const serial = Number(serialValue);
+  if (isNaN(serial) || serial < 1) return null;
+
+
+  const wholeDays = Math.floor(serial);
+  const fractional = serial - wholeDays;
+
+
+  const date = new Date(1899, 11, 30);
+  date.setDate(date.getDate() + wholeDays);
+
+
+  if (fractional > 0) {
+    const millisInDay = Math.round(fractional * 24 * 60 * 60 * 1000);
+    date.setMilliseconds(date.getMilliseconds() + millisInDay);
+  }
+
+
+  return isReasonableReportDate_(date) ? date : null;
+}
+
+function isReasonableReportDate_(date) {
+  const year = date.getFullYear();
+  return year >= 2000 && year <= 2099;
+}
+
+function createLocalDateOnly_(year, month, day) {
+  return new Date(year, month, day, 12, 0, 0, 0);
+}
+
+function getMonthDateParts_(date) {
+  const d = coerceToValidDate_(date);
+  if (!d) return null;
+
+
+  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const previousMonthFirstDay = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  const previousMonthLastDay = new Date(d.getFullYear(), d.getMonth(), 0);
+
+
+  return {
+    inputDate: d,
+    firstDay: firstDay,
+    lastDay: lastDay,
+    previousMonthFirstDay: previousMonthFirstDay,
+    previousMonthLastDay: previousMonthLastDay,
+    firstDayName: formatDateForSheetName_(firstDay),
+    lastDayName: formatDateForSheetName_(lastDay),
+    previousFirstDayName: formatDateForSheetName_(previousMonthFirstDay),
+    previousLastDayName: formatDateForSheetName_(previousMonthLastDay),
+    monthKey: Utilities.formatDate(firstDay, Session.getScriptTimeZone(), "yyyy-MM")
+  };
+}
+
+function formatDateForSheetName_(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), DATE_SHEET_FORMAT);
+}
+
+function formatDateDisplay_(date) {
+  const d = coerceToValidDate_(date);
+  return d ? Utilities.formatDate(d, Session.getScriptTimeZone(), DATE_DISPLAY_FORMAT) : "";
+}
+
+function dateKey_(value) {
+  const d = coerceToValidDate_(value);
+  return d ? Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyyMMdd") : "";
+}
+
+function isSameDate_(a, b) {
+  return dateKey_(a) !== "" && dateKey_(a) === dateKey_(b);
+}
+
+function isSameMonth_(a, b) {
+  return monthKey_(a) !== "" && monthKey_(a) === monthKey_(b);
+}
+
+
+// ----------------------------------------------------------------------------
+// Sheet Name / Monthly Sheet Lookup Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function buildMonthlySheetName_(prefix, firstDay, lastDay) {
+  // v1.4.2: Standard monthly output names use mm.yy only.
+  return buildStandardMonthlySheetName_(prefix, firstDay);
+}
+
+function buildStandardMonthlySheetName_(prefix, monthDate) {
+  const date = coerceToValidDate_(monthDate) || new Date();
+  const monthText = Utilities.formatDate(date, Session.getScriptTimeZone(), "MM.yy");
+  return String(prefix || "").trim() + " " + monthText;
+}
+
+function getNewestFormattedMonthlySheetByPrefix_(ss, prefix) {
+  if (!ss || !prefix) return null;
+
+
+  const sheets = ss.getSheets();
+  const matches = [];
+
+
+  sheets.forEach(sheet => {
+    const parsed = parseStandardMonthlySheetDateFromName_(sheet.getName(), prefix);
+    if (!parsed) return;
+    matches.push({
+      sheet,
+      key: monthKey_(parsed),
+      index: sheet.getIndex ? sheet.getIndex() : 0
+    });
+  });
+
+
+  if (!matches.length) return null;
+
+
+  matches.sort((a, b) => {
+    if (a.key !== b.key) return a.key < b.key ? 1 : -1;
+    return b.index - a.index;
+  });
+
+
+  return matches[0].sheet;
+}
+
+function getMonthlySheetByPrefixAndDate_(ss, prefix, firstDay, lastDay) {
+  // v1.4.2: all production sync sources use the standardized monthly output name Prefix mm.yy.
+  if (!ss || !prefix) return null;
+
+
+  const cacheKey = getMonthlySheetLookupCacheKey_(ss, prefix, firstDay, lastDay);
+  const cachedSheet = ML_MONTHLY_SHEET_LOOKUP_CACHE_[cacheKey];
+  if (cachedSheet) {
+    try {
+      if (cachedSheet.getName()) return cachedSheet;
+    } catch (err) {
+      delete ML_MONTHLY_SHEET_LOOKUP_CACHE_[cacheKey];
+    }
+  }
+
+
+  const standardName = buildStandardMonthlySheetName_(prefix, firstDay);
+  let sheet = ss.getSheetByName(standardName);
+  if (sheet) {
+    ML_MONTHLY_SHEET_LOOKUP_CACHE_[cacheKey] = sheet;
+    return sheet;
+  }
+
+
+  sheet = getNewestFormattedMonthlySheetByPrefix_(ss, prefix);
+  if (sheet) {
+    ML_MONTHLY_SHEET_LOOKUP_CACHE_[cacheKey] = sheet;
+    return sheet;
+  }
+
+
+  return null;
+}
+
+function setUniqueSheetName_(sheet, desiredName) {
+  if (!sheet || !desiredName) return desiredName;
+
+
+  const ss = sheet.getParent();
+  let name = desiredName;
+  let counter = 2;
+
+
+  if (sheet.getName && sheet.getName() === desiredName) {
+    return desiredName;
+  }
+
+
+  let existing = ss.getSheetByName(name);
+  while (existing && existing.getSheetId && existing.getSheetId() !== sheet.getSheetId()) {
+    name = `${desiredName} (${counter})`;
+    counter++;
+    existing = ss.getSheetByName(name);
+  }
+
+
+  if (sheet.getName() !== name) {
+    sheet.setName(name);
+    clearMonthlySheetLookupCache_();
+    clearSheetRuntimeCachesForSheet_(sheet);
+  }
+
+
+  return name;
+}
+
+
+/**
+ * Fast monthly output rename helper.
+ * Deletes/replaces an existing monthly output with the same name before renaming,
+ * then clears sheet lookup caches. This helper is required by Format Raw Data,
+ * Demo P, Master List, and other monthly output functions.
+ */
+
+
+// ----------------------------------------------------------------------------
+// Header Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function getHeaders_(sheet, headerRow) {
+  headerRow = headerRow || HEADER_ROW;
+  const key = getHeaderCacheKey_(sheet, headerRow);
+
+
+  if (key && ML_HEADER_CACHE_[key]) {
+    return ML_HEADER_CACHE_[key].slice();
+  }
+
+
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(headerRow, 1, 1, lastCol)
+    .getValues()[0]
+    .map(h => String(h || "").trim());
+
+
+  if (key) ML_HEADER_CACHE_[key] = headers.slice();
+  return headers;
+}
+
+function getHeaderMap_(sheet, headerRow) {
+  headerRow = headerRow || HEADER_ROW;
+  const key = getHeaderCacheKey_(sheet, headerRow);
+
+
+  if (key && ML_HEADER_MAP_CACHE_[key]) {
+    return Object.assign({}, ML_HEADER_MAP_CACHE_[key]);
+  }
+
+
+  const map = buildHeaderIndexMap_(getHeaders_(sheet, headerRow));
+  if (key) ML_HEADER_MAP_CACHE_[key] = Object.assign({}, map);
+  return map;
+}
+
+function buildHeaderIndexMap_(headers) {
+  const map = {};
+  headers.forEach((header, idx) => {
+    const clean = String(header || "").trim();
+    if (clean && map[clean] === undefined) map[clean] = idx;
+  });
+  return map;
+}
+
+function findHeaderIndex_(headerMap, possibleNames) {
+  for (let i = 0; i < possibleNames.length; i++) {
+    if (headerMap[possibleNames[i]] !== undefined) return headerMap[possibleNames[i]];
+  }
+  return -1;
+}
+
+function normalizeHeader_(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ");
+}
+
+
+// ----------------------------------------------------------------------------
+// PMR / Participant Key Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function normalizePMR_(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/\.0$/, "");
+}
+
+function getPMRIndex_(headerMap) {
+  return findHeaderIndex_(headerMap, ["Participant PMR#", "PMR #", "PMR#", "Participant PMR"]);
+}
+
+function normalizeKeyPart_(value) {
+  if (value === null || value === undefined) return "";
+
+
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyyMMdd");
+  }
+
+
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+
+// ----------------------------------------------------------------------------
+// Data Read / Row Mapping Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function getDataValues_(sheet, headerRow, dataStartRow) {
+  headerRow = headerRow || HEADER_ROW;
+  dataStartRow = dataStartRow || DATA_START_ROW;
+
+
+  const dimensions = getSheetDimensions_(sheet);
+  const lastRow = dimensions.lastRow;
+  const lastCol = dimensions.lastCol;
+  const headers = getHeaders_(sheet, headerRow);
+  const headerMap = getHeaderMap_(sheet, headerRow);
+
+
+  if (lastRow < dataStartRow || lastCol < 1) {
+    return {
+      headers: headers,
+      headerMap: headerMap,
+      values: [],
+      range: null,
+      lastRow: lastRow,
+      lastCol: lastCol
+    };
+  }
+
+
+  const range = sheet.getRange(dataStartRow, 1, lastRow - dataStartRow + 1, lastCol);
+
+
+  return {
+    headers: headers,
+    headerMap: headerMap,
+    values: range.getValues(),
+    range: range,
+    lastRow: lastRow,
+    lastCol: lastCol
+  };
+}
+
+function mapRowsToHeaders_(sourceRows, sourceHeaders, targetHeaders) {
+  const sourceHeaderMap = buildHeaderIndexMap_(sourceHeaders || []);
+
+
+  return (sourceRows || []).map(row => {
+    return (targetHeaders || []).map(header => {
+      const sourceIdx = sourceHeaderMap[header];
+      return sourceIdx === undefined ? "" : row[sourceIdx];
+    });
+  });
+}
+
+
+// ----------------------------------------------------------------------------
+// Comparison / Normalization Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function normalizeCompareValue_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+
+
+  if (value === null || value === undefined) return "";
+
+
+  const text = String(value).trim();
+  if (text === "") return "";
+
+
+  const parsed = coerceToValidDate_(text);
+  if (parsed && /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/.test(text)) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+
+
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function valuesAreEqual_(a, b) {
+  return normalizeCompareValue_(a) === normalizeCompareValue_(b);
+}
+
+function normalizeText_(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeKey_(value) {
+  return normalizeText_(value).toLowerCase();
+}
+
+function numberOrDefault_(value, fallback) {
+  const n = Number(value);
+  return isNaN(n) ? fallback : n;
+}
+
+function parseBoolean_(value) {
+  if (value === true) return true;
+  if (value === false) return false;
+
+
+  const text = String(value || "").trim().toLowerCase();
+  return ["true", "yes", "y", "1", "x"].indexOf(text) !== -1;
+}
+
+
+// ----------------------------------------------------------------------------
+// Cache Helpers - Carry Forward
+// ----------------------------------------------------------------------------
+
+function clearHeaderCacheForSheet_(sheet) {
+  if (!sheet) return;
+  const prefix = sheet.getSheetId() + ":";
+
+
+  Object.keys(ML_HEADER_CACHE_).forEach(key => {
+    if (key.indexOf(prefix) === 0) delete ML_HEADER_CACHE_[key];
+  });
+
+
+  Object.keys(ML_HEADER_MAP_CACHE_).forEach(key => {
+    if (key.indexOf(prefix) === 0) delete ML_HEADER_MAP_CACHE_[key];
+  });
+}
+
+function clearSheetRuntimeCachesForSheet_(sheet) {
+  clearHeaderCacheForSheet_(sheet);
+  clearSheetDimensionCacheForSheet_(sheet);
+}
+
+function getHeaderCacheKey_(sheet, headerRow) {
+  if (!sheet) return "";
+  const row = headerRow || HEADER_ROW;
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  return sheet.getSheetId() + ":" + row + ":" + lastCol;
+}
+
+function clearMonthlySheetLookupCache_() {
+  Object.keys(ML_MONTHLY_SHEET_LOOKUP_CACHE_).forEach(key => {
+    delete ML_MONTHLY_SHEET_LOOKUP_CACHE_[key];
+  });
+}
+
+function getMonthlySheetLookupCacheKey_(ss, prefix, firstDay, lastDay) {
+  const spreadsheetId = ss && ss.getId ? ss.getId() : "";
+  const startKey = dateKey_(firstDay);
+  const endKey = dateKey_(lastDay);
+  return [spreadsheetId, String(prefix || "").trim().toLowerCase(), startKey, endKey].join("||");
+}
+
+function getSheetDimensionCacheKey_(sheet) {
+  return sheet ? String(sheet.getSheetId()) : "";
+}
+
+function clearSheetDimensionCacheForSheet_(sheet) {
+  if (!sheet) return;
+  const key = getSheetDimensionCacheKey_(sheet);
+  if (key) delete ML_SHEET_DIMENSION_CACHE_[key];
+}
+
+function getSheetDimensions_(sheet) {
+  const key = getSheetDimensionCacheKey_(sheet);
+  if (key && ML_SHEET_DIMENSION_CACHE_[key]) {
+    return Object.assign({}, ML_SHEET_DIMENSION_CACHE_[key]);
+  }
+
+
+  const dimensions = {
+    lastRow: sheet.getLastRow(),
+    lastCol: sheet.getLastColumn(),
+    maxRows: sheet.getMaxRows(),
+    maxCols: sheet.getMaxColumns()
+  };
+
+
+  if (key) ML_SHEET_DIMENSION_CACHE_[key] = Object.assign({}, dimensions);
+  return dimensions;
+}
+
+
+// ----------------------------------------------------------------------------
+// Review Before Retention - Low Use or Section-Owned Helpers
+// ----------------------------------------------------------------------------
+
+// Holding section: used or low-use helpers that may belong to a future owner section. Do not delete until ownership is verified.
+
+function dateOnlyLocalClone_(date) {
+  const d = coerceToValidDate_(date);
+  if (!d) return null;
+  return createLocalDateOnly_(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function monthKey_(value) {
+  const d = coerceToValidDate_(value);
+  return d ? Utilities.formatDate(new Date(d.getFullYear(), d.getMonth(), 1), Session.getScriptTimeZone(), "yyyyMM") : "";
+}
+
+function parseStandardMonthlySheetDateFromName_(sheetName, prefix) {
+  const name = String(sheetName || "").trim();
+  const prefixText = String(prefix || "").trim();
+  if (!prefixText) return null;
+
+
+  const escapedPrefix = prefixText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp("^" + escapedPrefix + "\\s+(\\d{1,2})\\.(\\d{2})(?:\\s|$|\\()", "i");
+  const match = name.match(re);
+  if (!match) return null;
+
+
+  const month = Number(match[1]);
+  const year = 2000 + Number(match[2]);
+  if (month < 1 || month > 12 || year < 2000 || year > 2099) return null;
+
+
+  return new Date(year, month - 1, 1);
+}
+
+function buildRowsByPMR_(sheet, headerRow, dataStartRow) {
+  headerRow = headerRow || HEADER_ROW;
+  dataStartRow = dataStartRow || DATA_START_ROW;
+
+
+  const data = getDataValues_(sheet, headerRow, dataStartRow);
+  const result = new Map();
+
+
+  if (!data.values.length) return result;
+
+
+  const pmrIdx = getPMRIndex_(data.headerMap);
+
+
+  if (pmrIdx === -1) throw new Error(`${sheet.getName()} is missing Participant PMR# / PMR # column.`);
+
+
+  data.values.forEach((row, offset) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+
+
+    if (!result.has(pmr)) result.set(pmr, []);
+    result.get(pmr).push({
+      rowNumber: dataStartRow + offset,
+      values: row
+    });
+  });
+
+
+  return result;
+}
+
+function writeChangedColumnsOnly_(sheet, data, beforeValues) {
+  if (!sheet || !data || !data.values || !data.values.length) return 0;
+
+
+  const indexes = Object.keys(beforeValues || {})
+    .map(function(key) { return Number(key); })
+    .filter(function(idx) {
+      return idx >= 0 && data.values.some(function(row, r) {
+        return !valuesAreEqual_(row[idx], beforeValues[idx][r]);
+      });
+    })
+    .sort(function(a, b) { return a - b; });
+
+
+  if (!indexes.length) return 0;
+
+
+  const groups = [];
+  let current = [indexes[0]];
+
+
+  for (let i = 1; i < indexes.length; i++) {
+    if (indexes[i] === current[current.length - 1] + 1) {
+      current.push(indexes[i]);
+    } else {
+      groups.push(current);
+      current = [indexes[i]];
+    }
+  }
+  groups.push(current);
+
+
+  groups.forEach(function(group) {
+    const startIdx = group[0];
+    const width = group.length;
+    const values = data.values.map(function(row) {
+      return row.slice(startIdx, startIdx + width);
+    });
+
+
+    sheet.getRange(DATA_START_ROW, startIdx + 1, values.length, width).setValues(values);
+  });
+
+
+  return indexes.length;
+}
+
+function safeSheetName_(value) {
+  return normalizeText_(value)
+    .replace(/[\\\/\?\*\[\]:]/g, "-")
+    .substring(0, 99);
+}
+
+
+// ----------------------------------------------------------------------------
+// Review Before Removal - No Static Direct Callers Found
+// ----------------------------------------------------------------------------
+
+// Holding section: no static direct callers found in v1.5.54. Keep isolated until dynamic Apps Script usage is ruled out.
+
+function compareValues_(left, right) {
+  return normalizeText_(left) === normalizeText_(right);
+}
+
+function toBool_(value) {
+  return parseBoolean_(value);
+}
+
+function truthy_(value) {
+  return parseBoolean_(value);
+}
+
+function toNumber_(value, fallback) {
+  return numberOrDefault_(value, fallback || 0);
+}
+
+function resizeSheetMinimum_(sheet, rowCount, colCount) {
+  const currentRows = sheet.getMaxRows();
+  const currentCols = sheet.getMaxColumns();
+
+
+  if (currentRows < rowCount) {
+    sheet.insertRowsAfter(currentRows, rowCount - currentRows);
+  }
+
+
+  if (currentCols < colCount) {
+    sheet.insertColumnsAfter(currentCols, colCount - currentCols);
+  }
+}
+
+function forceSheetRowCount_(sheet, desiredRows) {
+  if (!sheet || !desiredRows) return;
+  desiredRows = Math.max(1, Number(desiredRows) || 1);
+  const current = sheet.getMaxRows();
+  if (current > desiredRows) {
+    sheet.deleteRows(desiredRows + 1, current - desiredRows);
+  } else if (current < desiredRows) {
+    sheet.insertRowsAfter(current, desiredRows - current);
+  }
+}
+
+
