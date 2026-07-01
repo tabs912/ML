@@ -1,0 +1,929 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - FRAMEWORK AND TIMING FUNCTIONS
+ *
+ * Scope:
+ * - Runtime timing diagnostics and framework timed wrappers.
+ * - Framework Timing Report shell, section registry, section replacement, styling, and retention.
+ * - Timing detail aggregation, issue rows, optimization recommendations, and performance severity helpers.
+ * - Menu-callable timing refresh / recommendation entry points.
+ *
+ * Diff hygiene:
+ * - This file is intentionally limited to active scripts/ timing code.
+ * - Do not add archive/report/spec/binary files to this diff.
+ */
+
+function startRuntimeTiming_(processName, monthParts) {
+  const now = new Date().getTime();
+  return {
+    processName: processName || "Workflow",
+    monthParts: monthParts || null,
+    startMs: now,
+    lastMs: now,
+    steps: [],
+    counters: {},
+    warnings: []
+  };
+}
+
+function markRuntimeStep_(timing, label, details) {
+  if (!timing) return;
+
+  const now = new Date().getTime();
+  const stepSeconds = (now - timing.lastMs) / 1000;
+  const totalSeconds = (now - timing.startMs) / 1000;
+  const cleanLabel = String(label || "Step");
+  const severity = /^ERROR\b/i.test(cleanLabel) ? "CRITICAL" : getRuntimeTimingSeverity_(stepSeconds);
+  const cleanDetails = details === undefined || details === null ? "" : String(details);
+
+  timing.steps.push({
+    step: cleanLabel,
+    seconds: stepSeconds,
+    totalSeconds: totalSeconds,
+    severity: severity,
+    details: cleanDetails,
+    timestamp: new Date()
+  });
+
+  if (severity !== "OK") {
+    timing.warnings.push(cleanLabel + " - " + severity + " - " + formatSeconds_(stepSeconds));
+  }
+
+  timing.lastMs = now;
+  logRuntimeTiming_(timing.processName, cleanLabel, stepSeconds, totalSeconds, severity, cleanDetails);
+}
+
+function addRuntimeCounter_(timing, name, value) {
+  if (!timing || !name) return;
+  timing.counters[String(name)] = value;
+}
+
+function logRuntimeInfo_(processName, message, details) {
+  const suffix = details === undefined || details === null || details === "" ? "" : " | " + details;
+  Logger.log("[INFO] " + String(processName || "Master List") + " | " + String(message || "") + suffix);
+}
+
+function logRuntimeWarning_(processName, message, details) {
+  const suffix = details === undefined || details === null || details === "" ? "" : " | " + details;
+  Logger.log("[WARNING] " + String(processName || "Master List") + " | " + String(message || "") + suffix);
+}
+
+function logRuntimeError_(processName, message, details) {
+  const suffix = details === undefined || details === null || details === "" ? "" : " | " + details;
+  Logger.log("[ERROR] " + String(processName || "Master List") + " | " + String(message || "") + suffix);
+}
+
+function logRuntimeTiming_(processName, stepName, stepSeconds, totalSeconds, severity, details) {
+  const detailText = details ? " | " + details : "";
+  Logger.log(
+    "[TIMING] " +
+    String(processName || "Workflow") +
+    " | " +
+    String(stepName || "Step") +
+    " | step " +
+    formatSeconds_(stepSeconds) +
+    " | total " +
+    formatSeconds_(totalSeconds) +
+    " | " +
+    String(severity || getRuntimeTimingSeverity_(stepSeconds)) +
+    detailText
+  );
+}
+
+function getRuntimeTimingSeverity_(seconds) {
+  const value = Number(seconds || 0);
+  if (value >= 60) return "CRITICAL";
+  if (value >= 30) return "BOTTLENECK";
+  if (value >= 10) return "SLOW";
+  return "OK";
+}
+
+function getRuntimeTimingReportName_(processName) {
+  return RFF_TIMING_SUMMARY_SHEET || "Timing Summary Report";
+}
+
+function writeRuntimeTimingReport_(timing) {
+  if (!timing) return;
+  appendRuntimeTimingToFrameworkTimingReport_(timing);
+  writeCombinedFrameworkTimingReport_();
+}
+
+function writeConsolidatedTimingSummaryReport_() {
+  writeCombinedFrameworkTimingReport_();
+}
+
+function writeCombinedFrameworkTimingReport_() {
+  const sheet = ensureFrameworkTimingReport_();
+  const detailRows = getFrameworkTimingDetailRows_(sheet);
+  const retainedDetailRows = detailRows.slice(-getFrameworkTimingRetentionLimit_());
+  const summaryRows = retainedDetailRows;
+  const processRows = buildFrameworkTimingProcessSummaryRows_(summaryRows);
+  const issueRows = buildFrameworkTimingIssueRows_(summaryRows, processRows);
+  const recommendationRows = buildFrameworkTimingRecommendationRows_(issueRows);
+  const options = { skipStyle: true };
+
+  replaceFrameworkTimingSectionRows_(sheet, "A", processRows, options);
+  replaceFrameworkTimingSectionRows_(sheet, "B", issueRows, options);
+  replaceFrameworkTimingSectionRows_(sheet, "C", recommendationRows, options);
+  replaceFrameworkTimingSectionRows_(sheet, "D", retainedDetailRows, options);
+  styleFrameworkTimingReport_(sheet, ["A", "B", "C", "D"]);
+}
+
+function getFrameworkTimingRetentionLimit_() {
+  return Math.max(Number(RFF_TIMING_MAX_ROWS) || 5000, 500);
+}
+
+function getFrameworkTimingReportSheetName_() {
+  return "Framework Timing Report";
+}
+
+function getFrameworkTimingSectionRegistry_() {
+  return [
+    {
+      id: "A",
+      title: "SECTION A - PROCESS SUMMARY",
+      headers: ["Process", "Runtime (Sec)", "Status", "Benchmark", "Variance", "Notes"]
+    },
+    {
+      id: "B",
+      title: "SECTION B - PERFORMANCE ISSUES",
+      headers: ["Priority", "Process", "Runtime (Sec)", "Threshold", "Issue", "Recommendation"]
+    },
+    {
+      id: "C",
+      title: "SECTION C - OPTIMIZATION RECOMMENDATIONS",
+      headers: ["Process", "Finding", "Impact", "Recommendation", "Priority", "Status"]
+    },
+    {
+      id: "D",
+      title: "SECTION D - DETAILED TIMING LOG",
+      headers: ["Timestamp", "Process", "Step", "Step Seconds", "Total Seconds", "Severity", "Details"]
+    }
+  ];
+}
+
+function findFrameworkTimingSectionRow_(sheet, sectionTitle) {
+  if (!sheet) return 0;
+  const target = String(sectionTitle || "").trim();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return 0;
+
+  const values = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0] || "").trim() === target) return i + 1;
+  }
+  return 0;
+}
+
+function findNextFrameworkTimingSectionRow_(sheet, startRow) {
+  if (!sheet) return 0;
+  const lastRow = sheet.getLastRow();
+  if (startRow > lastRow) return 0;
+
+  const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getDisplayValues();
+  for (let i = 0; i < values.length; i++) {
+    const value = String(values[i][0] || "").trim();
+    if (/^SECTION [A-Z] - /.test(value)) return startRow + i;
+  }
+  return 0;
+}
+
+function collectExistingFrameworkTimingSectionBlocks_(sheet) {
+  const blocks = {};
+  if (!sheet || sheet.getLastRow() < 1) return blocks;
+  const width = 8;
+
+  getFrameworkTimingSectionRegistry_().forEach(function(section) {
+    const titleRow = findFrameworkTimingSectionRow_(sheet, section.title);
+    if (!titleRow) return;
+
+    const nextRow = findNextFrameworkTimingSectionRow_(sheet, titleRow + 1);
+    const endRow = nextRow ? Math.max(titleRow, nextRow - 2) : sheet.getLastRow();
+    const rowCount = Math.max(1, endRow - Math.max(1, titleRow - 1) + 1);
+    const values = sheet.getRange(Math.max(1, titleRow - 1), 1, rowCount, width).getValues();
+    blocks[section.id] = trimTrailingBlankRows_(values);
+  });
+
+  return blocks;
+}
+
+function buildDefaultFrameworkTimingSectionBlock_(section) {
+  return [
+    [""],
+    [section.title],
+    ["Last Updated", "Date and time"],
+    section.headers,
+    ["Enter Data here"],
+    [""],
+    [""]
+  ];
+}
+
+function normalizeFrameworkTimingSectionBlock_(section, block) {
+  let rows = trimTrailingBlankRows_(block || []);
+  let titleIndex = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (String((rows[i] || [])[0] || "").trim() === section.title) {
+      titleIndex = i;
+      break;
+    }
+  }
+  if (titleIndex < 0) rows = buildDefaultFrameworkTimingSectionBlock_(section);
+  else rows = rows.slice(titleIndex);
+
+  const dataRows = [];
+  for (let i = 1; i < rows.length; i++) {
+    const joined = (rows[i] || []).join(" ").toLowerCase();
+    if (joined.indexOf("runtime") !== -1 || joined.indexOf("threshold") !== -1 || joined.indexOf("step seconds") !== -1 || joined.indexOf("recommendation") !== -1) {
+      for (let r = i + 1; r < rows.length; r++) {
+        if (rowHasAnyValue_(rows[r])) dataRows.push(rows[r]);
+      }
+      break;
+    }
+  }
+  if (!dataRows.length) dataRows.push(["Enter Data here"]);
+
+  const output = [[""], [section.title], ["Last Updated", "Date and time"], section.headers].concat(dataRows).concat([[""], [""]]);
+  return output.map(function(row) {
+    return normalizeSectionRowForWidth_(row, 8);
+  });
+}
+
+function rebuildFrameworkTimingReportShellCompact_(sheet) {
+  if (!sheet) return;
+
+  const requiredCols = 8;
+  if (sheet.getMaxColumns() < requiredCols) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredCols - sheet.getMaxColumns());
+  }
+
+  const existingBlocks = collectExistingFrameworkTimingSectionBlocks_(sheet);
+  const rows = [];
+  rows.push(normalizeSectionRowForWidth_(["Framework Timing Report", "- v" + MASTER_LIST_MERGE_ML_VERSION + " -", "Report Timing Framework"], requiredCols));
+  rows.push(normalizeSectionRowForWidth_(["Report Actions", "Refresh Framework Timing Report", "Write Performance Recommendations"], requiredCols));
+
+  getFrameworkTimingSectionRegistry_().forEach(function(section) {
+    const block = normalizeFrameworkTimingSectionBlock_(section, existingBlocks[section.id]);
+    block.forEach(function(row) {
+      rows.push(normalizeSectionRowForWidth_(row, requiredCols));
+    });
+  });
+
+  if (sheet.getMaxRows() < rows.length) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), rows.length - sheet.getMaxRows());
+  }
+
+  const clearRows = Math.max(sheet.getLastRow(), rows.length, 1);
+  sheet.getRange(1, 1, clearRows, requiredCols).clearContent().breakApart();
+  sheet.getRange(1, 1, rows.length, requiredCols).setValues(rows);
+
+  try {
+    sheet.getRange(1, 1, 1, requiredCols)
+      .setFontFamily("Arial")
+      .setFontSize(12)
+      .setFontWeight("bold")
+      .setBackground(RFF_SYSTEM_SHEET_TITLE_COLOR);
+    sheet.setFrozenRows(1);
+  } catch (err) {
+    Logger.log("Framework Timing compact shell formatting skipped: " + err.message);
+  }
+
+  styleFrameworkTimingReport_(sheet);
+}
+
+function hasFrameworkTimingReportShell_(sheet) {
+  if (!sheet) return false;
+
+  const titleValues = sheet.getRange(1, 1, 1, 3).getDisplayValues()[0];
+  if (String(titleValues[0] || "").trim() !== "Framework Timing Report") return false;
+  if (String(titleValues[1] || "").trim() !== "- v" + MASTER_LIST_MERGE_ML_VERSION + " -") return false;
+  if (String(titleValues[2] || "").trim() !== "Report Timing Framework") return false;
+
+  const sections = getFrameworkTimingSectionRegistry_();
+  for (let i = 0; i < sections.length; i++) {
+    const titleRow = findFrameworkTimingSectionRow_(sheet, sections[i].title);
+    if (!titleRow) return false;
+
+    const headerRow = titleRow + 2;
+    if (headerRow > sheet.getLastRow()) return false;
+
+    const actualHeaders = sheet.getRange(headerRow, 1, 1, sections[i].headers.length).getDisplayValues()[0]
+      .map(function(value) { return String(value || "").trim(); });
+    for (let h = 0; h < sections[i].headers.length; h++) {
+      if (actualHeaders[h] !== sections[i].headers[h]) return false;
+    }
+  }
+
+  return true;
+}
+
+function initializeFrameworkTimingSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(getFrameworkTimingReportSheetName_());
+
+  if (!sheet) {
+    sheet = ss.insertSheet(getFrameworkTimingReportSheetName_());
+  } else {
+    showSheetIfNeeded_(sheet);
+  }
+
+  if (!hasFrameworkTimingReportShell_(sheet)) {
+    rebuildFrameworkTimingReportShellCompact_(sheet);
+  } else {
+    styleFrameworkTimingReport_(sheet);
+  }
+
+  return sheet;
+}
+
+function ensureFrameworkTimingReport_() {
+  return initializeFrameworkTimingSheet_();
+}
+
+function trimSheetToColumnCount_(sheet, requiredCols, label) {
+  if (!sheet || !requiredCols) return;
+  try {
+    const maxCols = sheet.getMaxColumns();
+    if (maxCols < requiredCols) {
+      sheet.insertColumnsAfter(maxCols, requiredCols - maxCols);
+    } else if (maxCols > requiredCols) {
+      sheet.deleteColumns(requiredCols + 1, maxCols - requiredCols);
+    }
+  } catch (err) {
+    Logger.log((label || "Sheet") + " column resize skipped: " + err.message);
+  }
+}
+
+function styleFrameworkTimingReport_(sheet, sectionIds) {
+  if (!sheet) return;
+
+  const widths = [180, 180, 260, 140, 140, 260, 120, 120];
+  trimSheetToColumnCount_(sheet, widths.length, "Framework Timing Report");
+  for (let i = 0; i < widths.length; i++) {
+    try {
+      if (sheet.getColumnWidth(i + 1) !== widths[i]) sheet.setColumnWidth(i + 1, widths[i]);
+    } catch (err) {
+      Logger.log("Framework Timing width skipped for column " + (i + 1) + ": " + err.message);
+    }
+  }
+
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const width = widths.length;
+  const registry = getFrameworkTimingSectionRegistry_();
+  const sectionTitles = {};
+  registry.forEach(function(section) {
+    sectionTitles[section.title] = true;
+  });
+
+  const requested = sectionIds && sectionIds.length ? sectionIds : registry.map(function(section) { return section.id; });
+  const ranges = [];
+  if (!sectionIds || !sectionIds.length) {
+    ranges.push({ startRow: 1, rowCount: lastRow });
+  } else {
+    requested.forEach(function(sectionId) {
+      const section = getFrameworkTimingSectionForId_(sectionId);
+      if (!section) return;
+      const titleRow = findFrameworkTimingSectionRow_(sheet, section.title);
+      if (!titleRow) return;
+      const replaceStartRow = Math.max(2, titleRow - 1);
+      const nextRow = findNextFrameworkTimingSectionRow_(sheet, titleRow + 1);
+      const endRow = nextRow ? Math.max(replaceStartRow, nextRow - 2) : lastRow;
+      ranges.push({ startRow: replaceStartRow, rowCount: Math.max(1, endRow - replaceStartRow + 1) });
+    });
+  }
+  if (!ranges.length) return;
+
+  try {
+    ranges.forEach(function(item) {
+      const rowCount = Math.max(1, Math.min(item.rowCount, lastRow - item.startRow + 1));
+      if (rowCount <= 0) return;
+      const range = sheet.getRange(item.startRow, 1, rowCount, width);
+      const values = range.getDisplayValues();
+      const backgrounds = [];
+      const fontWeights = [];
+      const fontStyles = [];
+      const fontSizes = [];
+
+      for (let r = 0; r < rowCount; r++) {
+        const absoluteRow = item.startRow + r;
+        const first = String((values[r] || [])[0] || "").trim();
+        const previousFirst = r > 0 ? String((values[r - 1] || [])[0] || "").trim() : "";
+        const twoBackFirst = r > 1 ? String((values[r - 2] || [])[0] || "").trim() : "";
+        let background = "#FFFFFF";
+        let weight = "normal";
+        let style = "normal";
+        let size = 10;
+
+        if (absoluteRow === 1) {
+          background = RFF_SYSTEM_SHEET_TITLE_COLOR;
+          weight = "bold";
+          size = 12;
+        } else if (sectionTitles[first]) {
+          background = RFF_SYSTEM_SHEET_SECTION_COLOR;
+          weight = "bold";
+        } else if (sectionTitles[previousFirst]) {
+          background = RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
+          style = "italic";
+        } else if (sectionTitles[twoBackFirst]) {
+          background = RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
+          weight = "bold";
+        }
+
+        backgrounds.push(new Array(width).fill(background));
+        fontWeights.push(new Array(width).fill(weight));
+        fontStyles.push(new Array(width).fill(style));
+        fontSizes.push(new Array(width).fill(size));
+      }
+
+      range
+        .setFontFamily("Arial")
+        .setVerticalAlignment("top")
+        .setHorizontalAlignment("left")
+        .setBorder(true, true, true, true, true, true, RFF_SYSTEM_SHEET_BORDER_COLOR, SpreadsheetApp.BorderStyle.DOTTED)
+        .setBackgrounds(backgrounds)
+        .setFontWeights(fontWeights)
+        .setFontStyles(fontStyles)
+        .setFontSizes(fontSizes);
+
+      sheet.getRange(item.startRow, 1, rowCount, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+      [2, 3, 4, 5, 6, 7, 8].forEach(function(col) {
+        sheet.getRange(item.startRow, col, rowCount, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+      });
+    });
+
+    sheet.setFrozenRows(1);
+  } catch (err) {
+    Logger.log("Framework Timing styling skipped: " + err.message);
+  }
+}
+
+function getFrameworkTimingSectionForId_(sectionId) {
+  const id = String(sectionId || "").trim().toUpperCase();
+  const matches = getFrameworkTimingSectionRegistry_().filter(function(section) {
+    return section.id === id || section.title === sectionId;
+  });
+  return matches.length ? matches[0] : null;
+}
+
+function replaceFrameworkTimingSectionRows_(sheet, sectionId, rows, options) {
+  if (!sheet) return;
+
+  const section = getFrameworkTimingSectionForId_(sectionId);
+  if (!section) throw new Error("Unknown Framework Timing Report section: " + sectionId);
+
+  if (!hasFrameworkTimingReportShell_(sheet)) {
+    rebuildFrameworkTimingReportShellCompact_(sheet);
+  }
+
+  const width = 8;
+  let titleRow = findFrameworkTimingSectionRow_(sheet, section.title);
+  if (!titleRow) throw new Error("Framework Timing section not found: " + section.title);
+
+  const normalized = (rows || []).map(function(row) {
+    return normalizeSectionRowForWidth_(row || [], width);
+  });
+
+  const replaceStartRow = Math.max(2, titleRow - 1);
+  const nextRow = findNextFrameworkTimingSectionRow_(sheet, titleRow + 1);
+  const replaceEndRow = nextRow ? Math.max(replaceStartRow, nextRow - 2) : sheet.getLastRow();
+  let oldCount = Math.max(1, replaceEndRow - replaceStartRow + 1);
+  const output = [normalizeSectionRowForWidth_([], width)]
+    .concat([
+      normalizeSectionRowForWidth_([section.title], width),
+      normalizeSectionRowForWidth_(["Last Updated", new Date()], width),
+      normalizeSectionRowForWidth_(section.headers, width)
+    ])
+    .concat(normalized.length ? normalized : [normalizeSectionRowForWidth_(["Enter Data here"], width)])
+    .concat([normalizeSectionRowForWidth_([], width), normalizeSectionRowForWidth_([], width)]);
+
+  if (output.length > oldCount) {
+    sheet.insertRowsAfter(replaceStartRow + oldCount - 1, output.length - oldCount);
+    oldCount = output.length;
+  } else if (output.length < oldCount) {
+    sheet.deleteRows(replaceStartRow + output.length, oldCount - output.length);
+    oldCount = output.length;
+  }
+
+  sheet.getRange(replaceStartRow, 1, oldCount, width).clearContent();
+  sheet.getRange(replaceStartRow, 1, oldCount, width).setValues(output);
+  sheet.getRange(replaceStartRow + 2, 2).setNumberFormat("mm/dd/yyyy hh:mm:ss");
+  if (!options || !options.skipStyle) styleFrameworkTimingReport_(sheet, [section.id]);
+}
+
+function getFrameworkTimingBenchmarkForProcess_(processName, mode) {
+  const text = String(processName || "").toLowerCase();
+  const refreshMode = String(mode || "").toUpperCase();
+  if (text.indexOf("dashboard quality quick") !== -1) return 20;
+  if (text.indexOf("dashboard quality workflow") !== -1) return 30;
+  if (text.indexOf("dashboard quality validate") !== -1) return 30;
+  if (text.indexOf("verify framework") !== -1) return 15;
+  if (text.indexOf("template") !== -1) {
+    if (refreshMode === "FIRST_BUILD") return 240;
+    if (refreshMode === "FULL_REBUILD") return 180;
+    if (refreshMode === "METADATA_ONLY" || refreshMode === "NO_CHANGE") return 45;
+    return 45;
+  }
+  if (text.indexOf("master list") !== -1) return 60;
+  if (text.indexOf("demo p") !== -1) return 60;
+  return "";
+}
+
+function getFrameworkTimingThresholdForSeverity_(severity) {
+  const value = String(severity || "").trim().toUpperCase();
+  if (value === "CRITICAL") return ">= 60 sec";
+  if (value === "BOTTLENECK") return ">= 30 sec";
+  if (value === "SLOW") return ">= 10 sec";
+  return "";
+}
+
+function ensureFrameworkTimingReportShell_(sheet) {
+  if (!sheet) return;
+
+  /*
+   * v1.5.11:
+   * Lifecycle refactor. Shell setup is initialization-only.
+   * This legacy wrapper now repairs only missing/incomplete structure and does
+   * not rebuild a valid report during population.
+   */
+  if (!hasFrameworkTimingReportShell_(sheet)) {
+    rebuildFrameworkTimingReportShellCompact_(sheet);
+  }
+}
+
+function getFrameworkTimingDetailStartRow_(sheet) {
+  if (!sheet) return 16;
+  const section = getFrameworkTimingSectionForId_("D");
+  const titleRow = section ? findFrameworkTimingSectionRow_(sheet, section.title) : 0;
+  return titleRow ? titleRow + 3 : 16;
+}
+
+function getFrameworkTimingDetailRows_(sheet) {
+  if (!sheet || sheet.getLastRow() < 1) return [];
+  const section = getFrameworkTimingSectionForId_("D");
+  if (!section) return [];
+
+  const titleRow = findFrameworkTimingSectionRow_(sheet, section.title);
+  if (!titleRow) return [];
+
+  const dataStart = titleRow + 3;
+  const nextRow = findNextFrameworkTimingSectionRow_(sheet, titleRow + 1);
+  const endRow = nextRow ? nextRow - 1 : sheet.getLastRow();
+  const dataRows = Math.max(0, endRow - dataStart + 1);
+  if (dataRows <= 0) return [];
+
+  const lookbackRows = Math.min(dataRows, Math.max(Number(RFF_TIMING_SUMMARY_LOOKBACK_ROWS) || 750, 50));
+  const readStart = endRow - lookbackRows + 1;
+  const values = sheet.getRange(readStart, 1, lookbackRows, section.headers.length).getValues();
+  return values.filter(function(row) {
+    return row.some(function(value) {
+      return String(value === null || value === undefined ? "" : value).trim() !== "" && String(value).trim() !== "Enter Data here";
+    });
+  });
+}
+
+function getLatestFrameworkTimingRowsByProcess_(detailRows) {
+  const rows = detailRows || [];
+  const processStarts = {};
+  rows.forEach(function(row, index) {
+    const process = String(row[1] || "").trim();
+    const step = String(row[2] || "").trim().toLowerCase();
+    if (!process) return;
+    if (step === "start") processStarts[process] = index;
+    else if (processStarts[process] === undefined) processStarts[process] = index;
+  });
+
+  const latestRows = [];
+  rows.forEach(function(row, index) {
+    const process = String(row[1] || "").trim();
+    if (!process) return;
+    const startIndex = processStarts[process];
+    if (startIndex === undefined || index >= startIndex) latestRows.push(row);
+  });
+  return latestRows.length ? latestRows : rows;
+}
+
+function getFrameworkTimingBenchmarkSeverity_(runtime, benchmark) {
+  const value = Number(runtime || 0);
+  const target = Number(benchmark || 0);
+  if (!target || value <= target) return "OK";
+  const variance = value - target;
+  if (variance >= 60 || value >= 180) return "CRITICAL";
+  if (variance >= 30 || value >= 90) return "BOTTLENECK";
+  return "SLOW";
+}
+
+function getFrameworkTimingModeForStep_(stepText) {
+  const text = String(stepText || "").toLowerCase();
+  if (text.indexOf("metadata_only") !== -1 || text.indexOf("metadata-only") !== -1) return "METADATA_ONLY";
+  if (text.indexOf("template sheet did not exist") !== -1 || text.indexOf("no stored signature") !== -1) return "FIRST_BUILD";
+  if (text.indexOf("full_build") !== -1 || text.indexOf("full build required") !== -1) return "FULL_REBUILD";
+  if (text.indexOf("no_change") !== -1 || text.indexOf("template unchanged") !== -1) return "NO_CHANGE";
+  return "";
+}
+
+function mergeFrameworkTimingModes_(current, next) {
+  const rank = { "": 0, "NO_CHANGE": 1, "METADATA_ONLY": 2, "FULL_REBUILD": 3, "FIRST_BUILD": 4 };
+  return (rank[next] || 0) > (rank[current] || 0) ? next : current;
+}
+
+function buildFrameworkTimingProcessSummaryRows_(detailRows) {
+  const processMap = {};
+  const currentRunByProcess = {};
+  let globalRunSequence = 0;
+
+  (detailRows || []).forEach(function(row) {
+    const process = String(row[1] || "").trim();
+    if (!process) return;
+
+    const step = String(row[2] || "");
+    const normalizedStep = step.trim().toLowerCase();
+    const stepSeconds = Number(row[3]) || 0;
+    const severity = String((row.length >= 7 ? row[5] : row[4]) || "OK").trim() || "OK";
+    const timestamp = row[0] || "";
+    const mode = getFrameworkTimingModeForStep_(step);
+
+    if (normalizedStep === "start" || !currentRunByProcess[process]) {
+      globalRunSequence += 1;
+      currentRunByProcess[process] = {
+        key: process + "||" + globalRunSequence,
+        started: timestamp || new Date()
+      };
+    }
+
+    const runInfo = currentRunByProcess[process];
+    if (!processMap[runInfo.key]) {
+      processMap[runInfo.key] = {
+        process: process,
+        steps: 0,
+        runtime: 0,
+        slowSteps: 0,
+        worstSeverity: "OK",
+        firstTimestamp: runInfo.started || timestamp,
+        lastTimestamp: timestamp,
+        mode: ""
+      };
+    }
+
+    const item = processMap[runInfo.key];
+    item.steps += 1;
+    item.runtime += stepSeconds;
+    item.lastTimestamp = timestamp || item.lastTimestamp;
+    item.mode = mergeFrameworkTimingModes_(item.mode, mode);
+    if (severity !== "OK") item.slowSteps += 1;
+    item.worstSeverity = worseTimingSeverity_(item.worstSeverity, severity);
+  });
+
+  return Object.keys(processMap).sort(function(a, b) {
+    const left = processMap[a].firstTimestamp;
+    const right = processMap[b].firstTimestamp;
+    const leftTime = left instanceof Date ? left.getTime() : new Date(left).getTime();
+    const rightTime = right instanceof Date ? right.getTime() : new Date(right).getTime();
+    return (isNaN(leftTime) ? 0 : leftTime) - (isNaN(rightTime) ? 0 : rightTime);
+  }).map(function(key) {
+    const item = processMap[key];
+    const benchmark = getFrameworkTimingBenchmarkForProcess_(item.process, item.mode);
+    const variance = benchmark ? item.runtime - benchmark : "";
+    const benchmarkSeverity = getFrameworkTimingBenchmarkSeverity_(item.runtime, benchmark);
+    const status = worseTimingSeverity_(item.worstSeverity, benchmarkSeverity);
+    const notes = [];
+    if (item.firstTimestamp) notes.push("Run Started: " + formatTimingTimestampForSummary_(item.firstTimestamp));
+    if (item.mode) notes.push("Mode: " + item.mode);
+    if (variance !== "" && variance > 0) notes.push("Exceeded benchmark by " + Number(variance.toFixed(3)) + " sec");
+    if (item.slowSteps) notes.push(item.slowSteps + " slow/bottleneck/critical step(s)");
+    if (!notes.length) notes.push("Within target");
+    return [
+      item.process,
+      Number(item.runtime.toFixed(3)),
+      status === "OK" ? "PASS" : status,
+      benchmark || "",
+      variance === "" ? "" : Number(variance.toFixed(3)),
+      notes.join("; ")
+    ];
+  });
+}
+
+function formatTimingTimestampForSummary_(value) {
+  try {
+    const date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return String(value || "");
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
+  } catch (err) {
+    return String(value || "");
+  }
+}
+
+function buildFrameworkTimingIssueRows_(detailRows, processRows) {
+  const rows = (detailRows || []).filter(function(row) {
+    const severity = String((row.length >= 7 ? row[5] : row[4]) || "").trim().toUpperCase();
+    return severity === "SLOW" || severity === "BOTTLENECK" || severity === "CRITICAL";
+  }).map(function(row) {
+    const severity = String((row.length >= 7 ? row[5] : row[4]) || "");
+    const recommendation = getPerformanceRecommendationForTimingStep_(String(row[1] || ""), String(row[2] || ""), Number(row[3]) || 0, severity);
+    return [severity, row[1], row[3], getFrameworkTimingThresholdForSeverity_(severity), row[2], recommendation];
+  });
+
+  (processRows || []).forEach(function(row) {
+    const status = String(row[2] || "").trim().toUpperCase();
+    const process = String(row[0] || "").trim();
+    const runtime = Number(row[1]) || 0;
+    const benchmark = Number(row[3]) || 0;
+    const variance = Number(row[4]) || 0;
+    if (!process || status === "PASS" || status === "OK" || !benchmark || variance <= 0) return;
+    rows.push([
+      status,
+      process,
+      runtime,
+      "Benchmark " + benchmark + " sec",
+      "Process exceeded benchmark by " + Number(variance.toFixed(3)) + " sec",
+      getPerformanceRecommendationForTimingStep_(process, "process exceeded benchmark", runtime, status)
+    ]);
+  });
+
+  return rows;
+}
+
+function buildFrameworkTimingRecommendationRows_(issueRows) {
+  const seen = {};
+  const rows = [];
+
+  (issueRows || []).forEach(function(row) {
+    const process = String(row[1] || "").trim();
+    const priority = String(row[0] || "").trim();
+    const recommendation = String(row[5] || "").trim();
+    const key = process + "|" + priority + "|" + recommendation;
+    if (!process || seen[key]) return;
+    seen[key] = true;
+    rows.push([process, row[4] || "Performance issue", priority, recommendation, priority, "Open"]);
+  });
+
+  return rows;
+}
+
+function writeFrameworkPerformanceRecommendationsSheet_() {
+  writeCombinedFrameworkTimingReport_();
+}
+
+function getPerformanceRecommendationForTimingStep_(process, step, seconds, severity) {
+  const text = String(step || "").toLowerCase();
+
+  if (text.indexOf("process exceeded benchmark") !== -1) {
+    return "Separate first-build/full-rebuild timing from metadata-only refresh, apply the governed benchmark for that mode, and optimize the largest full-build steps before treating this as a steady-state failure.";
+  }
+  if (text.indexOf("dashboard loaded for sections f-g") !== -1) {
+    return "Dashboard config reads are capped to governed dashboard columns and Sections F-G are batch-written; rerun Validate Templates and compare this step against the v1.5.38 baseline.";
+  }
+  if (text.indexOf("dashboard quality sections a-e updated") !== -1) {
+    return "A-E section writes now skip redundant unmerge work in batch mode and merge adjacent style ranges to reduce Apps Script range calls.";
+  }
+  if (text.indexOf("error -") !== -1) {
+    return "Resolve the runtime exception before performance tuning this workflow; timed errors are forced to CRITICAL even when the failure is fast.";
+  }
+  if (text.indexOf("resize rows") !== -1) {
+    return "Review dashboard Template Row Count and row mode. Row resizing is the likely source of this resize cost.";
+  }
+  if (text.indexOf("resize columns") !== -1) {
+    return "Review Dashboard Section C header count and remove obsolete columns only through Sheet Headers.";
+  }
+  if (text.indexOf("resize sheet") !== -1) {
+    return "Split resize timing into rows and columns; v1.4.30 logs those separately for future runs.";
+  }
+  if (text.indexOf("dashboard quality") !== -1 && text.indexOf("saved") !== -1) {
+    return "Use the contiguous A-O Dashboard Quality shell and repair stale shells before section writes. Keep section writes scoped between adjacent section titles.";
+  }
+  if (text.indexOf("apply row heights") !== -1) {
+    return "Keep row-height work out of CP Due/Unlocked CP/Banner/Change Log outputs. Use final forced 25px row lock only after Raw Data, Demo P, Master List, and Disenrolled processing because processing/data writes can expand rows.";
+  }
+  if (text.indexOf("create filter") !== -1) {
+    return "Skip filter recreation when the existing filter already matches the governed template range.";
+  }
+  if (text.indexOf("clear sheet") !== -1 || text.indexOf("clear formats") !== -1) {
+    return "Use create-template fast path for blank sheets and reserve clear/rebuild only for existing template updates with signature mismatch.";
+  }
+
+  return "Review this slow step and confirm it is necessary for the governed dashboard/template path.";
+}
+
+function worseTimingSeverity_(current, next) {
+  const rank = { "OK": 0, "PASS": 0, "INFO": 0, "WARNING": 1, "SLOW": 2, "BOTTLENECK": 3, "CRITICAL": 4 };
+  const c = rank[String(current || "OK").toUpperCase()] || 0;
+  const n = rank[String(next || "OK").toUpperCase()] || 0;
+  return n > c ? String(next || "OK") : String(current || "OK");
+}
+
+function appendRuntimeTimingToFrameworkTimingReport_(timing) {
+  if (!timing || !timing.steps || timing.steps.length === 0) return;
+
+  try {
+    const sheet = ensureFrameworkTimingReport_();
+    const existing = getFrameworkTimingDetailRows_(sheet);
+
+    const rows = timing.steps.map(function(step) {
+      return [
+        step.timestamp || new Date(),
+        step.processName || timing.processName || "",
+        step.stepName || step.step || "",
+        Number(step.stepSeconds || step.seconds || 0),
+        Number(step.totalSeconds || step.total || 0),
+        step.severity || getRuntimeTimingSeverity_(Number(step.stepSeconds || step.seconds || 0)),
+        step.details || ""
+      ];
+    });
+
+    const combined = existing.concat(rows).slice(-getFrameworkTimingRetentionLimit_());
+    replaceFrameworkTimingSectionRows_(sheet, "D", combined, { skipStyle: true });
+  } catch (err) {
+    Logger.log("[WARNING] Framework Timing Report append skipped | " + err.message);
+  }
+}
+
+function formatSeconds_(seconds) {
+  const value = Number(seconds || 0);
+  if (value < 60) return value.toFixed(2) + " sec";
+
+  const minutes = Math.floor(value / 60);
+  const remaining = value - (minutes * 60);
+  return minutes + " min " + remaining.toFixed(1) + " sec";
+}
+
+function refreshFrameworkTimingReport() {
+  writeConsolidatedTimingSummaryReport_();
+}
+
+function writeFrameworkTimingPerformanceRecommendations() {
+  writeFrameworkPerformanceRecommendationsSheet_();
+}
+
+function runFrameworkTimed_(processName, callback) {
+  const timing = startFrameworkTiming_(processName);
+
+  try {
+    markFrameworkStep_(timing, "Start");
+    const result = callback(timing);
+    markFrameworkStep_(timing, "Complete");
+    writeFrameworkTimingReport_(timing);
+    return result;
+  } catch (err) {
+    const detailText = err && err.timingDetails ? err.timingDetails : (err && err.stack ? err.stack : "");
+    markFrameworkStep_(timing, "ERROR - " + err.message, detailText);
+    writeFrameworkTimingReport_(timing);
+    throw err;
+  }
+}
+
+function startFrameworkTiming_(processName) {
+  const now = new Date().getTime();
+  return {
+    processName: processName,
+    startTime: new Date(),
+    startMs: now,
+    lastMs: now,
+    steps: []
+  };
+}
+
+function markFrameworkStep_(timing, stepName, details) {
+  if (!timing) return;
+
+  const normalizedStepName = stepName || "Step";
+  if (Object.prototype.hasOwnProperty.call(timing, "warnings") || Object.prototype.hasOwnProperty.call(timing, "monthParts")) {
+    markRuntimeStep_(timing, normalizedStepName, details || "");
+    return;
+  }
+
+  const now = new Date().getTime();
+  const stepSeconds = (now - timing.lastMs) / 1000;
+  const totalSeconds = (now - timing.startMs) / 1000;
+  const severity = /^ERROR\b/i.test(String(normalizedStepName)) ? "CRITICAL" : getRuntimeTimingSeverity_(stepSeconds);
+  timing.steps.push({
+    processName: timing.processName,
+    stepName: normalizedStepName,
+    stepSeconds: stepSeconds,
+    totalSeconds: totalSeconds,
+    timestamp: new Date(),
+    severity: severity,
+    details: details || ""
+  });
+  timing.lastMs = now;
+}
+
+function writeFrameworkTimingReport_(timing) {
+  if (!timing) return;
+  appendRuntimeTimingToFrameworkTimingReport_(timing);
+  writeCombinedFrameworkTimingReport_();
+}
+
+function trimTimingReportRows_(sheet) {
+  if (!sheet || !RFF_TIMING_MAX_ROWS) return;
+
+  try {
+    const lastRow = sheet.getLastRow();
+    const maxRowsWithHeader = Math.max(Number(RFF_TIMING_MAX_ROWS) + 1, 2);
+    if (lastRow <= maxRowsWithHeader) return;
+
+    const rowsToDelete = lastRow - maxRowsWithHeader;
+    if (rowsToDelete > 0) {
+      sheet.deleteRows(2, rowsToDelete);
+    }
+  } catch (err) {
+    Logger.log("Timing row trim skipped: " + err.message);
+  }
+}
