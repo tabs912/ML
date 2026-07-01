@@ -1,1 +1,112 @@
 
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - MENU FUNCTIONS Section
+ *
+ * Depends on:
+ * - CONFIGURATION rebuild section for release/version constants.
+ * - Later owner sections for callback implementations.
+ *
+ * Purpose:
+ * - Own only Apps Script menu construction and public menu callback registration.
+ * - Do not own workflow implementation, dashboard logic, template logic, QA logic, or timing logic.
+ * - Callback functions remain in their owning sections.
+ */
+
+// ============================================================================
+// MENU FUNCTIONS
+// ============================================================================
+
+// -----------------------------------------------------------------------------
+// Menu callback registry
+// -----------------------------------------------------------------------------
+// This registry documents every callback used by onOpen(). It is validation metadata;
+// callback implementations belong to their owner sections, not this menu section.
+const ML_MENU_CALLBACKS = Object.freeze({
+  setup: Object.freeze([
+    "setupSystemSheets",
+    "setupReportFormattingDashboardFromScriptDefaults_",
+    "createOrRefreshAllReportTemplates"
+  ]),
+  quality: Object.freeze([
+    "runDashboardQualityStartUp",
+    "runDashboardQualityValidateTemplates",
+    "runDashboardQualityFull"
+  ]),
+  workflowFormat: Object.freeze([
+    "formatBannerReport",
+    "formatCarePlanDueReport",
+    "formatUnlockedCarePlanReport",
+    "formatRawData"
+  ]),
+  workflowCreate: Object.freeze([
+    "createDisenrolledList",
+    "processDemoP",
+    "createMasterList"
+  ]),
+  workflowUpdate: Object.freeze([
+    "buildMonthlyChangeReportFromDemoP",
+    "runUpdateMasterListMergeAudit"
+  ]),
+  sheetManagement: Object.freeze([
+    "hideReportTemplates",
+    "showReportTemplates",
+    "showSystemSheetsNow",
+    "hideSystemSheetsNow"
+  ])
+});
+
+// -----------------------------------------------------------------------------
+// Apps Script open trigger
+// -----------------------------------------------------------------------------
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+
+  const setupMenu = ui.createMenu("Setup")
+    .addItem("Set up System Sheets", "setupSystemSheets")
+    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
+    .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
+
+  const qualityMenu = ui.createMenu("Quality")
+    .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
+    .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates")
+    .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
+
+  const workflowFormatMenu = ui.createMenu("Format")
+    .addItem("Format Banner Report", "formatBannerReport")
+    .addItem("Format Care Plan Due", "formatCarePlanDueReport")
+    .addItem("Format Unlocked Care Plan", "formatUnlockedCarePlanReport")
+    .addItem("Format Raw Data", "formatRawData");
+
+  const workflowCreateMenu = ui.createMenu("Create")
+    .addItem("Create Disenrolled List", "createDisenrolledList")
+    .addItem("Process Demo P", "processDemoP")
+    .addItem("Create Master List", "createMasterList");
+
+  const workflowUpdateMenu = ui.createMenu("Update")
+    .addItem("Monthly Change", "buildMonthlyChangeReportFromDemoP")
+    .addItem("Master List Change Log", "runUpdateMasterListMergeAudit");
+
+  const workflowMenu = ui.createMenu("Workflow")
+    .addSubMenu(workflowFormatMenu)
+    .addSubMenu(workflowCreateMenu)
+    .addSubMenu(workflowUpdateMenu);
+
+  const templateManagementMenu = ui.createMenu("Templates")
+    .addItem("Hide Templates", "hideReportTemplates")
+    .addItem("Show Templates", "showReportTemplates");
+
+  const systemSheetMenu = ui.createMenu("System Sheets")
+    .addItem("Show System Sheets", "showSystemSheetsNow")
+    .addItem("Hide System Sheets", "hideSystemSheetsNow");
+
+  const sheetManagementMenu = ui.createMenu("Sheet Management")
+    .addSubMenu(templateManagementMenu)
+    .addSubMenu(systemSheetMenu);
+
+  ui.createMenu("Master List Tools")
+    .addSubMenu(setupMenu)
+    .addSubMenu(qualityMenu)
+    .addSubMenu(workflowMenu)
+    .addSubMenu(sheetManagementMenu)
+    .addToUi();
+}
