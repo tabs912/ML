@@ -63,6 +63,7 @@ If any required artifact is missing:
 - Stop and wait for instructions.
 - Do not assume missing artifacts exist.
 
+
 - Diff Exclusion Rules
 
 Do not modify, stage, or include in generated diffs:
@@ -83,6 +84,34 @@ Do not modify, stage, or include in generated diffs:
 
 These folders are reference/storage only.
 Do not include them in commits, patches, reviews, or generated diffs unless explicitly instructed.
+
+Diff Cleanup Policy
+
+Before generating a diff:
+
+1. Remove Archive/
+2. Remove Report/
+3. Remove Codex_Ignore/
+4. Remove all binary files:
+   - pdf
+   - xlsx
+   - docx
+   - pptx
+   - png
+   - jpg
+   - zip
+
+Only include:
+- Current_Production/
+- scripts/
+- spec/
+- AGENTS.md
+- README.md
+
+If the diff exceeds 25 files or 2000 lines:
+- Stop
+- Clean the diff
+- Split the work into phases
 ---
 
 # Governing Authority
