@@ -62,6 +62,27 @@ If any required artifact is missing:
 - Report the missing artifact.
 - Stop and wait for instructions.
 - Do not assume missing artifacts exist.
+
+- Diff Exclusion Rules
+
+Do not modify, stage, or include in generated diffs:
+
+- Archive/
+- Report/
+- Codex_Ignore/
+- Governance/
+- Reference/
+- Report/
+- spec/
+- *.pdf
+- *.xlsx
+- *.png
+- *.jpg
+- *.zip
+-
+
+These folders are reference/storage only.
+Do not include them in commits, patches, reviews, or generated diffs unless explicitly instructed.
 ---
 
 # Governing Authority
@@ -307,6 +328,8 @@ without explicit approval.
 ---
 
 # Required Output Format
+
+Never reuse script version unless instructed to do so. 
 
 When performing framework engineering provide:
 
