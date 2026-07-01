@@ -1,8 +1,8 @@
-# AGENTS.md
+# AGENT.md
 
 ## Purpose
 
-This document defines mandatory operating instructions for AI agents working on the Master List Framework.
+This document defines mandatory operating instructions for AI AGENT working on the Master List Framework.
 
 Applies to:
 
@@ -20,7 +20,7 @@ Before performing any work:
 
 1. Determine repository root.
 
-2. Read AGENTS.md completely.
+2. Read AGENT.md completely.
 
 3. Read README.md completely.
 
@@ -53,7 +53,7 @@ Before performing any work:
 
 Required Artifacts
 
-- AGENTS.md
+- AGENT.md
 - README.md
 - /Current_Production
 - /spec
@@ -70,17 +70,15 @@ Do not modify, stage, or include in generated diffs:
 
 - Archive/
 - Report/
-- Codex_Ignore/
+- .codexignore/
 - Governance/
 - Reference/
-- Report/
 - spec/
 - *.pdf
 - *.xlsx
 - *.png
 - *.jpg
 - *.zip
--
 
 These folders are reference/storage only.
 Do not include them in commits, patches, reviews, or generated diffs unless explicitly instructed.
@@ -91,7 +89,7 @@ Before generating a diff:
 
 1. Remove Archive/
 2. Remove Report/
-3. Remove Codex_Ignore/
+3. Remove .codexignore/
 4. Remove all binary files:
    - pdf
    - xlsx
@@ -104,8 +102,7 @@ Before generating a diff:
 Only include:
 - Current_Production/
 - scripts/
-- spec/
-- AGENTS.md
+- AGENT.md
 - README.md
 
 Do not read these directories.
