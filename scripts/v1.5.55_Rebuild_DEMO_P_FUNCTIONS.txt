@@ -1,0 +1,845 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - DEMO P FUNCTIONS Section
+ *
+ * Depends on:
+ * - CONFIGURATION rebuild section for shared constants and sheet-type values.
+ * - HELPER FUNCTIONS rebuild section for dashboard, date, PMR, hash, and sheet helpers.
+ * - FORMATTERS/TEMPLATE sections for dashboard-governed output formatting.
+ *
+ * Purpose:
+ * - Build and update the ongoing Demo P processed participant source sheet.
+ * - Preserve Raw Data as the import snapshot while Demo P becomes the active participant working source.
+ * - Add universal metadata fields and PMR-level source hashes for future metadata-driven Monthly Change logic.
+ * - Keep Care Plan Due and Unlocked Care Plan sync ownership out of Demo P; those remain Master List sync functions.
+ */
+
+// ============================================================================
+// DEMO P FUNCTIONS
+// ============================================================================
+
+
+
+// -----------------------------------------------------------------------------
+// Demo P header sets and metadata columns
+// -----------------------------------------------------------------------------
+
+
+const DEMO_P_RAW_HEADERS = [
+  "Last Name",
+  "First Name",
+  "Preferred Name",
+  "Date of Birth",
+  "Participant PMR#",
+  "Phone Number",
+  "Address Line 1",
+  "Address Line 2",
+  "City",
+  "State",
+  "Zip",
+  "Oxygen",
+  "Primary Language",
+  "Residence Type",
+  "Contact - Last Name",
+  "Contact - First Name",
+  "Type of Contact",
+  "Contact - Primary Language",
+  "Relationship",
+  "AD1 - Phone",
+  "AD1 - Phone Valid Dates From",
+  "AD1 - Phone Valid Dates To",
+  "AD2 - Phone",
+  "AD2 - Phone Valid Dates From",
+  "AD2 - Phone Valid Dates To",
+  "AD3 - Phone",
+  "AD3 - Phone Valid Dates From",
+  "AD3 - Phone Valid Dates To",
+  "Company",
+  "Contact - Notes",
+  "Capitation Date",
+  "Enrollment Status",
+  "Disenrollment Date",
+  "Disenrollment Effective Date",
+  "Disenrollment Reason",
+  "Date of Death",
+  "Caseload - Social Work",
+  "Caseload - RN",
+  "Caseload - PCP",
+  "Caseload - HCC",
+  "Caseload - Activities",
+  "Caseload - OT",
+  "Caseload - PT",
+  "Caseload - RD",
+  "Caseload - Supervising MD",
+  "Additional Important Information"
+];
+
+
+const DEMO_P_OPTIONAL_SYNC_HEADERS = [
+  "Safety - 2 Person",
+  "Wanderer",
+  "Interpreter Needed",
+  "Fall Risk",
+  "DPOA or Guardian Active",
+  "Palliative Care",
+  "Primary PMR Row",
+  "Banner Summary",
+  "Phone 1 - Label",
+  "Phone 1 - Value",
+  "Phone 2 - Label",
+  "Phone 2 - Value",
+  "Phone 3 - Label",
+  "Phone 3 - Value",
+  "Phone 4 - Label",
+  "Phone 4 - Value",
+  "Address 1 - Street",
+  "Custom Field 1 - Label",
+  "Custom Field 1 - Value",
+  "Notes",
+  "Contact - 1",
+  "Contact - 2",
+  "Contact - 3",
+  "Contact - 4",
+  "Contact - 5",
+  "Contact - 6",
+  "Contact - 7",
+  "Contact - 8",
+  "Contact - Summary",
+  "Update Status",
+  "Update Month",
+  "Source Sheet",
+  "Columns Updated",
+  "Last Updated At",
+  "Source Hash",
+  "Previous Source Hash",
+  "Source Workflow"
+];
+
+
+const DEMO_P_FORMAT_HEADERS = DEMO_P_RAW_HEADERS.concat(DEMO_P_OPTIONAL_SYNC_HEADERS);
+
+
+const DEMO_P_TEMPLATE_DATE_HEADERS = GLOBAL_DATE_FORMAT_HEADERS.filter(header =>
+  header !== "Master List Update Month"
+);
+
+
+const DEMO_P_BANNER_SYNC_HEADERS = [
+  "Safety - 2 Person",
+  "Wanderer",
+  "Interpreter Needed",
+  "Fall Risk",
+  "DPOA or Guardian Active",
+  "Palliative Care"
+];
+
+
+
+// -----------------------------------------------------------------------------
+// Dashboard Section C Demo P metadata headers
+// -----------------------------------------------------------------------------
+function getDefaultDemoPMetadataHeaderRows_v155_() {
+  return [
+    h_("Demo P Update Status", "Process"),
+    h_("Demo P Update Month", "Process"),
+    h_("Demo P Source Sheet", "Process"),
+    h_("Update Status", "Process"),
+    h_("Update Month", "Process"),
+    h_("Source Sheet", "Process"),
+    h_("Columns Updated", "Process"),
+    h_("Last Updated At", "Process"),
+    h_("Source Hash", "Process"),
+    h_("Previous Source Hash", "Process"),
+    h_("Source Workflow", "Process")
+  ];
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Demo P build/update workflow
+// -----------------------------------------------------------------------------
+
+
+function processDemoP() {
+  const monthParts = promptForLockedYearReportMonth_("Process Demo P");
+  if (!monthParts) return;
+
+
+  const timing = startRuntimeTiming_("Process Demo P", monthParts);
+  let movedResult = {
+    pmrsRemoved: 0,
+    rowsRemoved: 0,
+    rowsCopied: 0
+  };
+
+
+  try {
+    const buildResult = getOrCreateDemoPProcessingSheet_(monthParts, timing);
+    const sheet = buildResult && buildResult.sheet ? buildResult.sheet : buildResult;
+
+
+    if (buildResult && buildResult.movedResult) {
+      movedResult = buildResult.movedResult;
+    }
+
+
+    ensureStandardTitleRows_(sheet);
+    markRuntimeStep_(timing, "Prepare Demo P title/header rows");
+
+
+    enforceDemoPStrictDashboardSchema_(sheet);
+    clearSheetRuntimeCachesForSheet_(sheet);
+    markRuntimeStep_(timing, "Enforce Demo P strict dashboard schema and clear caches");
+
+
+    if (!buildResult || !buildResult.sourceWasRawData) {
+      movedResult = moveDisenrolledPMRsFromDemoPToExclusion_(sheet, monthParts);
+      markRuntimeStep_(
+        timing,
+        "Move disenrolled PMRs to exclusion list - PMRs removed: " + movedResult.pmrsRemoved +
+          ", rows copied: " + movedResult.rowsCopied +
+          ", rows removed: " + movedResult.rowsRemoved
+      );
+
+
+      processDemoPAsWorkingSource_(sheet, monthParts, timing, sheet.getName(), "Updated");
+    } else {
+      markRuntimeStep_(
+        timing,
+        "Disenrolled exclusion built from Raw Data - PMRs excluded from Demo P: " + movedResult.pmrsRemoved +
+          ", rows copied: " + movedResult.rowsCopied
+      );
+
+
+      if (buildResult.preProcessedWorkingSource) {
+        markRuntimeStep_(timing, "Demo P Working Source processing skipped - already completed in optimized Raw Data single-pass build");
+      } else {
+        processDemoPAsWorkingSource_(sheet, monthParts, timing, sheet.getName(), "Updated");
+      }
+    }
+
+
+    if (buildResult && buildResult.createdFromDashboardTemplate) {
+      markRuntimeStep_(timing, "Apply Demo P dashboard template formatting skipped - template copy already formatted");
+    } else {
+      applyDemoPTemplateToSheet_(sheet, monthParts);
+      markRuntimeStep_(timing, "Apply Demo P dashboard template formatting");
+    }
+
+
+    setUniqueSheetName_(sheet, DEMO_P_PREFIX);
+    markRuntimeStep_(timing, "Maintain ongoing Demo P sheet name");
+
+
+    lockFinalOutputRowHeights_(sheet, "Demo P");
+    markRuntimeStep_(timing, "Lock Demo P final row heights");
+
+
+    writeRuntimeTimingReport_(timing);
+
+
+    notify_(
+      "Demo P processed as the working source.\n" +
+      "Raw Data preserved when source sheet was Raw Data.\n" +
+      "Demo P contains active participants only when built from Raw Data.\n" +
+      "Disenrolled PMRs excluded from Demo P: " + movedResult.pmrsRemoved + "\n" +
+      "Disenrolled primary rows copied to exclusion list: " + movedResult.rowsCopied + "\n" +
+      "Contact, phone, address, language, notes, banner, and Primary PMR fields were processed on Demo P.\n" +
+      "Care Plan Due and Unlocked Care Plan remain Master List sync functions.\n" +
+      "Master List can now be created from Primary PMR rows only."
+    );
+
+
+    return sheet;
+  } catch (err) {
+    markRuntimeStep_(timing, "ERROR - " + err.message);
+    writeRuntimeTimingReport_(timing);
+    notify_("Process Demo P stopped: " + err.message + "\nTiming log updated: " + FORMAT_DEMO_P_TIMING_SHEET);
+    throw err;
+  }
+}
+
+
+function processDemoPAsWorkingSource_(sheet, monthParts, timing, sourceSheetName, status) {
+  enforceDemoPStrictDashboardSchema_(sheet);
+  markRuntimeStep_(timing, "Demo P Working Source - verify strict working-source headers");
+
+
+  const data = getDataValues_(sheet, HEADER_ROW, DATA_START_ROW);
+  markRuntimeStep_(timing, "Demo P Working Source - read Demo P data range");
+  if (!data.values.length) return;
+
+
+  /*
+   * v1.4.23:
+   * Primary PMR Row is assigned during Format Raw Data and copied into Demo P.
+   * Do not verify, rescan, or reassign Primary PMR ownership here.
+   * Banner values are also sourced from Raw Data; do not sync a newest Banners sheet
+   * into Demo P memory during this process.
+   */
+
+
+  updateBannerColumnData_(data, null);
+  markRuntimeStep_(timing, "Demo P Working Source - build Banner Summary");
+
+
+  combineAddressesData_(data, null);
+  markRuntimeStep_(timing, "Demo P Working Source - combine address fields");
+
+
+  handleLanguageData_(data, null);
+  markRuntimeStep_(timing, "Demo P Working Source - process language fields");
+
+
+  splitPhoneNumbersData_(data, null);
+  markRuntimeStep_(timing, "Demo P Working Source - split phone fields");
+
+
+  runMasterContactProcessData_(data, null);
+  markRuntimeStep_(timing, "Demo P Working Source - process contacts");
+
+
+  combineNotesSummaryData_(data, null);
+  markRuntimeStep_(timing, "Demo P Working Source - combine Notes Summary");
+
+
+  populateDemoPUpdateColumns_(data, monthParts, sourceSheetName || sheet.getName(), status || "Updated");
+  populateUniversalMetadataColumns_(data, monthParts, sourceSheetName || sheet.getName(), "Demo P", status || "Updated");
+  markRuntimeStep_(timing, "Demo P Working Source - populate Demo P metadata and PMR source hashes");
+
+
+  if (data.range) data.range.setValues(data.values);
+  markRuntimeStep_(timing, "Demo P Working Source - single write processed Demo P data");
+
+
+  clearSheetRuntimeCachesForSheet_(sheet);
+}
+
+
+function markPrimaryPMRRowsForSequentialData_(data) {
+  if (!data || !data.values || !data.values.length || !data.headerMap) return;
+
+
+  const headerMap = data.headerMap;
+  const pmrIdx = getPMRIndex_(headerMap);
+  const primaryIdx = headerMap["Primary PMR Row"];
+
+
+  if (pmrIdx === -1 || primaryIdx === undefined) return;
+
+
+  let previousPMR = "";
+
+
+  data.values.forEach(row => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+
+
+    if (!pmr) {
+      row[primaryIdx] = "";
+      return;
+    }
+
+
+    row[primaryIdx] = pmr !== previousPMR ? "Yes" : "";
+    previousPMR = pmr;
+  });
+}
+
+
+function assignPrimaryPMRRowsInData_(data) {
+  if (!data || !data.values || !data.values.length || !data.headerMap) return;
+
+
+  const headerMap = data.headerMap;
+  const pmrIdx = getPMRIndex_(headerMap);
+  const primaryIdx = headerMap["Primary PMR Row"];
+
+
+  if (pmrIdx === -1 || primaryIdx === undefined) return;
+
+
+  data.values.forEach(row => {
+    if (!normalizePMR_(row[pmrIdx])) row[primaryIdx] = "";
+  });
+
+
+  const blocks = buildParticipantBlocksForSortOrder_(data.values, headerMap, pmrIdx);
+  blocks.forEach(block => assignPrimaryRowForBlock_(block, headerMap, primaryIdx));
+}
+
+
+function formatDemoPStructure() {
+  return processDemoP();
+}
+
+
+function buildRawDataSheetName_(monthParts) {
+  return "Raw Data " + Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy");
+}
+
+
+function getOrCreateDemoPProcessingSheet_(monthParts, timing) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const active = ss.getActiveSheet();
+  const rawName = buildRawDataSheetName_(monthParts);
+  const targetName = DEMO_P_PREFIX;
+
+
+  if (!active) {
+    throw new Error("No active sheet found. Select the Raw Data sheet or existing Demo P sheet before running Process Demo P.");
+  }
+
+
+  const activeName = String(active.getName() || "").trim();
+  const activeLower = activeName.toLowerCase();
+
+
+  if (activeName === targetName || activeLower.indexOf("demo p") === 0) {
+    markRuntimeStep_(timing, "Using active Demo P sheet: " + activeName);
+    return {
+      sheet: active,
+      sourceWasRawData: false,
+      movedResult: {
+        pmrsRemoved: 0,
+        rowsRemoved: 0,
+        rowsCopied: 0
+      },
+      preProcessedWorkingSource: false
+    };
+  }
+
+
+  let rawSheet = null;
+
+
+  if (activeName === rawName || activeLower.indexOf("raw data") === 0) {
+    rawSheet = active;
+  } else {
+    rawSheet = ss.getSheetByName(rawName);
+  }
+
+
+  if (!rawSheet) {
+    throw new Error("Raw Data sheet was not found for " + Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy") + ". Run Format Raw Data first.");
+  }
+
+
+  deleteSheetIfExistsForDemoPProcess_(ss, targetName, rawSheet.getName());
+
+
+  const buildResult = createActiveDemoPFromRawData_(rawSheet, targetName, monthParts, timing);
+  const demoSheet = buildResult && buildResult.sheet ? buildResult.sheet : buildResult;
+
+
+  ss.setActiveSheet(demoSheet);
+  clearSheetRuntimeCachesForSheet_(demoSheet);
+  markRuntimeStep_(timing, "Active-only processed Demo P built from protected Raw Data: " + targetName);
+
+
+  return {
+    sheet: demoSheet,
+    sourceWasRawData: true,
+    createdFromDashboardTemplate: true,
+    preProcessedWorkingSource: !!(buildResult && buildResult.preProcessedWorkingSource),
+    movedResult: (buildResult && buildResult.movedResult) ? buildResult.movedResult : getLastRawDataDisenrolledBuildResult_()
+  };
+}
+
+
+function deleteSheetIfExistsForDemoPProcess_(ss, sheetName, protectedSheetName) {
+  const existing = ss.getSheetByName(sheetName);
+  if (!existing) return;
+
+
+  if (existing.getName() === protectedSheetName) {
+    throw new Error("Cannot replace Demo P processing sheet because it is also the protected Raw Data sheet.");
+  }
+
+
+  ss.deleteSheet(existing);
+  clearMonthlySheetLookupCache_();
+}
+
+
+function getLastRawDataDisenrolledBuildResult_() {
+  return {
+    pmrsRemoved: ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_.pmrsRemoved || 0,
+    rowsRemoved: ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_.rowsRemoved || 0,
+    rowsCopied: ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_.rowsCopied || 0
+  };
+}
+
+
+function setLastRawDataDisenrolledBuildResult_(result) {
+  result = result || {};
+  ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_.pmrsRemoved = result.pmrsRemoved || 0;
+  ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_.rowsRemoved = result.rowsRemoved || 0;
+  ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_.rowsCopied = result.rowsCopied || 0;
+}
+
+
+function createActiveDemoPFromRawData_(rawSheet, targetName, monthParts, timing) {
+  const rawData = getDataValues_(rawSheet, HEADER_ROW, DATA_START_ROW);
+
+  if (!rawData.values.length) {
+    throw new Error("Raw Data has no participant rows to process.");
+  }
+
+  const pmrIdx = getPMRIndex_(rawData.headerMap);
+  if (pmrIdx === -1) {
+    throw new Error("Raw Data is missing Participant PMR# / PMR # column.");
+  }
+
+  const disenrolledPMRSet = loadDisenrolledPMRSetForMonth_(monthParts);
+  const split = splitRawDataRowsIntoActiveAndDisenrolled_(rawData, disenrolledPMRSet);
+  const movedResult = {
+    pmrsRemoved: split.disenrolledPMRs.size,
+    rowsRemoved: 0,
+    rowsCopied: split.disenrolledRows.length,
+    primaryRowsOnly: true
+  };
+
+  setLastRawDataDisenrolledBuildResult_(movedResult);
+
+  movedResult.outputRowsWritten = 0;
+  markRuntimeStep_(timing, "Disenrolled PMRs identified and excluded from Demo P - " +
+    (disenrolledPMRSet && disenrolledPMRSet.size ? "used Disenrolled List PMR set" : "used Raw Data disenrollment fields") +
+    " | Rows Read: " + rawData.values.length +
+    "; Rows Processed: " + split.activeRows.length +
+    "; Rows Excluded: " + split.disenrolledRows.length);
+
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DEMO_P);
+  const headers = getHeadersForSheetType_(dashboard, SHEET_TYPE.DEMO_P);
+  const outputRows = mapRowsToHeaders_(split.activeRows, rawData.headers, headers);
+
+  const workingData = {
+    headers: headers,
+    headerMap: buildHeaderIndexMap_(headers),
+    values: outputRows,
+    range: null
+  };
+
+  populateDemoPUpdateColumns_(workingData, monthParts, rawSheet.getName(), "Created");
+  populateUniversalMetadataColumns_(workingData, monthParts, rawSheet.getName(), "Demo P", "Created");
+  markRuntimeStep_(timing, "Demo P Working Source - populate Demo P update tracking columns | Rows Processed: " + workingData.values.length + "; Write Mode: in-memory only");
+
+  const demoSheet = createOutputSheetFromDashboardTemplate_(
+    SHEET_TYPE.DEMO_P,
+    targetName,
+    workingData.values,
+    monthParts.firstDay,
+    monthParts.lastDay
+  );
+  markRuntimeStep_(timing, "Demo P Working Source - copy active Raw Data rows to Demo P template | Rows Read: " + rawData.values.length + "; Rows Written: " + workingData.values.length + "; Write Mode: single output write");
+
+  try {
+    demoSheet.getRange("A1").setValue(sheetDef.reportTitle || "Demo P");
+  } catch (err) {
+    Logger.log("Could not set Demo P title: " + err.message);
+  }
+
+  clearSheetRuntimeCachesForSheet_(demoSheet);
+
+  processDemoPAsWorkingSource_(demoSheet, monthParts, timing, rawSheet.getName(), "Created");
+
+  return {
+    sheet: demoSheet,
+    movedResult: movedResult,
+    createdFromDashboardTemplate: true,
+    sourceWasRawData: true,
+    preProcessedWorkingSource: true
+  };
+}
+
+
+function populateDemoPUpdateColumns_(data, monthParts, sourceSheetName, status) {
+  if (!data || !data.headerMap || !data.values) return;
+  const statusIdx = data.headerMap["Demo P Update Status"];
+  const monthIdx = data.headerMap["Demo P Update Month"];
+  const sourceIdx = data.headerMap["Demo P Source Sheet"];
+  if (statusIdx === undefined && monthIdx === undefined && sourceIdx === undefined) return;
+
+
+  const monthText = monthParts && monthParts.firstDay
+    ? Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy")
+    : "";
+  data.values.forEach(function(row) {
+    if (statusIdx !== undefined) row[statusIdx] = status || "Created";
+    if (monthIdx !== undefined) row[monthIdx] = monthText;
+    if (sourceIdx !== undefined) row[sourceIdx] = sourceSheetName || "";
+  });
+}
+
+
+function populateUniversalMetadataColumns_(data, monthParts, sourceSheetName, sourceWorkflow, status) {
+  if (!data || !data.headerMap || !data.values) return;
+
+  const headerMap = data.headerMap;
+  const statusIdx = headerMap["Update Status"];
+  const monthIdx = headerMap["Update Month"];
+  const sourceIdx = headerMap["Source Sheet"];
+  const columnsUpdatedIdx = headerMap["Columns Updated"];
+  const lastUpdatedAtIdx = headerMap["Last Updated At"];
+  const sourceHashIdx = headerMap["Source Hash"];
+  const previousSourceHashIdx = headerMap["Previous Source Hash"];
+  const workflowIdx = headerMap["Source Workflow"];
+
+  if (statusIdx === undefined && monthIdx === undefined && sourceIdx === undefined &&
+      columnsUpdatedIdx === undefined && lastUpdatedAtIdx === undefined &&
+      sourceHashIdx === undefined && previousSourceHashIdx === undefined && workflowIdx === undefined) {
+    return;
+  }
+
+  const monthText = monthParts && monthParts.firstDay
+    ? Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy")
+    : "";
+  const updatedAt = new Date();
+  const pmrIdx = getPMRIndex_(headerMap);
+  const hashByPMR = buildSourceHashByPMR_(data, pmrIdx);
+  const columnList = buildColumnsUpdatedText_(data.headers);
+
+  data.values.forEach(function(row) {
+    const pmr = pmrIdx === -1 ? "" : normalizePMR_(row[pmrIdx]);
+    const nextHash = pmr && hashByPMR[pmr] ? hashByPMR[pmr] : buildSourceHashForRow_(row, data.headers);
+    const previousHash = sourceHashIdx !== undefined ? row[sourceHashIdx] : "";
+
+    if (statusIdx !== undefined) row[statusIdx] = status || "Updated";
+    if (monthIdx !== undefined) row[monthIdx] = monthText;
+    if (sourceIdx !== undefined) row[sourceIdx] = sourceSheetName || "";
+    if (columnsUpdatedIdx !== undefined) row[columnsUpdatedIdx] = columnList;
+    if (lastUpdatedAtIdx !== undefined) row[lastUpdatedAtIdx] = updatedAt;
+    if (previousSourceHashIdx !== undefined) row[previousSourceHashIdx] = previousHash || "";
+    if (sourceHashIdx !== undefined) row[sourceHashIdx] = nextHash;
+    if (workflowIdx !== undefined) row[workflowIdx] = sourceWorkflow || "";
+  });
+}
+
+
+function buildSourceHashByPMR_(data, pmrIdx) {
+  const hashByPMR = {};
+  if (!data || !data.values || !data.headers || pmrIdx === -1) return hashByPMR;
+
+  const rowsByPMR = {};
+  data.values.forEach(function(row) {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (!rowsByPMR[pmr]) rowsByPMR[pmr] = [];
+    rowsByPMR[pmr].push(row);
+  });
+
+  Object.keys(rowsByPMR).forEach(function(pmr) {
+    hashByPMR[pmr] = buildSourceHashForRows_(rowsByPMR[pmr], data.headers);
+  });
+  return hashByPMR;
+}
+
+
+function buildSourceHashForRows_(rows, headers) {
+  const excluded = {
+    "Update Status": true,
+    "Update Month": true,
+    "Source Sheet": true,
+    "Columns Updated": true,
+    "Last Updated At": true,
+    "Source Hash": true,
+    "Previous Source Hash": true,
+    "Source Workflow": true,
+    "Demo P Update Status": true,
+    "Demo P Update Month": true,
+    "Demo P Source Sheet": true,
+    "Master List Update Status": true,
+    "Master List Update Month": true,
+    "Master List Source Sheet": true
+  };
+  const normalizedRows = rows.map(function(row) {
+    return headers.map(function(header, index) {
+      if (excluded[header]) return null;
+      return normalizeHashValue_(row[index]);
+    });
+  });
+  return computeStableHash_(JSON.stringify(normalizedRows));
+}
+
+
+function buildSourceHashForRow_(row, headers) {
+  return buildSourceHashForRows_([row], headers);
+}
+
+
+function buildColumnsUpdatedText_(headers) {
+  const excluded = {
+    "Update Status": true,
+    "Update Month": true,
+    "Source Sheet": true,
+    "Columns Updated": true,
+    "Last Updated At": true,
+    "Source Hash": true,
+    "Previous Source Hash": true,
+    "Source Workflow": true
+  };
+  return (headers || []).filter(function(header) {
+    return header && !excluded[header];
+  }).join(", ");
+}
+
+
+function normalizeHashValue_(value) {
+  if (value === null || value === undefined) return "";
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  return String(value).trim().replace(/\s+/g, " ");
+}
+
+
+function computeStableHash_(text) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(text || ""), Utilities.Charset.UTF_8);
+  return digest.map(function(byte) {
+    const value = byte < 0 ? byte + 256 : byte;
+    return ("0" + value.toString(16)).slice(-2);
+  }).join("");
+}
+
+
+function verifyPrimaryPMRColumnFromRawData_(data) {
+  if (!data || !data.headerMap) return;
+  const idx = data.headerMap["Primary PMR Row"];
+  if (idx === undefined) {
+    throw new Error("Demo P requires Primary PMR Row from Raw Data. Run Format Raw Data first.");
+  }
+  // Do not rescan or reassign PMR blocks here. Raw Data is the source of truth.
+}
+
+
+function createOrRefreshDemoPTemplate_(ss) {
+  /*
+   * v1.4.25:
+   * Legacy Demo P template builder is restricted. All templates, including
+   * Demo P, must build through the shared dashboard template pipeline.
+   */
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DEMO_P);
+  return createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, null);
+}
+
+
+function getOrCreateDemoPTemplate_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  let template = ss.getSheetByName(DEMO_P_TEMPLATE_SHEET);
+  if (!template) template = createOrRefreshDemoPTemplate_(ss);
+  return template;
+}
+
+
+function initializeDemoPTemplateTitleRows_(sheet, monthParts) {
+  if (!sheet) return;
+
+
+  if (sheet.getMaxColumns() < 4) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), 4 - sheet.getMaxColumns());
+  }
+
+
+  sheet.getRange("A1").setValue("Demographics - Participants");
+  sheet.getRange("A2").setValue("Date");
+  sheet.getRange("B2").setValue(monthParts.firstDay);
+  sheet.getRange("C2").setValue("to");
+  sheet.getRange("D2").setValue(monthParts.lastDay);
+}
+
+
+function applyDemoPTemplateFormatting_(sheet, monthParts) {
+  if (!sheet) return;
+
+
+  monthParts = monthParts || getMonthPartsFromTitleRows_(sheet) || getMonthDateParts_(new Date());
+
+
+  applyStandardFormatting_(sheet, {
+    sheetType: SHEET_TYPE.DEMO_P,
+    title: "Demographics - Participants",
+    startDate: monthParts.firstDay,
+    endDate: monthParts.lastDay,
+    titleInfoText: "",
+    renameSheet: false,
+    skipAlternatingColors: true,
+    promptDate: monthParts.firstDay
+  });
+
+
+  applyDemoPDateFormattingByHeader_(sheet);
+  applyStandardRowHeights_(sheet);
+}
+
+
+function applyDemoPTemplateToSheet_(targetSheet, monthParts) {
+  if (!targetSheet) return;
+
+
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DEMO_P);
+  const headers = getHeadersForSheetType_(dashboard, SHEET_TYPE.DEMO_P);
+  const behavior = dashboard.behaviors[sheetDef.sheetType] || getDefaultBehavior_();
+
+
+  enforceDemoPStrictDashboardSchema_(targetSheet);
+
+
+  applyDashboardTemplateFormattingToActiveReportSheet_(
+    targetSheet,
+    dashboard,
+    sheetDef,
+    headers,
+    behavior,
+    monthParts || {
+      firstDay: new Date(),
+      lastDay: new Date()
+    },
+    monthParts ? monthParts.lastDay : new Date(),
+    "",
+    null
+  );
+
+
+  try {
+    targetSheet.getRange("A1").setValue(sheetDef.reportTitle || "Demo P");
+  } catch (err) {
+    Logger.log("Could not refresh Demo P title after dashboard template apply: " + err.message);
+  }
+
+
+  applyDemoPDateFormattingByHeader_(targetSheet);
+  clearSheetRuntimeCachesForSheet_(targetSheet);
+}
+
+
+function applyDemoPDateFormattingByHeader_(sheet) {
+  if (!sheet) return;
+
+
+  const lastRow = Math.max(sheet.getLastRow(), DATA_START_ROW);
+  const headers = getHeaders_(sheet, HEADER_ROW);
+
+
+  DEMO_P_TEMPLATE_DATE_HEADERS.forEach(headerName => {
+    const idx = headers.indexOf(headerName);
+    if (idx === -1) return;
+
+
+    try {
+      sheet.getRange(DATA_START_ROW, idx + 1, Math.max(lastRow - DATA_START_ROW + 1, 1), 1);
+    } catch (err) {
+      Logger.log("Could not apply Demo P date format for " + headerName + ": " + err.message);
+    }
+  });
+
+
+  try {
+    sheet.getRange("B2");
+    sheet.getRange("D2");
+  } catch (err) {
+    Logger.log("Could not apply Demo P title date format: " + err.message);
+  }
+}
