@@ -23,13 +23,14 @@
 // callback implementations belong to their owner sections, not this menu section.
 const ML_MENU_CALLBACKS = Object.freeze({
   startUp: Object.freeze([
-    "setupSystemSheets",
+    "verifyFrameworkConfiguration",
     "setupReportFormattingDashboardFromScriptDefaults_",
     "runDashboardQualityStartUp",
     "createOrRefreshAllReportTemplates",
     "runDashboardQualityValidateTemplates"
+  ]),
   setup: Object.freeze([
-    "setupSystemSheets",
+    "verifyFrameworkConfiguration",
     "setupReportFormattingDashboardFromScriptDefaults_",
     "createOrRefreshAllReportTemplates"
   ]),
@@ -71,13 +72,13 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
   const startUpMenu = ui.createMenu("Start-Up")
-    .addItem("Set up System Sheets", "setupSystemSheets")
+    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
     .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
     .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates");
   const setupMenu = ui.createMenu("Setup")
-    .addItem("Set up System Sheets", "setupSystemSheets")
+    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
 
@@ -106,7 +107,6 @@ function onOpen() {
     .addSubMenu(workflowCreateMenu)
     .addSubMenu(workflowUpdateMenu)
     .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
-    .addSubMenu(workflowUpdateMenu);
 
   const templateManagementMenu = ui.createMenu("Templates")
     .addItem("Hide Templates", "hideReportTemplates")
