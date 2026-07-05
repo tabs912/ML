@@ -1,0 +1,2377 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - MASTER LIST FUNCTIONS Section
+ * Purpose: create and update the governed Master List output from processed Demo P, Monthly Change, Disenrollment, and sync sources.
+ */
+// ============================================================================
+// MASTER LIST FUNCTIONS
+// ============================================================================
+
+// Monthly update orchestration
+
+function runMonthlyUpdate() {
+  const monthParts = promptForLockedYearReportMonth_("Monthly Update");
+  if (!monthParts) return;
+  const messages = [];
+  messages.push("Automatic monthly-sheet hiding is disabled in v1.3.5; archive monthly sheets separately.");
+  try {
+    const reportSheet = buildMonthlyChangeReportFromDemoPForMonth_(monthParts);
+    messages.push("Monthly Change Report: " + (reportSheet ? reportSheet.getName() : "No report created"));
+  } catch (err) {
+    notify_("Monthly Update stopped during Monthly Change Report: " + err.message);
+    throw err;
+  }
+  try {
+    const masterSheet = updateMasterListForMonth_(monthParts);
+    messages.push("Master List Update: " + (masterSheet ? masterSheet.getName() : "Not completed"));
+  } catch (err) {
+    notify_("Monthly Update stopped during Update Master List: " + err.message);
+    throw err;
+  }
+  try {
+    createIndexSheet();
+  } catch (err) {
+    Logger.log("Monthly Update final index refresh skipped: " + err.message);
+  }
+  notify_("Monthly Update complete.\n\n" + messages.join("\n"));
+}
+
+function updateMasterList() {
+  const monthParts = promptForLockedYearReportMonth_("Update Master List");
+  if (!monthParts) return;
+  updateMasterListForMonth_(monthParts);
+}
+
+function updateMasterListForMonth_(monthParts) {
+  if (!monthParts) return null;
+  const timing = startRuntimeTiming_("Update Master List", monthParts);
+  const hiddenSheetNamesAtStart = captureHiddenSheetNames_();
+  let currentMaster = null;
+  let rebuiltCount = 0;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    markRuntimeStep_(timing, "Start");
+    const currentDemo = getCurrentDemoPSheet_(monthParts);
+    const previousDemo = getPreviousDemoPSheet_(monthParts);
+    const previousMaster = getPreviousMasterListSheet_(monthParts);
+    markRuntimeStep_(timing, "Locate monthly source sheets");
+    if (!currentDemo) {
+      notify_("Current month Demo P was not found. Format Demo P first.");
+      markRuntimeStep_(timing, "Stopped - missing current Demo P");
+      return null;
+    }
+    if (!previousMaster) {
+      notify_("Previous month Master List was not found. Create the previous month Master List first.");
+      markRuntimeStep_(timing, "Stopped - missing previous Master List");
+      return null;
+    }
+    currentMaster = copyPreviousMasterListToCurrentMonth_(previousMaster, monthParts);
+    markRuntimeStep_(timing, "Copy previous Master List to current month");
+    let reportSheet;
+    try {
+      reportSheet = getOrBuildMonthlyChangeReport_(ss, monthParts, currentDemo, previousDemo);
+      markRuntimeStep_(timing, "Get or build Monthly Change Report");
+    } catch (err) {
+      markRuntimeStep_(timing, "Stopped - Monthly Change Report error");
+      notify_(err.message);
+      return null;
+    }
+    if (reportSheet) {
+      rebuiltCount = rebuildChangedPMRsOnExistingMaster_(
+        currentDemo,
+        currentMaster,
+        reportSheet,
+        monthParts,
+        true,
+        timing
+      );
+      markRuntimeStep_(timing, "Rebuild changed PMRs on copied Master List");
+    } else {
+      processMasterListFull_(currentMaster, monthParts, null);
+      markRuntimeStep_(timing, "No change report rows - full current-month processing");
+    }
+    finalizeWorkflowAfterCreateOrUpdate_();
+    markRuntimeStep_(timing, "Finalize workflow after create/update");
+    hidePreviousMonthSheets_(monthParts);
+    markRuntimeStep_(timing, "Hide previous month sheets");
+    currentMaster.activate();
+    removeDisenrolledPMRBlocksFromMasterUsingDemoP_(currentMaster, currentDemo);
+    markRuntimeStep_(timing, "Remove disenrolled PMR blocks");
+    prepareMasterListSortOrderBeforeFormatting_(currentMaster);
+    markRuntimeStep_(timing, "Prepare Sort Order before formatting");
+    applyMasterListTemplateModeUpdateDisplay_(currentMaster);
+    markRuntimeStep_(timing, "Apply template-mode update display settings");
+    applyFinalMasterListColorAndDisplay_(currentMaster);
+    markRuntimeStep_(timing, "Apply final Sort Order coloring and display lock");
+    autoHidePreviousMonthSheetsAfterWorkflow_(monthParts);
+    markRuntimeStep_(timing, "Auto-hide previous month sheets");
+    enforceMasterListFinalDisplay_(currentMaster);
+    markRuntimeStep_(timing, "Final Master List display enforcement");
+    restorePreviouslyHiddenSheets_(hiddenSheetNamesAtStart, currentMaster);
+    markRuntimeStep_(timing, "Restore previously hidden sheets");
+    writeRuntimeTimingReport_(timing);
+    hideSystemSheets_();
+    notify_(
+      "Update Master List complete.\\n\\n" +
+      `New Master List: ${currentMaster.getName()}\\n` +
+      `Changed PMRs rebuilt: ${rebuiltCount}\\n` +
+      `Runtime: ${formatSeconds_((new Date().getTime() - timing.startMs) / 1000)}\\n` +
+      "Previous month sheets hidden."
+    );
+    return currentMaster;
+  } catch (err) {
+    markRuntimeStep_(timing, "ERROR - " + err.message);
+    try {
+      writeRuntimeTimingReport_(timing);
+    } catch (reportErr) {
+      Logger.log("Could not write timing report: " + reportErr.message);
+    }
+    throw err;
+  }
+}
+
+// Create Master List
+
+function createMasterList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const monthParts = promptForLockedYearReportMonth_("Create Master List");
+  if (!monthParts) return;
+  const timing = startRuntimeTiming_("Create Master List", monthParts);
+  let masterSheet = null;
+  let copiedRowCount = 0;
+  try {
+    markRuntimeStep_(timing, "Start");
+    const demoSheet = getCurrentDemoPSheet_(monthParts);
+    markRuntimeStep_(timing, "Locate current processed Demo P sheet");
+    if (!demoSheet) {
+      notify_("Demo P sheet for that month was not found. Run Process Demo P first.");
+      markRuntimeStep_(timing, "Stopped - missing Demo P");
+      writeRuntimeTimingReport_(timing);
+      return;
+    }
+    const masterName = buildMonthlySheetName_(MASTER_LIST_PREFIX, monthParts.firstDay, monthParts.lastDay);
+    masterSheet = ss.getSheetByName(masterName);
+    if (masterSheet) {
+      const ui = SpreadsheetApp.getUi();
+      const response = ui.alert(
+        "Master List Exists",
+        `${masterName} already exists. Replace it?`,
+        ui.ButtonSet.YES_NO
+      );
+      if (response !== ui.Button.YES) {
+        notify_("Create Master List cancelled.");
+        markRuntimeStep_(timing, "Cancelled - existing Master List not replaced");
+        writeRuntimeTimingReport_(timing);
+        return;
+      }
+      ss.deleteSheet(masterSheet);
+      markRuntimeStep_(timing, "Delete existing Master List sheet");
+    }
+    masterSheet = createMasterListSheetFromTemplate_(ss, masterName, monthParts);
+    markRuntimeStep_(timing, "Copy Template - Master List as output sheet");
+    buildMasterListHeadersBeforeDataCopy_(demoSheet, masterSheet);
+    markRuntimeStep_(timing, "Build Master List headers");
+    copiedRowCount = copyPrimaryDemoPRowsToMasterListByHeader_(demoSheet, masterSheet, monthParts);
+    markRuntimeStep_(timing, "Copy Primary PMR rows from processed Demo P to Master List");
+    trimOutputSheetToDataSize_(masterSheet, copiedRowCount || 0, SHEET_TYPE.MASTER_LIST);
+    markRuntimeStep_(timing, "Right-size Master List output rows");
+    fillMasterListMetadataColumns_(masterSheet, monthParts, demoSheet.getName(), "Created from processed Demo P primary rows");
+    markRuntimeStep_(timing, "Fill Master List metadata columns");
+    syncMasterListFromUnlockedCarePlan_(masterSheet, monthParts, null);
+    markRuntimeStep_(timing, "Sync Unlocked CP to Master List primary rows");
+    syncMasterListFromCarePlanDue_(masterSheet, monthParts, null);
+    markRuntimeStep_(timing, "Sync Care Plan Due to Master List primary rows");
+    setUniqueSheetName_(masterSheet, masterName);
+    markRuntimeStep_(timing, "Set final Master List sheet name");
+    enforceMasterListFinalDisplay_(masterSheet);
+    markRuntimeStep_(timing, "Final Master List display enforcement");
+    lockFinalOutputRowHeights_(masterSheet, "Master List");
+    markRuntimeStep_(timing, "Lock Master List final row heights");
+    writeRuntimeTimingReport_(timing);
+    notify_(
+      `Master List created. Copied ${copiedRowCount} Primary PMR row(s) from processed Demo P.\n\n` +
+      `Runtime: ${formatSeconds_((new Date().getTime() - timing.startMs) / 1000)}`
+    );
+    return masterSheet;
+  } catch (err) {
+    markRuntimeStep_(timing, "ERROR - " + err.message);
+    try {
+      writeRuntimeTimingReport_(timing);
+    } catch (reportErr) {
+      Logger.log("Could not write timing report: " + reportErr.message);
+    }
+    throw err;
+  }
+}
+
+function copyPrimaryDemoPRowsToMasterListByHeader_(demoSheet, masterSheet, monthParts) {
+  const demoData = getDataValues_(demoSheet, HEADER_ROW, DATA_START_ROW);
+  if (!demoData.values.length) return 0;
+  const demoHeaders = demoData.headers;
+  const demoHeaderMap = demoData.headerMap;
+  const masterHeaders = getHeaders_(masterSheet, HEADER_ROW);
+  const masterHeaderMap = getHeaderMap_(masterSheet, HEADER_ROW);
+  const pmrIdx = getPMRIndex_(demoHeaderMap);
+  if (pmrIdx === -1) {
+    throw new Error("Demo P is missing Participant PMR# / PMR # column.");
+  }
+  const primaryIdx = demoHeaderMap["Primary PMR Row"];
+  const dobIdx = getDOBIndex_(demoHeaderMap);
+  function getMasterTargetIndex_(header) {
+    if (masterHeaderMap[header] !== undefined) return masterHeaderMap[header];
+    const aliases = {
+      "Participant PMR#": ["PMR #", "PMR#", "Participant PMR"],
+      "PMR #": ["Participant PMR#", "PMR#", "Participant PMR"],
+      "PMR#": ["Participant PMR#", "PMR #", "Participant PMR"],
+      "Participant PMR": ["Participant PMR#", "PMR #", "PMR#"]
+    };
+    const candidates = aliases[header] || [];
+    for (let i = 0; i < candidates.length; i++) {
+      if (masterHeaderMap[candidates[i]] !== undefined) return masterHeaderMap[candidates[i]];
+    }
+    return undefined;
+  }
+  function buildOutputRows_(mode) {
+    const output = [];
+    const seenPMRs = new Set();
+    demoData.values.forEach(row => {
+      const pmr = normalizePMR_(row[pmrIdx]);
+      if (!pmr) return;
+      let includeRow = false;
+      if (mode === "primary") {
+        includeRow = primaryIdx !== undefined && isPrimaryPMRRowValue_(row[primaryIdx]);
+      } else if (mode === "dob") {
+        includeRow = dobIdx !== -1 && normalizeCompareValue_(row[dobIdx]) !== "" && !seenPMRs.has(pmr);
+      } else if (mode === "first") {
+        includeRow = !seenPMRs.has(pmr);
+      }
+      if (!includeRow) return;
+      seenPMRs.add(pmr);
+      const out = new Array(masterHeaders.length).fill("");
+      demoHeaders.forEach((header, sourceIdx) => {
+        if (!header) return;
+        const targetIdx = getMasterTargetIndex_(header);
+        if (targetIdx !== undefined) {
+          out[targetIdx] = row[sourceIdx];
+        }
+      });
+      output.push(out);
+    });
+    return output;
+  }
+  let output = buildOutputRows_("primary");
+  /*
+   * v1.5.1:
+   * Master List creation depends on Primary PMR Row when available. Some v1.5
+   * runs produced processed Demo P sheets where the Primary PMR Row column existed
+   * but was blank, which caused an empty Master List. Preserve Primary PMR
+   * governance first, then fall back to one row per PMR using DOB/first-row
+   * selection only when no primary rows are detected.
+   */
+  if (output.length === 0) output = buildOutputRows_("dob");
+  if (output.length === 0) output = buildOutputRows_("first");
+  if (output.length > 0) {
+    masterSheet.getRange(DATA_START_ROW, 1, output.length, masterHeaders.length).setValues(output);
+    clearSheetRuntimeCachesForSheet_(masterSheet);
+  }
+  return output.length;
+}
+
+function fillMasterListMetadataColumns_(sheet, monthParts, sourceSheetName, statusText) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < DATA_START_ROW) return;
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const headerMap = buildHeaderIndexMap_(headers);
+  const required = ["Master List Update Status", "Master List Update Month", "Master List Source Sheet"];
+  const missing = required.filter(function(header) { return headerMap[header] === undefined; });
+  if (missing.length) {
+    Logger.log("Master List metadata write skipped for missing dashboard-defined columns: " + missing.join(", "));
+  }
+  const rowCount = lastRow - DATA_START_ROW + 1;
+  const metadata = {
+    "Master List Update Status": statusText || "Created",
+    "Master List Update Month": monthParts.firstDay,
+    "Master List Source Sheet": sourceSheetName || ""
+  };
+  const indexes = required
+    .map(function(header) { return headerMap[header]; })
+    .filter(function(idx) { return idx !== undefined; })
+    .sort(function(a, b) { return a - b; });
+  if (!indexes.length) return;
+  if (indexes[indexes.length - 1] - indexes[0] + 1 === indexes.length) {
+    const startIdx = indexes[0];
+    const width = indexes.length;
+    const rowTemplate = [];
+    for (let c = startIdx; c <= indexes[indexes.length - 1]; c++) {
+      const header = headers[c];
+      rowTemplate.push(Object.prototype.hasOwnProperty.call(metadata, header) ? metadata[header] : "");
+    }
+    const values = Array.from({ length: rowCount }, function() { return rowTemplate.slice(); });
+    sheet.getRange(DATA_START_ROW, startIdx + 1, rowCount, width).setValues(values);
+    return;
+  }
+  indexes.forEach(function(idx) {
+    const header = headers[idx];
+    const value = Object.prototype.hasOwnProperty.call(metadata, header) ? metadata[header] : "";
+    const values = Array.from({ length: rowCount }, function() { return [value]; });
+    sheet.getRange(DATA_START_ROW, idx + 1, rowCount, 1).setValues(values);
+  });
+}
+
+// Template and sheet handoff
+
+function getMasterListTemplateHeaders_() {
+  /*
+   * v1.4.24:
+   * Legacy Master List template helper now defers to Dashboard/App C header
+   * defaults instead of COLUMN_FORMATS or MASTER_LIST_ADDED_HEADERS.
+   */
+  return (getDefaultHeaderSets_()[RFF_SHEET_TYPES.MASTER_LIST] || [])
+    .map(function(item) { return item.header; });
+}
+
+function createOrRefreshMasterListTemplate_(ss) {
+  /*
+   * v1.4.25:
+   * Legacy Master List template builder is restricted. All templates, including
+   * Master List, must build through the shared dashboard template pipeline.
+   */
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MASTER_LIST);
+  return createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, null);
+}
+
+function getOrCreateMasterListTemplate_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  let template = ss.getSheetByName(MASTER_LIST_TEMPLATE_SHEET);
+  if (!template) template = createOrRefreshMasterListTemplate_(ss);
+  return template;
+}
+
+function createMasterListSheetFromTemplate_(ss, targetName, monthParts) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  const existing = ss.getSheetByName(targetName);
+  if (existing && ss.getSheets().length > 1) ss.deleteSheet(existing);
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MASTER_LIST);
+  const template = ss.getSheetByName(sheetDef.templateName);
+  if (!template) {
+    throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh Master List Template first.");
+  }
+  // v1.4.19: monthly Master List creation must copy the verified template only.
+  // Do not rebuild dashboard formatting during monthly processing.
+  const sheet = template.copyTo(ss);
+  sheet.showSheet();
+  setMonthlySheetNameFast_(sheet, targetName);
+  try {
+    sheet.getRange("A1:D2").setValues([
+      ["Master List", "", "", ""],
+      ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
+    ]);
+    const lastRow = sheet.getMaxRows();
+    const lastCol = sheet.getMaxColumns();
+    if (lastRow >= DATA_START_ROW && lastCol > 0) {
+      sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, lastCol).clearContent();
+    }
+  } catch (err) {
+    Logger.log("Master List template copy initialization skipped: " + err.message);
+  }
+  clearSheetRuntimeCachesForSheet_(sheet);
+  return sheet;
+}
+
+function applyMasterListTemplateFormatting_(sheet) {
+  // v1.1.0: Legacy Master List template formatting removed. Dashboard template builder owns formatting.
+  return;
+}
+
+function writeMasterListTitleDateBlock_(masterSheet, monthParts) {
+  masterSheet.getRange("A1:D2").setValues([
+    ["Master List", "", "", ""],
+    ["Date:", monthParts.firstDay, "to", monthParts.lastDay]
+  ]);
+}
+
+function initializeMasterListTitleRows_(masterSheet, monthParts) {
+  masterSheet.clearContents();
+  if (masterSheet.getMaxColumns() < 4) {
+    masterSheet.insertColumnsAfter(masterSheet.getMaxColumns(), 4 - masterSheet.getMaxColumns());
+  }
+  writeMasterListTitleDateBlock_(masterSheet, monthParts);
+  clearSheetRuntimeCachesForSheet_(masterSheet);
+}
+
+function copyDemoPHeaderRowsToMasterList_(demoSheet, masterSheet, monthParts) {
+  const demoLastCol = Math.max(demoSheet.getLastColumn(), 1);
+  masterSheet.clear();
+  demoSheet.getRange(1, 1, HEADER_ROW, demoLastCol)
+    .copyTo(masterSheet.getRange(1, 1, HEADER_ROW, demoLastCol), { contentsOnly: false });
+  clearHeaderCacheForSheet_(masterSheet);
+  writeMasterListTitleDateBlock_(masterSheet, monthParts);
+  try {
+    const missingColumns = demoLastCol - masterSheet.getMaxColumns();
+    if (missingColumns > 0) {
+      masterSheet.insertColumnsAfter(masterSheet.getMaxColumns(), missingColumns);
+    }
+// v1.1.0 removed orphaned legacy formatting statement.
+  } catch (err) {
+    Logger.log("Column growth skipped while copying Demo P headers: " + err.message);
+  }
+}
+
+function copyQualifyingDemoPRowsToMasterList_(demoSheet, masterSheet, monthParts) {
+  const demoLastRow = demoSheet.getLastRow();
+  const demoLastCol = demoSheet.getLastColumn();
+  if (demoLastRow < DATA_START_ROW) return;
+  const headers = getHeaders_(demoSheet, HEADER_ROW);
+  const headerMap = buildHeaderIndexMap_(headers);
+  const pmrIdx = getPMRIndex_(headerMap);
+  if (pmrIdx === -1) {
+    throw new Error("Demo P is missing Participant PMR# / PMR # column.");
+  }
+  const data = demoSheet.getRange(DATA_START_ROW, 1, demoLastRow - DATA_START_ROW + 1, demoLastCol).getValues();
+  const disenrolledPMRs = buildDisenrolledPMRSetFromDemoPValues_(data, headerMap);
+  const exclusionPMRs = loadDisenrolledExclusionPMRsForPart3_();
+  exclusionPMRs.forEach(pmr => disenrolledPMRs.add(pmr));
+  const qualifyingRows = [];
+  data.forEach(row => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (disenrolledPMRs.has(pmr)) return;
+    qualifyingRows.push(row);
+  });
+  if (qualifyingRows.length > 0) {
+    masterSheet.getRange(DATA_START_ROW, 1, qualifyingRows.length, demoLastCol).setValues(qualifyingRows);
+  }
+}
+
+function formatMasterListSheet_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const monthParts = getMonthPartsFromTitleRows_(sheet) || {
+    firstDay: coerceToValidDate_(sheet.getRange("B2").getValue()) || new Date(),
+    lastDay: coerceToValidDate_(sheet.getRange("D2").getValue()) || new Date()
+  };
+  applyMasterListTemplateFormatting_(sheet, monthParts);
+}
+
+function applyMasterListTemplateModeUpdateDisplay_(sheet) {
+  // v1.1.0: Runtime Master List update display formatting removed.
+  return;
+}
+
+function getMonthPartsFromTitleRows_(sheet) {
+  const firstDay = coerceToValidDate_(sheet.getRange("B2").getValue()) ||
+    coerceToValidDate_(sheet.getRange("B2").getDisplayValue());
+  const lastDay = coerceToValidDate_(sheet.getRange("D2").getValue()) ||
+    coerceToValidDate_(sheet.getRange("D2").getDisplayValue());
+  if (!firstDay || !lastDay) return null;
+  return {
+    firstDay: firstDay,
+    lastDay: lastDay
+  };
+}
+
+function updateCopiedMasterListHeader_(sheet, monthParts) {
+  sheet.getRange("A1").setValue("Master List");
+  sheet.getRange("A2").setValue("Date:");
+  sheet.getRange("B2").setValue(monthParts.firstDay);
+  sheet.getRange("C2").setValue("to");
+  sheet.getRange("D2").setValue(monthParts.lastDay);
+}
+
+function applyMasterListTemplateHeaderFormatting_(sheet) {
+  // v1.1.0: Runtime header formatting removed. Dashboard templates are formatting authority.
+  return;
+}
+
+// Index and organization
+
+function createIndexSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Index");
+  if (!sheet) {
+    sheet = ss.insertSheet("Index", 0);
+  } else {
+    sheet.clear();
+  }
+  sheet;
+  const rows = [];
+  ss.getSheets().forEach(sh => {
+    const sheetName = sh.getName();
+    if (sheetName === "Index") return;
+    const monthDate = extractFirstDateFromSheetName_(sheetName);
+    const monthText = monthDate ? formatDateForSheetName_(monthDate) : "";
+    const sheetType = getSheetTypeForOrganization_(sheetName);
+    const hidden = sh.isSheetHidden() ? "Yes" : "No";
+    rows.push([
+      monthText,
+      sheetName,
+      `=HYPERLINK("#gid=${sh.getSheetId()}","Open")`,
+      sheetType,
+      hidden
+    ]);
+  });
+  rows.sort((a, b) => {
+    const aDate = parseIndexMonthDate_(a[0]);
+    const bDate = parseIndexMonthDate_(b[0]);
+    if (aDate && bDate && aDate.getTime() !== bDate.getTime()) {
+      return bDate.getTime() - aDate.getTime();
+    }
+    const aType = SHEET_TAB_ORDER.indexOf(a[3]);
+    const bType = SHEET_TAB_ORDER.indexOf(b[3]);
+    const aOrder = aType === -1 ? 999 : aType;
+    const bOrder = bType === -1 ? 999 : bType;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return String(a[1]).localeCompare(String(b[1]));
+  });
+  sheet.getRange(1, 1, 1, INDEX_HEADERS.length)
+    .setValues([INDEX_HEADERS]);
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, INDEX_HEADERS.length)
+      .setValues(rows);
+  }
+  applyIndexSheetRowFills_(sheet);
+  sheet;
+  sheet;
+  sheet;
+  sheet;
+  sheet;
+  sheet;
+  if (sheet.getFilter()) {
+    sheet;
+  }
+  sheet.getRange(1, 1, Math.max(sheet.getLastRow(), 1), INDEX_HEADERS.length);
+  applyCurrentVsOlderTabColors_();
+  organizeSheetTabs_();
+  applyCurrentVsOlderTabColors_();
+  return sheet;
+  applyStandardRowHeights_(sheet);
+}
+
+function extractFirstDateFromSheetName_(sheetName) {
+  const text = String(sheetName || "").trim();
+  const match = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})/);
+  if (!match) return null;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  let year = Number(match[3]);
+  if (year < 100) year += 2000;
+  const date = createLocalDateOnly_(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function parseIndexMonthDate_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return createLocalDateOnly_(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const dotMatch = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+  if (dotMatch) {
+    const month = Number(dotMatch[1]);
+    const day = Number(dotMatch[2]);
+    let year = Number(dotMatch[3]);
+    if (year < 100) year += 2000;
+    const date = createLocalDateOnly_(year, month - 1, day);
+    if (
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day
+    ) {
+      return date;
+    }
+  }
+  return coerceToValidDate_(text);
+}
+
+function organizeWorkbookTabs_(monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!monthParts) return;
+  const orderedNames = [
+    INDEX_SHEET,
+    buildMonthlySheetName_(MASTER_LIST_PREFIX, monthParts.firstDay, monthParts.lastDay),
+    buildMonthlySheetName_(MONTHLY_CHANGE_REPORT_PREFIX, monthParts.firstDay, monthParts.lastDay),
+    buildMonthlySheetNameNoDashAfterPrefix_(DEMO_P_PREFIX, monthParts.firstDay, monthParts.lastDay),
+    buildStandardMonthlySheetName_("Banners", monthParts.firstDay),
+    buildStandardMonthlySheetName_("Unlocked CP", monthParts.firstDay),
+    buildStandardMonthlySheetName_("CP Due", monthParts.firstDay),
+    DISENROLLED_EXCLUSION_SHEET,
+    MASTER_LIST_CHANGE_LOG_SHEET
+  ];
+  let position = 1;
+  orderedNames.forEach(sheetName => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    try {
+      ss.setActiveSheet(sheet);
+      ss.moveActiveSheet(position++);
+    } catch (err) {
+      Logger.log("Could not move sheet " + sheetName + ": " + err.message);
+    }
+  });
+  hideSystemSheets_();
+  const currentMaster = getMonthlySheetByPrefixAndDate_(ss, MASTER_LIST_PREFIX, monthParts.firstDay, monthParts.lastDay);
+  if (currentMaster) currentMaster.activate();
+}
+
+function hideSystemSheets_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let hiddenCount = 0;
+  ss.getSheets().forEach(sheet => {
+    if (!isSystemOrTestingSheet_(sheet)) return;
+    try {
+      if (!sheet.isSheetHidden()) {
+        sheet.hideSheet();
+        hiddenCount++;
+      }
+    } catch (err) {
+      Logger.log("Could not hide system/testing sheet " + sheet.getName() + ": " + err.message);
+    }
+  });
+  return hiddenCount;
+}
+
+function getSystemAndTestingSheetNames_() {
+  const names = new Set(SYSTEM_SHEETS_TO_HIDE || []);
+  [
+    RFF_DASHBOARD_SHEET,
+    RFF_VALIDATION_SHEET,
+    RFF_TIMING_SHEET,
+    RFF_TEST6_DATE_FORMAT_SHEET,
+    RFF_TEST7_VALIDATION_FAILURE_SHEET,
+    RFF_TEST9_SUBHEADER_SHEET,
+    RFF_TEST10_DASHBOARD_AUDIT_SHEET,
+    RFF_TEST_DASHBOARD_SHEET,
+    RFF_HEALTH_CHECK_SHEET
+  ].forEach(function(name) {
+    if (name) names.add(name);
+  });
+  // Templates are intentionally excluded. Template visibility is controlled only
+  // by the existing Hide Report Templates / Show Report Templates workflow.
+  return names;
+}
+
+function isSystemOrTestingSheet_(sheet) {
+  if (!sheet) return false;
+  const sheetName = String(sheet.getName() || "").trim();
+  const lower = sheetName.toLowerCase();
+  const explicitNames = getSystemAndTestingSheetNames_();
+  // Do not treat Template - sheets as system sheets. Templates have their own
+  // separate show/hide menu actions and triggers.
+  return explicitNames.has(sheetName) ||
+    lower.indexOf("framework test") !== -1 ||
+    lower.indexOf("template validation") !== -1 ||
+    lower.indexOf("framework health check") !== -1 ||
+    lower.indexOf("dashboard audit") !== -1 ||
+    lower.endsWith(" audit") ||
+    lower.endsWith(" validation") ||
+    lower.endsWith(" diagnostics") ||
+    lower.endsWith(" health check") ||
+    lower.indexOf("timing") !== -1;
+}
+
+// Sort/group/display
+
+function assignSortOrderAndHideExtraRows() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  assignSortOrderByParticipant_(sheet);
+  sortBySortOrder_(sheet);
+  formatSortOrderDisplayValues_(sheet);
+  applyParticipantAlternatingColorsBySortOrder_(sheet);
+  hideDecimalSortOrderRows_(sheet);
+  enforceMasterListFinalDisplay_(sheet);
+  notify_("Sort Order assigned. Primary rows remain visible and extra rows are hidden.");
+}
+
+function applySortOrderDisplayForMasterList_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  assignSortOrderByParticipant_(sheet);
+  sortBySortOrder_(sheet);
+  formatSortOrderDisplayValues_(sheet);
+  applyParticipantAlternatingColorsBySortOrder_(sheet);
+  hideDecimalSortOrderRows_(sheet);
+  enforceMasterListFinalDisplay_(sheet);
+}
+
+function assignSortOrderByParticipant_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const primaryCol = ensurePrimaryPMRRowColumn_(sheet);
+  const sortCol = ensureSortOrderColumn_(sheet);
+  if (sortCol < 1) {
+    notify_("Sort Order skipped: Sort Order column is not defined in Dashboard Sheet Headers.");
+    return;
+  }
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < DATA_START_ROW || lastCol < 1) return;
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const headerMap = buildHeaderIndexMap_(headers);
+  const pmrIdx = getPMRIndex_(headerMap);
+  const primaryIdx = headerMap["Primary PMR Row"];
+  if (pmrIdx === -1) {
+    notify_("Sort Order skipped: Participant PMR# / PMR # column not found.");
+    return;
+  }
+  const sortIdx = sortCol - 1;
+  const dataRange = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, lastCol);
+  const values = dataRange.getValues();
+  const blankOrNoPMRRows = [];
+  values.forEach((row, idx) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (pmr) return;
+    if (primaryIdx !== undefined) row[primaryIdx] = "";
+    row[sortIdx] = "";
+    blankOrNoPMRRows.push({ row: row, originalIndex: idx });
+  });
+  const blocks = buildParticipantBlocksForSortOrder_(values, headerMap, pmrIdx);
+  blocks.forEach(block => {
+    assignPrimaryRowForBlock_(block, headerMap, primaryIdx);
+  });
+  blocks.sort((a, b) => {
+    const aLast = normalizeKeyPart_(a.lastName);
+    const bLast = normalizeKeyPart_(b.lastName);
+    if (aLast !== bLast) return aLast < bLast ? -1 : 1;
+    const aFirst = normalizeKeyPart_(a.firstName);
+    const bFirst = normalizeKeyPart_(b.firstName);
+    if (aFirst !== bFirst) return aFirst < bFirst ? -1 : 1;
+    const aPMR = normalizePMR_(a.pmr);
+    const bPMR = normalizePMR_(b.pmr);
+    if (aPMR !== bPMR) return aPMR < bPMR ? -1 : 1;
+    return 0;
+  });
+  let participantNumber = 1;
+  const outputRows = [];
+  blocks.forEach(block => {
+    block.rows.sort((a, b) => {
+      const aPrimary = isPrimaryPMRRowValue_(a.row[primaryIdx]);
+      const bPrimary = isPrimaryPMRRowValue_(b.row[primaryIdx]);
+      if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
+      return a.originalIndex - b.originalIndex;
+    });
+    block.rows.forEach((item, idx) => {
+      item.row[sortIdx] = idx === 0 ? participantNumber : Number((participantNumber + (idx / 1000)).toFixed(3));
+      outputRows.push(item.row);
+    });
+    participantNumber++;
+  });
+  blankOrNoPMRRows.sort((a, b) => a.originalIndex - b.originalIndex);
+  blankOrNoPMRRows.forEach(item => outputRows.push(item.row));
+  if (outputRows.length > 0) {
+    dataRange.setValues(outputRows);
+    sheet.getRange(DATA_START_ROW, sortCol, outputRows.length, 1);
+    sheet.getRange(DATA_START_ROW, primaryCol, outputRows.length, 1);
+  }
+}
+
+function ensureSortOrderColumn_(sheet) {
+  /*
+   * v1.4.24:
+   * Do not create Sort Order at runtime. It must exist from the dashboard Sheet
+   * Headers/template definition when a workflow requires it.
+   */
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const idx = headers.indexOf("Sort Order");
+  return idx !== -1 ? idx + 1 : -1;
+}
+
+function buildParticipantBlocksForSortOrder_(values, headerMap, pmrIdx) {
+  const lastNameIdx = headerMap["Last Name"];
+  const firstNameIdx = headerMap["First Name"];
+  const blocksByPMR = new Map();
+  values.forEach((row, idx) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (!blocksByPMR.has(pmr)) {
+      blocksByPMR.set(pmr, {
+        pmr: pmr,
+        lastName: lastNameIdx !== undefined ? row[lastNameIdx] : "",
+        firstName: firstNameIdx !== undefined ? row[firstNameIdx] : "",
+        rows: []
+      });
+    }
+    const block = blocksByPMR.get(pmr);
+    if (!String(block.lastName || "").trim() && lastNameIdx !== undefined && String(row[lastNameIdx] || "").trim()) {
+      block.lastName = row[lastNameIdx];
+    }
+    if (!String(block.firstName || "").trim() && firstNameIdx !== undefined && String(row[firstNameIdx] || "").trim()) {
+      block.firstName = row[firstNameIdx];
+    }
+    block.rows.push({ row: row, originalIndex: idx });
+  });
+  return Array.from(blocksByPMR.values());
+}
+
+function getPrimaryRowScoreForSortOrder_(row, headerMap) {
+  let score = 0;
+  const checks = [
+    ["Date of Birth", 1000],
+    ["Enrollment Date", 250],
+    ["Capitation Date", 200],
+    ["Address Line 1", 100],
+    ["Phone Number", 50],
+    ["Primary Language", 25],
+    ["Participant Name", 20],
+    ["PMR #", 10]
+  ];
+  checks.forEach(pair => {
+    const idx = headerMap[pair[0]];
+    if (idx !== undefined && normalizeCompareValue_(row[idx]) !== "") {
+      score += pair[1];
+    }
+  });
+  return score;
+}
+
+function sortBySortOrder_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const sortIdx = headers.indexOf("Sort Order");
+  if (sortIdx === -1) return;
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < DATA_START_ROW || lastCol < 1) return;
+  sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, lastCol)
+    .sort([{ column: sortIdx + 1, ascending: true }]);
+}
+
+function hideDecimalSortOrderRows_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const sortIdx = headers.indexOf("Sort Order");
+  if (sortIdx === -1) return;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < DATA_START_ROW) return;
+  sheet.showRows(DATA_START_ROW, lastRow - DATA_START_ROW + 1);
+  const values = sheet.getRange(DATA_START_ROW, sortIdx + 1, lastRow - DATA_START_ROW + 1, 1).getValues();
+  const rowsToHide = [];
+  values.forEach((row, idx) => {
+    if (isDecimalSortOrder_(row[0])) {
+      rowsToHide.push(DATA_START_ROW + idx);
+    }
+  });
+  hideRowNumberBatches_(sheet, rowsToHide);
+}
+
+function isDecimalSortOrder_(value) {
+  const num = Number(value);
+  if (isNaN(num)) return false;
+  return Math.abs(num - Math.floor(num)) > 0.000001;
+}
+
+function getWholeSortOrderNumber_(value) {
+  const num = Number(value);
+  if (isNaN(num)) return 0;
+  return Math.floor(num);
+}
+
+function showAllMasterListRows() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  if (sheet.getMaxRows() >= DATA_START_ROW) {
+    sheet.showRows(DATA_START_ROW, sheet.getMaxRows() - DATA_START_ROW + 1);
+  }
+  notify_("All rows shown.");
+}
+
+function groupMasterListRowsByPMR_(sheet) {
+  sortMasterListByParticipantNameAndPMR_(sheet);
+  hideNonPrimaryPMRRows_(sheet);
+}
+
+function hideRowsWithBlankDOB_(sheet) {
+  hideNonPrimaryPMRRows_(sheet);
+}
+
+function sortMasterListByParticipantNameAndPMR_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < DATA_START_ROW || lastCol < 1) return;
+  clearAllRowGroupsIfPossible_(sheet);
+  sheet.showRows(DATA_START_ROW, lastRow - DATA_START_ROW + 1);
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const headerMap = buildHeaderIndexMap_(headers);
+  const pmrIdx = getPMRIndex_(headerMap);
+  const lastNameIdx = headerMap["Last Name"];
+  const firstNameIdx = headerMap["First Name"];
+  if (pmrIdx === -1 || lastNameIdx === undefined || firstNameIdx === undefined) {
+    notify_("Sort skipped: missing Last Name, First Name, or Participant PMR#.");
+    return;
+  }
+  const range = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, lastCol);
+  const values = range.getValues();
+  const blocksByPMR = new Map();
+  values.forEach((row, idx) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (!blocksByPMR.has(pmr)) {
+      blocksByPMR.set(pmr, {
+        pmr: pmr,
+        lastName: row[lastNameIdx],
+        firstName: row[firstNameIdx],
+        rows: []
+      });
+    }
+    const block = blocksByPMR.get(pmr);
+    if (!String(block.lastName || "").trim() && String(row[lastNameIdx] || "").trim()) block.lastName = row[lastNameIdx];
+    if (!String(block.firstName || "").trim() && String(row[firstNameIdx] || "").trim()) block.firstName = row[firstNameIdx];
+    block.rows.push({ row: row, originalIndex: idx });
+  });
+  const blocks = Array.from(blocksByPMR.values());
+  blocks.sort((a, b) => {
+    const aLast = normalizeKeyPart_(a.lastName);
+    const bLast = normalizeKeyPart_(b.lastName);
+    if (aLast !== bLast) return aLast < bLast ? -1 : 1;
+    const aFirst = normalizeKeyPart_(a.firstName);
+    const bFirst = normalizeKeyPart_(b.firstName);
+    if (aFirst !== bFirst) return aFirst < bFirst ? -1 : 1;
+    return normalizePMR_(a.pmr) < normalizePMR_(b.pmr) ? -1 : 1;
+  });
+  const sortedRows = [];
+  blocks.forEach(block => {
+    block.rows.sort((a, b) => {
+      const aScore = getPrimaryRowScore_(a.row, headerMap);
+      const bScore = getPrimaryRowScore_(b.row, headerMap);
+      if (aScore !== bScore) return bScore - aScore;
+      return a.originalIndex - b.originalIndex;
+    });
+    block.rows.forEach(item => sortedRows.push(item.row));
+  });
+  if (sortedRows.length > 0) {
+    range.setValues(sortedRows);
+  }
+}
+
+function getPrimaryRowScore_(row, headerMap) {
+  let score = 0;
+  const checks = [
+    ["Date of Birth", 1000],
+    ["Enrollment Date", 250],
+    ["Capitation Date", 200],
+    ["Address Line 1", 100],
+    ["Phone Number", 50],
+    ["Primary Language", 25],
+    ["Participant Name", 20],
+    ["PMR #", 10]
+  ];
+  checks.forEach(item => {
+    const idx = headerMap[item[0]];
+    if (idx !== undefined && normalizeCompareValue_(row[idx]) !== "") score += item[1];
+  });
+  return score;
+}
+
+function hideNonPrimaryPMRRows_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < DATA_START_ROW || lastCol < 1) return;
+  sheet.showRows(DATA_START_ROW, lastRow - DATA_START_ROW + 1);
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const headerMap = buildHeaderIndexMap_(headers);
+  const pmrIdx = getPMRIndex_(headerMap);
+  if (pmrIdx === -1) return;
+  const values = sheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, lastCol).getValues();
+  const seenPMRs = new Set();
+  const rowsToHide = [];
+  values.forEach((row, offset) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (!seenPMRs.has(pmr)) {
+      seenPMRs.add(pmr);
+      return;
+    }
+    rowsToHide.push(DATA_START_ROW + offset);
+  });
+  hideRowNumberBatches_(sheet, rowsToHide);
+}
+
+function hideRowNumberBatches_(sheet, rowNumbers) {
+  if (!rowNumbers || rowNumbers.length === 0) return;
+  const sorted = Array.from(new Set(rowNumbers)).sort((a, b) => a - b);
+  let start = sorted[0];
+  let previous = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    if (current === previous + 1) {
+      previous = current;
+      continue;
+    }
+    sheet.hideRows(start, previous - start + 1);
+    start = current;
+    previous = current;
+  }
+  sheet.hideRows(start, previous - start + 1);
+}
+
+function clearAllRowGroupsIfPossible_(sheet) {
+  const maxRows = sheet.getMaxRows();
+  if (maxRows < DATA_START_ROW) return;
+  for (let i = 0; i < 8; i++) {
+    try {
+      sheet.shiftRowGroupDepth(DATA_START_ROW, maxRows - DATA_START_ROW + 1, -1);
+    } catch (err) {
+      break;
+    }
+  }
+}
+
+function prepareMasterListSortOrderBeforeFormatting_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  sheet.showRows(DATA_START_ROW, Math.max(sheet.getLastRow() - DATA_START_ROW + 1, 1));
+  assignPrimaryPMRRows_(sheet);
+  assignSortOrderByParticipant_(sheet);
+  sortBySortOrder_(sheet);
+  formatSortOrderDisplayValues_(sheet);
+}
+
+function formatSortOrderDisplayValues_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  const headers = getHeaders_(sheet, HEADER_ROW);
+  const sortIdx = headers.indexOf("Sort Order");
+  if (sortIdx === -1) return;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < DATA_START_ROW) return;
+  const range = sheet.getRange(DATA_START_ROW, sortIdx + 1, lastRow - DATA_START_ROW + 1, 1);
+  const values = range.getValues();
+  const output = values.map(row => {
+    const value = row[0];
+    const num = Number(value);
+    if (isNaN(num) || value === "" || value === null || value === undefined) return [value];
+    const whole = Math.floor(num);
+    const detail = Math.round((num - whole) * 1000);
+    if (detail <= 0) return [String(whole)];
+    return [whole + "." + detail];
+  });
+  range;
+  range.setValues(output);
+}
+
+function applyFinalMasterListColorAndDisplay_(sheet) {
+  sheet = sheet || SpreadsheetApp.getActiveSheet();
+  sheet.showRows(DATA_START_ROW, Math.max(sheet.getLastRow() - DATA_START_ROW + 1, 1));
+  hideMasterListSourceColumns_(sheet);
+  applyParticipantAlternatingColorsBySortOrder_(sheet);
+  hideDecimalSortOrderRows_(sheet);
+  enforceMasterListFinalDisplay_(sheet);
+}
+
+function applyMasterListDisplaySettings_(sheet) {
+  applyFinalMasterListColorAndDisplay_(sheet || SpreadsheetApp.getActiveSheet());
+}
+
+function enforceMasterListFinalDisplay_(sheet) {
+  // v1.1.0: Runtime display formatting removed. Dashboard templates are formatting authority.
+  return;
+}
+
+function lockMasterListRowHeightsAndClip_(sheet) {
+  // v1.1.0: Runtime row-height/wrap formatting removed. Dashboard templates are formatting authority.
+  return;
+}
+
+// Processing pipeline
+
+function processMasterListFull_(masterSheet, monthParts, pmrFilter, timing) {
+  ensureHeaders_(masterSheet, MASTER_LIST_ADDED_HEADERS, HEADER_ROW);
+  ensureBannerSummaryOutputHeaders_(masterSheet);
+  ensureContactOutputHeaders_(masterSheet);
+  markRuntimeStep_(timing, "Process Full - ensure Master List headers");
+  processMasterListSingleDataPass_(masterSheet, monthParts, pmrFilter || null, true, timing);
+}
+
+function processMasterListDataOnly_(masterSheet, pmrFilter, timing) {
+  processMasterListSingleDataPass_(masterSheet, null, pmrFilter || null, false, timing);
+}
+
+function processMasterListSingleDataPass_(masterSheet, monthParts, pmrFilter, includeMonthlySyncs, timing) {
+  ensureHeaders_(masterSheet, MASTER_LIST_ADDED_HEADERS, HEADER_ROW);
+  ensureBannerSummaryOutputHeaders_(masterSheet);
+  ensureContactOutputHeaders_(masterSheet);
+  ensureHeaders_(masterSheet, ["Notes"], HEADER_ROW);
+  markRuntimeStep_(timing, "Single Pass - ensure processing headers");
+  assignPrimaryPMRRows_(masterSheet);
+  markRuntimeStep_(timing, "Single Pass - assign Primary PMR Row");
+  const data = getDataValues_(masterSheet, HEADER_ROW, DATA_START_ROW);
+  markRuntimeStep_(timing, "Single Pass - read Master List data range");
+  if (!data.values.length) return;
+  if (includeMonthlySyncs && monthParts) {
+    syncMasterListMonthlySourcesIntoData_(data, monthParts, pmrFilter || null);
+    markRuntimeStep_(timing, "Single Pass - sync monthly source data into memory");
+  }
+  updateBannerColumnData_(data, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - build Banner Summary");
+  combineAddressesData_(data, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - combine address fields");
+  handleLanguageData_(data, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - process language fields");
+  splitPhoneNumbersData_(data, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - split phone fields");
+  runMasterContactProcessData_(data, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - process contacts");
+  combineNotesSummaryData_(data, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - combine Notes Summary");
+  if (data.range) data.range.setValues(data.values);
+  markRuntimeStep_(timing, "Single Pass - write processed Master List data");
+  highlightAndStrikeExpiredADPhones_(masterSheet, pmrFilter || null);
+  markRuntimeStep_(timing, "Single Pass - highlight expired AD phones");
+  lockMasterListRowHeightsAndClip_(masterSheet);
+  markRuntimeStep_(timing, "Single Pass - row height/wrap lock");
+}
+
+function updateBannerColumnData_(data, pmrFilter) {
+  const headerMap = data.headerMap;
+  const bIdx = headerMap["Banner Summary"];
+  if (bIdx === undefined) return;
+  const bannerHeaders = [
+    "Safety - 2 Person",
+    "Wanderer",
+    "Interpreter Needed",
+    "Fall Risk",
+    "DPOA or Guardian Active",
+    "Palliative Care"
+  ];
+  data.values.forEach(row => {
+    if (!shouldProcessRowByPMR_(row, headerMap, pmrFilter)) return;
+    const parts = [];
+    bannerHeaders.forEach(header => {
+      const idx = headerMap[header];
+      if (idx === undefined) return;
+      const value = String(row[idx] || "").trim();
+      if (value !== "") parts.push(header);
+    });
+    row[bIdx] = parts.join(" | ");
+  });
+}
+
+function combineAddressesData_(data, pmrFilter) {
+  const headerMap = data.headerMap;
+  const a1Idx = headerMap["Address Line 1"];
+  const a2Idx = headerMap["Address Line 2"];
+  const targetIdx = headerMap["Address 1 - Street"];
+  if (a1Idx === undefined || targetIdx === undefined) return;
+  data.values.forEach(row => {
+    if (!shouldProcessRowByPMR_(row, headerMap, pmrFilter)) return;
+    const p1 = String(row[a1Idx] || "").trim();
+    const p2 = a2Idx !== undefined ? String(row[a2Idx] || "").trim() : "";
+    row[targetIdx] = p1 && p2 ? `${p1} ${p2}` : (p1 || p2);
+  });
+}
+
+function handleLanguageData_(data, pmrFilter) {
+  const headerMap = data.headerMap;
+  const labelIdx = headerMap["Custom Field 1 - Label"];
+  const valueIdx = headerMap["Custom Field 1 - Value"];
+  const langIdx = headerMap["Primary Language"];
+  if (labelIdx === undefined || valueIdx === undefined || langIdx === undefined) return;
+  data.values.forEach(row => {
+    if (!shouldProcessRowByPMR_(row, headerMap, pmrFilter)) return;
+    const lang = String(row[langIdx] || "").trim();
+    const existingValue = String(row[valueIdx] || "").trim();
+    if (lang && lang.toLowerCase() !== "english") {
+      row[labelIdx] = "Language";
+      row[valueIdx] = lang;
+    } else if (existingValue) {
+      row[labelIdx] = "Language";
+    } else {
+      row[labelIdx] = "";
+      row[valueIdx] = "";
+    }
+  });
+}
+
+function splitPhoneNumbersData_(data, pmrFilter) {
+  const headerMap = data.headerMap;
+  const phoneIdx = headerMap["Phone Number"];
+  if (phoneIdx === undefined) return;
+  const labelHeaders = ["Phone 1 - Label", "Phone 2 - Label", "Phone 3 - Label", "Phone 4 - Label"];
+  const valueHeaders = ["Phone 1 - Value", "Phone 2 - Value", "Phone 3 - Value", "Phone 4 - Value"];
+  const labels = ["Home", "Mobile", "Other", "Other"];
+  data.values.forEach(row => {
+    if (!shouldProcessRowByPMR_(row, headerMap, pmrFilter)) return;
+    const phoneText = String(row[phoneIdx] || "").trim();
+    for (let i = 0; i < 4; i++) {
+      const labelIdx = headerMap[labelHeaders[i]];
+      const valueIdx = headerMap[valueHeaders[i]];
+      if (labelIdx !== undefined) row[labelIdx] = "";
+      if (valueIdx !== undefined) row[valueIdx] = "";
+    }
+    if (!phoneText) return;
+    const parts = phoneText.split("_").map(part => part.trim()).filter(Boolean);
+    parts.slice(0, 4).forEach((phone, idx) => {
+      const labelIdx = headerMap[labelHeaders[idx]];
+      const valueIdx = headerMap[valueHeaders[idx]];
+      if (labelIdx !== undefined) row[labelIdx] = labels[idx];
+      if (valueIdx !== undefined) row[valueIdx] = phone;
+    });
+  });
+}
+
+function runMasterContactProcessData_(data, pmrFilter) {
+  if (!data || !data.values || !data.values.length) return;
+  writePMRContactsToParticipantRows_(null, data.values, data.headers, data.headerMap, pmrFilter || null);
+}
+
+function combineNotesSummaryData_(data, pmrFilter) {
+  if (!data || !data.values || !data.values.length) return;
+  const headerMap = data.headerMap;
+  const notesIdx = headerMap["Notes"];
+  if (notesIdx === undefined) return;
+  const sourceHeaders = [
+    "Banner Summary",
+    "Contact - Summary",
+    "Additional Important Information"
+  ];
+  data.values.forEach(row => {
+    if (!shouldProcessRowByPMR_(row, headerMap, pmrFilter)) return;
+    const parts = [];
+    sourceHeaders.forEach(header => {
+      const idx = headerMap[header];
+      if (idx === undefined) return;
+      const value = String(row[idx] || "").trim();
+      if (value) parts.push(value);
+    });
+    row[notesIdx] = parts.join("\n\n");
+  });
+}
+
+// Monthly Change update actions
+
+function rebuildChangedPMRsFromDemoP_(currentDemo, currentMaster, reportSheet, changedInfo, monthParts, runProcessing) {
+  return rebuildChangedPMRsOnExistingMaster_(
+    currentDemo,
+    currentMaster,
+    reportSheet,
+    monthParts,
+    runProcessing !== false
+  );
+}
+
+function copyPreviousMasterListToCurrentMonth_(previousMaster, monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const targetName = buildMonthlySheetName_(MASTER_LIST_PREFIX, monthParts.firstDay, monthParts.lastDay);
+  const existing = ss.getSheetByName(targetName);
+  if (existing) {
+    ss.deleteSheet(existing);
+  }
+  const currentMaster = createMasterListSheetFromTemplate_(ss, targetName, monthParts);
+  const lastRow = Math.max(previousMaster.getLastRow(), HEADER_ROW);
+  const lastCol = Math.max(previousMaster.getLastColumn(), 1);
+  if (lastCol > currentMaster.getMaxColumns()) {
+    currentMaster.insertColumnsAfter(currentMaster.getMaxColumns(), lastCol - currentMaster.getMaxColumns());
+  }
+  if (lastRow > currentMaster.getMaxRows()) {
+    currentMaster.insertRowsAfter(currentMaster.getMaxRows(), lastRow - currentMaster.getMaxRows());
+  }
+  const values = previousMaster.getRange(1, 1, lastRow, lastCol).getValues();
+  currentMaster.getRange(1, 1, lastRow, lastCol).setValues(values);
+  updateCopiedMasterListHeader_(currentMaster, monthParts);
+  applyMasterListTemplateHeaderFormatting_(currentMaster, monthParts);
+  ensureHeaders_(currentMaster, MASTER_LIST_ADDED_HEADERS, HEADER_ROW);
+  ensureBannerSummaryOutputHeaders_(currentMaster);
+  ensureContactOutputHeaders_(currentMaster);
+  clearSheetRuntimeCachesForSheet_(currentMaster);
+  return currentMaster;
+}
+
+function rebuildChangedPMRsOnExistingMaster_(currentDemo, currentMaster, reportSheet, monthParts, runFullProcessing, timing) {
+  const changedInfo = getChangedPMRsFromMonthlyChangeReport_(reportSheet);
+  const changedPMRs = Array.from(changedInfo.keys());
+  markRuntimeStep_(timing, "Update - read PMRs from Monthly Change Report (" + changedPMRs.length + " PMRs)");
+  if (changedPMRs.length === 0) {
+    return 0;
+  }
+  const result = updateMasterListFromMonthlyChangeActions_(currentDemo, currentMaster, reportSheet, monthParts, changedInfo, timing);
+  const affectedPMRFilter = result.affectedPMRs || new Set(changedPMRs);
+  markRuntimeStep_(timing, "Update - build affected PMR filter (" + affectedPMRFilter.size + " PMRs)");
+  if (runFullProcessing) {
+    processMasterListFull_(currentMaster, monthParts, affectedPMRFilter, timing);
+  } else {
+    processMasterListDataOnly_(currentMaster, affectedPMRFilter, timing);
+    markRuntimeStep_(timing, "Update - process affected PMRs data-only");
+    formatMasterListSheet_(currentMaster);
+    markRuntimeStep_(timing, "Update - format Master List");
+    groupMasterListRowsByPMR_(currentMaster);
+    markRuntimeStep_(timing, "Update - group/sort Master List rows");
+    hideRowsWithBlankDOB_(currentMaster);
+    markRuntimeStep_(timing, "Update - hide non-primary rows");
+  }
+  removeDisenrolledPMRBlocksFromMasterUsingDemoP_(currentMaster, currentDemo);
+  markRuntimeStep_(timing, "Update - remove disenrolled PMR blocks after update actions");
+  return changedPMRs.length;
+}
+
+function updateMasterListFromMonthlyChangeActions_(currentDemo, currentMaster, reportSheet, monthParts, changedInfo, timing) {
+  const enrollmentPMRs = getPMRsForMonthlyChangeSections_(changedInfo, ["Enrollments"]);
+  const disenrollmentPMRs = getPMRsForMonthlyChangeSections_(changedInfo, ["Disenrollments"]);
+  const primaryUpdatePMRs = getPMRsForMonthlyChangeSections_(changedInfo, ["Demographic Changes", "Caseload Changes", "Banner Changes"]);
+  const contactChangePMRs = getPMRsForMonthlyChangeSections_(changedInfo, ["Contact Changes"]);
+  const affectedPMRs = new Set();
+  disenrollmentPMRs.forEach(pmr => affectedPMRs.add(pmr));
+  enrollmentPMRs.forEach(pmr => affectedPMRs.add(pmr));
+  primaryUpdatePMRs.forEach(pmr => affectedPMRs.add(pmr));
+  contactChangePMRs.forEach(pmr => affectedPMRs.add(pmr));
+  deletePMRBlocksFromMasterListBySet_(currentMaster, disenrollmentPMRs, reportSheet, monthParts, "Disenrollments - remove PMR block");
+  markRuntimeStep_(timing, "Update - remove Disenrollment PMR blocks (" + disenrollmentPMRs.size + " PMRs)");
+  deletePMRBlocksFromMasterListBySet_(currentMaster, enrollmentPMRs, reportSheet, monthParts, "Enrollments - replace/add PMR block");
+  const addedRows = copyChangedPMRsFromDemoPToMasterList_(currentDemo, currentMaster, enrollmentPMRs, monthParts);
+  markRuntimeStep_(timing, "Update - add Enrollment PMR blocks (" + enrollmentPMRs.size + " PMRs, " + addedRows + " rows)");
+  const primaryResult = updatePrimaryRowsFromDemoPForPMRs_(currentDemo, currentMaster, primaryUpdatePMRs, monthParts);
+  markRuntimeStep_(timing, "Update - primary row updates (" + primaryResult.rowsUpdated + " rows, " + primaryResult.columnsUpdated + " columns)");
+  const contactResult = mergeSecondaryRowsFromDemoPForPMRs_(currentDemo, currentMaster, contactChangePMRs, monthParts);
+  markRuntimeStep_(timing, "Update - contact row merge (" + contactResult.rowsUpdated + " updates, " + contactResult.rowsAdded + " adds, " + contactResult.rowsRemoved + " removes)");
+  return {
+    affectedPMRs: affectedPMRs,
+    enrollmentPMRs: enrollmentPMRs,
+    disenrollmentPMRs: disenrollmentPMRs,
+    primaryUpdatePMRs: primaryUpdatePMRs,
+    contactChangePMRs: contactChangePMRs,
+    primaryResult: primaryResult,
+    contactResult: contactResult
+  };
+}
+
+function getPMRsForMonthlyChangeSections_(changedInfo, sectionsToMatch) {
+  const targets = new Set(sectionsToMatch || []);
+  const result = new Set();
+  (changedInfo || new Map()).forEach((sections, pmr) => {
+    if (!sections) return;
+    const hasMatch = Array.from(sections).some(section => targets.has(section));
+    if (hasMatch) result.add(pmr);
+  });
+  return result;
+}
+
+function deletePMRBlocksFromMasterListBySet_(masterSheet, pmrSet, reportSheet, monthParts, reasonText) {
+  if (!masterSheet || !pmrSet || pmrSet.size === 0) return 0;
+  const rowsByPMR = buildRowsByPMR_(masterSheet, HEADER_ROW, DATA_START_ROW);
+  const headers = getHeaders_(masterSheet, HEADER_ROW);
+  const logRows = [];
+  const rowsToDelete = [];
+  const timestamp = new Date();
+  pmrSet.forEach(pmr => {
+    const items = rowsByPMR.get(pmr) || [];
+    items.forEach(item => {
+      logRows.push([
+        timestamp,
+        monthParts.firstDay,
+        pmr,
+        reasonText || "Monthly Change action",
+        masterSheet.getName(),
+        item.rowNumber,
+        reportSheet ? reportSheet.getName() : "",
+        JSON.stringify(rowObjectFromHeaders_(headers, item.values))
+      ]);
+      rowsToDelete.push(item.rowNumber);
+    });
+  });
+  appendMasterListChangeLog_(logRows);
+  deleteRowNumberBatches_(masterSheet, rowsToDelete);
+  clearSheetRuntimeCachesForSheet_(masterSheet);
+  return rowsToDelete.length;
+}
+
+function updatePrimaryRowsFromDemoPForPMRs_(demoSheet, masterSheet, pmrSet, monthParts) {
+  const result = { rowsUpdated: 0, columnsUpdated: 0, missingInMaster: 0, missingInDemo: 0 };
+  if (!demoSheet || !masterSheet || !pmrSet || pmrSet.size === 0) return result;
+  const demoData = getDataValues_(demoSheet, HEADER_ROW, DATA_START_ROW);
+  const masterData = getDataValues_(masterSheet, HEADER_ROW, DATA_START_ROW);
+  const demoBlocks = buildMergeRowsByPMRFromData_(demoData);
+  const masterBlocks = buildMergeRowsByPMRFromData_(masterData);
+  const masterHeaders = masterData.headers;
+  const masterHeaderMap = masterData.headerMap;
+  const sourceSheetName = demoSheet.getName();
+  pmrSet.forEach(pmr => {
+    const demoPrimary = getPrimaryMergeRowItem_(demoBlocks.get(pmr) || [], demoData.headerMap);
+    const masterPrimary = getPrimaryMergeRowItem_(masterBlocks.get(pmr) || [], masterHeaderMap);
+    if (!demoPrimary) {
+      result.missingInDemo++;
+      return;
+    }
+    if (!masterPrimary) {
+      result.missingInMaster++;
+      return;
+    }
+    const changedColumns = getPrimaryRowChangedColumnDetails_(
+      masterPrimary.values,
+      masterHeaderMap,
+      demoPrimary.values,
+      demoData.headerMap
+    ).map(item => item.column);
+    if (changedColumns.length === 0) return;
+    setMasterRowColumnsFromDemoRow_(
+      masterSheet,
+      masterPrimary.rowNumber,
+      masterHeaders,
+      masterHeaderMap,
+      demoPrimary.values,
+      demoData.headerMap,
+      changedColumns,
+      monthParts,
+      sourceSheetName,
+      "Primary row updated from Demo P"
+    );
+    result.rowsUpdated++;
+    result.columnsUpdated += changedColumns.length;
+  });
+  clearSheetRuntimeCachesForSheet_(masterSheet);
+  return result;
+}
+
+function mergeSecondaryRowsFromDemoPForPMRs_(demoSheet, masterSheet, pmrSet, monthParts) {
+  const result = { rowsUpdated: 0, rowsAdded: 0, rowsRemoved: 0, missingInDemo: 0 };
+  if (!demoSheet || !masterSheet || !pmrSet || pmrSet.size === 0) return result;
+  const demoData = getDataValues_(demoSheet, HEADER_ROW, DATA_START_ROW);
+  let masterData = getDataValues_(masterSheet, HEADER_ROW, DATA_START_ROW);
+  const demoBlocks = buildMergeRowsByPMRFromData_(demoData);
+  let masterBlocks = buildMergeRowsByPMRFromData_(masterData);
+  const masterHeaders = masterData.headers;
+  const masterHeaderMap = masterData.headerMap;
+  const sourceSheetName = demoSheet.getName();
+  const rowsToDelete = [];
+  const rowsToAppend = [];
+  pmrSet.forEach(pmr => {
+    const demoRows = demoBlocks.get(pmr) || [];
+    const masterRows = masterBlocks.get(pmr) || [];
+    if (!demoRows.length) {
+      result.missingInDemo++;
+      return;
+    }
+    const demoKeys = buildSecondaryMergeKeyMapForRows_(demoRows, demoData.headerMap, pmr);
+    const masterKeys = buildSecondaryMergeKeyMapForRows_(masterRows, masterHeaderMap, pmr);
+    const allKeys = new Set([].concat(Array.from(demoKeys.keys()), Array.from(masterKeys.keys())));
+    allKeys.forEach(key => {
+      const demoItem = demoKeys.get(key);
+      const masterItem = masterKeys.get(key);
+      if (demoItem && masterItem) {
+        const changedFields = getMergeAuditChangedFields_(masterItem.values, masterHeaderMap, demoItem.values, demoData.headerMap);
+        if (changedFields.length > 0) {
+          setMasterRowColumnsFromDemoRow_(
+            masterSheet,
+            masterItem.rowNumber,
+            masterHeaders,
+            masterHeaderMap,
+            demoItem.values,
+            demoData.headerMap,
+            changedFields,
+            monthParts,
+            sourceSheetName,
+            "Contact row updated from Demo P"
+          );
+          result.rowsUpdated++;
+        }
+      } else if (demoItem && !masterItem) {
+        rowsToAppend.push(buildMappedMasterRowFromDemoRow_(
+          demoItem.values,
+          demoData.headers,
+          demoData.headerMap,
+          masterHeaders,
+          masterHeaderMap,
+          monthParts,
+          sourceSheetName,
+          "Contact row added from Demo P"
+        ));
+        result.rowsAdded++;
+      } else if (!demoItem && masterItem) {
+        rowsToDelete.push(masterItem.rowNumber);
+        result.rowsRemoved++;
+      }
+    });
+  });
+  if (rowsToAppend.length) {
+    const appendRow = Math.max(masterSheet.getLastRow() + 1, DATA_START_ROW);
+    masterSheet.getRange(appendRow, 1, rowsToAppend.length, masterHeaders.length).setValues(rowsToAppend);
+  }
+  if (rowsToDelete.length) {
+    deleteRowNumberBatches_(masterSheet, rowsToDelete);
+  }
+  clearSheetRuntimeCachesForSheet_(masterSheet);
+  return result;
+}
+
+function buildMappedMasterRowFromDemoRow_(demoRow, demoHeaders, demoHeaderMap, masterHeaders, masterHeaderMap, monthParts, sourceSheetName, statusText) {
+  const output = new Array(masterHeaders.length).fill("");
+  demoHeaders.forEach((header, sourceIdx) => {
+    if (!header) return;
+    const targetIdx = masterHeaderMap[header];
+    if (targetIdx !== undefined) output[targetIdx] = demoRow[sourceIdx];
+  });
+  applyMasterListUpdateMetadataToRow_(output, masterHeaderMap, monthParts, sourceSheetName, statusText);
+  return output;
+}
+
+function setMasterRowColumnsFromDemoRow_(masterSheet, rowNumber, masterHeaders, masterHeaderMap, demoRow, demoHeaderMap, headersToUpdate, monthParts, sourceSheetName, statusText) {
+  if (!masterSheet || !rowNumber || rowNumber < DATA_START_ROW) return;
+  const rowValues = masterSheet.getRange(rowNumber, 1, 1, masterHeaders.length).getValues()[0];
+  (headersToUpdate || []).forEach(header => {
+    const masterIdx = masterHeaderMap[header];
+    const demoIdx = demoHeaderMap[header];
+    if (masterIdx === undefined || demoIdx === undefined) return;
+    rowValues[masterIdx] = demoRow[demoIdx];
+  });
+  applyMasterListUpdateMetadataToRow_(rowValues, masterHeaderMap, monthParts, sourceSheetName, statusText);
+  masterSheet.getRange(rowNumber, 1, 1, masterHeaders.length).setValues([rowValues]);
+}
+
+function applyMasterListUpdateMetadataToRow_(rowValues, headerMap, monthParts, sourceSheetName, statusText) {
+  const statusIdx = headerMap["Master List Update Status"];
+  const monthIdx = headerMap["Master List Update Month"];
+  const sourceIdx = headerMap["Master List Source Sheet"];
+  if (statusIdx !== undefined) rowValues[statusIdx] = statusText || "Updated from Demo P";
+  if (monthIdx !== undefined) rowValues[monthIdx] = monthParts ? monthParts.firstDay : new Date();
+  if (sourceIdx !== undefined) rowValues[sourceIdx] = sourceSheetName || "";
+}
+
+// Source columns
+
+function hideMasterListSourceColumns_(sheet) {
+  /*
+   * v1.4.25:
+   * Runtime Master List column hiding is restricted. Hidden/show settings are
+   * applied only by the dashboard template builder from Section D.
+   */
+  return 0;
+}
+
+function showMasterListSourceColumns_(sheet) {
+  /*
+   * v1.4.25:
+   * Runtime Master List column showing is restricted. Hidden/show settings are
+   * applied only by the dashboard template builder from Section D.
+   */
+  return 0;
+}
+
+function hideCurrentMasterListSourceColumns() {
+  const monthParts = promptForLockedYearReportMonth_("Hide Master List Source Columns");
+  if (!monthParts) return;
+  const sheet = getCurrentMasterListSheet_(monthParts) || SpreadsheetApp.getActiveSheet();
+  hideMasterListSourceColumns_(sheet);
+  notify_("Master List source columns hidden.");
+}
+
+function showCurrentMasterListSourceColumns() {
+  const monthParts = promptForLockedYearReportMonth_("Show Master List Source Columns");
+  if (!monthParts) return;
+  const sheet = getCurrentMasterListSheet_(monthParts) || SpreadsheetApp.getActiveSheet();
+  showMasterListSourceColumns_(sheet);
+  notify_("Master List columns shown.");
+}
+
+// -----------------------------------------------------------------------------
+// System sheet menu callbacks
+// -----------------------------------------------------------------------------
+
+function hideSystemSheetsNow() {
+  const count = hideSystemSheets_();
+  notify_("System/testing sheets hidden: " + count);
+}
+
+function showSystemSheetsNow() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const names = getSystemAndTestingSheetNames_();
+  let shownCount = 0;
+
+
+  ss.getSheets().forEach(function(sheet) {
+    const sheetName = String(sheet.getName() || "").trim();
+    if (!names.has(sheetName) && !isSystemOrTestingSheet_(sheet)) return;
+
+
+    try {
+      if (sheet.isSheetHidden()) {
+        sheet.showSheet();
+        shownCount++;
+      }
+    } catch (err) {
+      Logger.log("Could not show system/testing sheet " + sheetName + ": " + err.message);
+    }
+  });
+
+
+  notify_("System/testing sheets shown: " + shownCount);
+}
+
+// -----------------------------------------------------------------------------
+// Update Master List merge audit callbacks
+// -----------------------------------------------------------------------------
+
+function runUpdateMasterListMergeAudit() {
+  const monthParts = promptForLockedYearReportMonth_("Update Master List Merge Audit");
+  if (!monthParts) return;
+
+
+  const secondarySheet = buildUpdateMasterListMergeAuditForMonth_(monthParts);
+  const primarySheet = buildUpdateMasterListPrimaryRowAuditForMonth_(monthParts);
+
+
+  if (secondarySheet) secondarySheet.showSheet();
+  if (primarySheet) {
+    primarySheet.showSheet();
+    primarySheet.activate();
+  } else if (secondarySheet) {
+    secondarySheet.activate();
+  }
+
+
+  if (secondarySheet || primarySheet) {
+    notify_("Update Master List Merge Audit complete. Review the secondary-row audit and primary-row audit sheets.");
+  }
+}
+
+function buildUpdateMasterListMergeAuditForMonth_(monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const currentDemo = getCurrentDemoPSheet_(monthParts);
+  const sourceMaster = getPreviousMasterListSheet_(monthParts);
+
+
+  if (!currentDemo) {
+    notify_("Current month Demo P was not found. Format Demo P first.");
+    return null;
+  }
+
+
+  if (!sourceMaster) {
+    notify_("Previous month Master List was not found for merge audit.");
+    return null;
+  }
+
+
+  const reportSheet = getMonthlySheetByPrefixAndDate_(
+    ss,
+    MONTHLY_CHANGE_REPORT_PREFIX,
+    monthParts.firstDay,
+    monthParts.lastDay
+  );
+
+
+  if (!reportSheet) {
+    notify_("Monthly Change Report was not found. Create Monthly Change Report first.");
+    return null;
+  }
+
+
+  const changedInfo = getChangedPMRsFromMonthlyChangeReport_(reportSheet);
+  const contactChangePMRs = Array.from(changedInfo.keys())
+    .filter(pmr => changedInfo.get(pmr) && changedInfo.get(pmr).has("Contact Changes"))
+    .sort();
+
+
+  const demoData = getDataValues_(currentDemo, HEADER_ROW, DATA_START_ROW);
+  const masterData = getDataValues_(sourceMaster, HEADER_ROW, DATA_START_ROW);
+
+
+  const demoBlocks = buildMergeRowsByPMRFromData_(demoData);
+  const masterBlocks = buildMergeRowsByPMRFromData_(masterData);
+
+
+  const summaryRows = [];
+  const detailRows = [];
+
+
+  contactChangePMRs.forEach(pmr => {
+    const demoRows = demoBlocks.get(pmr) || [];
+    const masterRows = masterBlocks.get(pmr) || [];
+    const participantName = getMergeAuditParticipantName_(demoRows, demoData.headerMap, masterRows, masterData.headerMap);
+
+
+    const demoKeys = buildSecondaryMergeKeyMapForRows_(demoRows, demoData.headerMap, pmr);
+    const masterKeys = buildSecondaryMergeKeyMapForRows_(masterRows, masterData.headerMap, pmr);
+
+
+    const contactKeys = new Set(
+      [].concat(Array.from(demoKeys.keys()), Array.from(masterKeys.keys()))
+    );
+
+
+    let matchedCount = 0;
+    let updateCount = 0;
+    let addCount = 0;
+    let removeCount = 0;
+    let noActionCount = 0;
+
+
+    contactKeys.forEach(key => {
+      const demoItem = demoKeys.get(key);
+      const masterItem = masterKeys.get(key);
+      const masterSummary = masterItem ? buildMergeAuditContactSummary_(masterItem.values, masterData.headerMap) : "";
+      const demoSummary = demoItem ? buildMergeAuditContactSummary_(demoItem.values, demoData.headerMap) : "";
+
+
+      let auditAction = "";
+      let differenceFound = "";
+      let recommendedAction = "";
+
+
+      if (demoItem && masterItem) {
+        matchedCount++;
+        const changedFields = getMergeAuditChangedFields_(masterItem.values, masterData.headerMap, demoItem.values, demoData.headerMap);
+
+
+        if (changedFields.length > 0) {
+          auditAction = "Update";
+          differenceFound = "Contact exists in both; changed fields: " + changedFields.join(", ");
+          recommendedAction = "Update existing Master List contact row";
+          updateCount++;
+        } else {
+          auditAction = "No action";
+          differenceFound = "Contact exists in both; no compared field differences";
+          recommendedAction = "No Master List contact row change needed";
+          noActionCount++;
+        }
+      } else if (demoItem && !masterItem) {
+        auditAction = "Add";
+        differenceFound = "Contact exists in Demo P only";
+        recommendedAction = "Add new contact row to Master List";
+        addCount++;
+      } else if (!demoItem && masterItem) {
+        auditAction = "Remove";
+        differenceFound = "Contact exists in previous Master List only";
+        recommendedAction = "Remove contact row from Master List";
+        removeCount++;
+      }
+
+
+      detailRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        auditAction,
+        differenceFound,
+        recommendedAction,
+        masterItem ? masterItem.rowNumber : "",
+        demoItem ? demoItem.rowNumber : "",
+        "Secondary/Contact",
+        "Yes",
+        masterSummary,
+        demoSummary,
+        key
+      ]);
+    });
+
+
+    let recommendation = "No contact row change needed";
+    if (addCount || removeCount || updateCount) {
+      const pieces = [];
+      if (updateCount) pieces.push(updateCount + " update");
+      if (addCount) pieces.push(addCount + " add");
+      if (removeCount) pieces.push(removeCount + " remove");
+      recommendation = pieces.join(", ");
+    }
+
+
+    summaryRows.push([
+      pmr,
+      participantName.lastName,
+      participantName.firstName,
+      masterRows.length,
+      demoRows.length,
+      matchedCount,
+      updateCount,
+      addCount,
+      removeCount,
+      noActionCount,
+      recommendation
+    ]);
+  });
+
+
+  const auditName = "Update Master List Merge Audit";
+  let audit = ss.getSheetByName(auditName);
+  if (audit) ss.deleteSheet(audit);
+  audit = ss.insertSheet(auditName);
+
+
+  audit.getRange("A1").setValue(auditName);
+  audit.getRange("A2").setValue("Date");
+  audit.getRange("B2").setValue(monthParts.firstDay);
+  audit.getRange("C2").setValue("to");
+  audit.getRange("D2").setValue(monthParts.lastDay);
+  audit.getRange("A3").setValue("Audit Scope");
+  audit.getRange("B3").setValue("Contact Changes only - secondary rows only");
+  audit.getRange("C3").setValue("Source Master List");
+  audit.getRange("D3").setValue(sourceMaster.getName());
+  audit.getRange("E3").setValue("Source Demo P");
+  audit.getRange("F3").setValue(currentDemo.getName());
+
+
+  const summaryHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Master Row Count",
+    "Demo P Row Count",
+    "Contacts Matched",
+    "Contacts To Update",
+    "Contacts To Add",
+    "Contacts To Remove",
+    "Contacts With No Action",
+    "Merge Recommendation"
+  ];
+
+
+  audit.getRange(5, 1, 1, summaryHeaders.length).setValues([summaryHeaders]);
+  if (summaryRows.length) {
+    audit.getRange(6, 1, summaryRows.length, summaryHeaders.length).setValues(summaryRows);
+  } else {
+    audit.getRange(6, 1).setValue("No PMRs were found in the Contact Changes section of the Monthly Change Report.");
+  }
+
+
+  const detailStart = Math.max(8 + summaryRows.length, 8);
+  audit.getRange(detailStart, 1).setValue("Contact Change Details");
+  const detailHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Audit Action",
+    "Difference Found",
+    "Recommended Master List Action",
+    "Master Row #",
+    "Demo P Row #",
+    "Row Type",
+    "Secondary Row Only",
+    "Master Contact Summary",
+    "Demo P Contact Summary",
+    "Contact Match Key"
+  ];
+
+
+  audit.getRange(detailStart + 1, 1, 1, detailHeaders.length).setValues([detailHeaders]);
+  if (detailRows.length) {
+    audit.getRange(detailStart + 2, 1, detailRows.length, detailHeaders.length).setValues(detailRows);
+  }
+
+
+  applyStandardFormatting_(audit, {
+    sheetType: SHEET_TYPE.MASTER_LIST_CHANGE_LOG,
+    title: auditName,
+    startDate: monthParts.firstDay,
+    endDate: monthParts.lastDay,
+    renameSheet: false
+  });
+// v1.1.0 removed orphaned legacy formatting statement.
+  return audit;
+}
+
+function buildUpdateMasterListPrimaryRowAuditForMonth_(monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const currentDemo = getCurrentDemoPSheet_(monthParts);
+  const sourceMaster = getPreviousMasterListSheet_(monthParts);
+
+
+  if (!currentDemo || !sourceMaster) return null;
+
+
+  const reportSheet = getMonthlySheetByPrefixAndDate_(
+    ss,
+    MONTHLY_CHANGE_REPORT_PREFIX,
+    monthParts.firstDay,
+    monthParts.lastDay
+  );
+
+
+  if (!reportSheet) return null;
+
+
+  const changedInfo = getChangedPMRsFromMonthlyChangeReport_(reportSheet);
+  const primarySections = new Set(["Demographic Changes", "Caseload Changes", "Banner Changes"]);
+
+
+  const primaryChangePMRs = Array.from(changedInfo.keys())
+    .filter(pmr => {
+      const sections = changedInfo.get(pmr);
+      if (!sections) return false;
+      return Array.from(sections).some(section => primarySections.has(section));
+    })
+    .sort();
+
+
+  const demoData = getDataValues_(currentDemo, HEADER_ROW, DATA_START_ROW);
+  const masterData = getDataValues_(sourceMaster, HEADER_ROW, DATA_START_ROW);
+
+
+  const demoBlocks = buildMergeRowsByPMRFromData_(demoData);
+  const masterBlocks = buildMergeRowsByPMRFromData_(masterData);
+
+
+  const summaryRows = [];
+  const detailRows = [];
+
+
+  primaryChangePMRs.forEach(pmr => {
+    const demoRows = demoBlocks.get(pmr) || [];
+    const masterRows = masterBlocks.get(pmr) || [];
+    const participantName = getMergeAuditParticipantName_(demoRows, demoData.headerMap, masterRows, masterData.headerMap);
+    const sections = Array.from(changedInfo.get(pmr) || []).filter(section => primarySections.has(section)).join(" | ");
+
+
+    const demoPrimary = getPrimaryMergeRowItem_(demoRows, demoData.headerMap);
+    const masterPrimary = getPrimaryMergeRowItem_(masterRows, masterData.headerMap);
+
+
+    if (!demoPrimary && !masterPrimary) {
+      summaryRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        "",
+        "",
+        0,
+        "No primary row found in either source",
+        "Review PMR manually"
+      ]);
+      return;
+    }
+
+
+    if (demoPrimary && !masterPrimary) {
+      summaryRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        "",
+        demoPrimary.rowNumber,
+        0,
+        "Primary row exists in Demo P only",
+        "Add PMR block or add primary row to Master List"
+      ]);
+      return;
+    }
+
+
+    if (!demoPrimary && masterPrimary) {
+      summaryRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        masterPrimary.rowNumber,
+        "",
+        0,
+        "Primary row exists in previous Master List only",
+        "Review/remove PMR block"
+      ]);
+      return;
+    }
+
+
+    const changedColumns = getPrimaryRowChangedColumnDetails_(
+      masterPrimary.values,
+      masterData.headerMap,
+      demoPrimary.values,
+      demoData.headerMap
+    );
+
+
+    changedColumns.forEach(change => {
+      detailRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        masterPrimary.rowNumber,
+        demoPrimary.rowNumber,
+        change.column,
+        change.masterValue,
+        change.demoValue,
+        "Update Master List primary row column"
+      ]);
+    });
+
+
+    summaryRows.push([
+      pmr,
+      participantName.lastName,
+      participantName.firstName,
+      sections,
+      masterPrimary.rowNumber,
+      demoPrimary.rowNumber,
+      changedColumns.length,
+      changedColumns.map(item => item.column).join(", "),
+      changedColumns.length ? "Update primary row columns listed in detail section" : "No compared primary-row column differences found"
+    ]);
+  });
+
+
+  const auditName = "Update Master List Primary Row Audit";
+  let audit = ss.getSheetByName(auditName);
+  if (audit) ss.deleteSheet(audit);
+  audit = ss.insertSheet(auditName);
+
+
+  audit.getRange("A1").setValue(auditName);
+  audit.getRange("A2").setValue("Date");
+  audit.getRange("B2").setValue(monthParts.firstDay);
+  audit.getRange("C2").setValue("to");
+  audit.getRange("D2").setValue(monthParts.lastDay);
+  audit.getRange("A3").setValue("Audit Scope");
+  audit.getRange("B3").setValue("Primary rows only - Demographic, Caseload, and Banner Changes");
+  audit.getRange("C3").setValue("Source Master List");
+  audit.getRange("D3").setValue(sourceMaster.getName());
+  audit.getRange("E3").setValue("Source Demo P");
+  audit.getRange("F3").setValue(currentDemo.getName());
+
+
+  const summaryHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Monthly Change Sections",
+    "Master Primary Row #",
+    "Demo P Primary Row #",
+    "Columns To Update Count",
+    "Columns To Update",
+    "Primary Row Recommendation"
+  ];
+
+
+  audit.getRange(5, 1, 1, summaryHeaders.length).setValues([summaryHeaders]);
+  if (summaryRows.length) {
+    audit.getRange(6, 1, summaryRows.length, summaryHeaders.length).setValues(summaryRows);
+  } else {
+    audit.getRange(6, 1).setValue("No PMRs were found in Demographic, Caseload, or Banner Changes.");
+  }
+
+
+  const detailStart = Math.max(8 + summaryRows.length, 8);
+  audit.getRange(detailStart, 1).setValue("Primary Row Column Update Details");
+  const detailHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Monthly Change Sections",
+    "Master Row #",
+    "Demo P Row #",
+    "Column To Update",
+    "Current Master List Value",
+    "New Demo P Value",
+    "Recommended Master List Action"
+  ];
+
+
+  audit.getRange(detailStart + 1, 1, 1, detailHeaders.length).setValues([detailHeaders]);
+  if (detailRows.length) {
+    audit.getRange(detailStart + 2, 1, detailRows.length, detailHeaders.length).setValues(detailRows);
+  }
+
+
+  applyStandardFormatting_(audit, {
+    sheetType: SHEET_TYPE.MASTER_LIST_CHANGE_LOG,
+    title: auditName,
+    startDate: monthParts.firstDay,
+    endDate: monthParts.lastDay,
+    renameSheet: false
+  });
+// v1.1.0 removed orphaned legacy formatting statement.
+  return audit;
+}
+
+function getPrimaryMergeRowItem_(rows, headerMap) {
+  const primaryIdx = headerMap ? headerMap["Primary PMR Row"] : undefined;
+
+
+  if (primaryIdx !== undefined) {
+    const primaryItem = (rows || []).find(item => {
+      const row = item.values || [];
+      const value = String(row[primaryIdx] || "").trim().toLowerCase();
+      return value === "yes" || value === "true" || value === "primary";
+    });
+
+
+    if (primaryItem) return primaryItem;
+  }
+
+
+  return (rows || [])[0] || null;
+}
+
+function getPrimaryRowChangedColumnDetails_(masterRow, masterHeaderMap, demoRow, demoHeaderMap) {
+  const skipHeaders = new Set([
+    "Contact - Last Name",
+    "Contact - First Name",
+    "Type of Contact",
+    "Contact - Primary Language",
+    "Relationship",
+    "AD1 - Phone",
+    "AD1 - Phone Valid Dates From",
+    "AD1 - Phone Valid Dates To",
+    "AD2 - Phone",
+    "AD2 - Phone Valid Dates From",
+    "AD2 - Phone Valid Dates To",
+    "AD3 - Phone",
+    "AD3 - Phone Valid Dates From",
+    "AD3 - Phone Valid Dates To",
+    "Company",
+    "Contact - Notes",
+    "Contact - 1",
+    "Contact - 2",
+    "Contact - 3",
+    "Contact - 4",
+    "Contact - 5",
+    "Contact - 6",
+    "Contact - 7",
+    "Contact - 8",
+    "Contact - Summary",
+    "Phone 1 - Label",
+    "Phone 1 - Value",
+    "Phone 2 - Label",
+    "Phone 2 - Value",
+    "Phone 3 - Label",
+    "Phone 3 - Value",
+    "Phone 4 - Label",
+    "Phone 4 - Value",
+    "Address 1 - Street",
+    "Custom Field 1 - Label",
+    "Custom Field 1 - Value",
+    "Notes",
+    "Primary PMR Row",
+    "Sort Order",
+    "Master List Update Status",
+    "Master List Update Month",
+    "Master List Source Sheet"
+  ]);
+
+
+  const changes = [];
+  const headers = Object.keys(demoHeaderMap || {}).filter(header => {
+    if (!header) return false;
+    if (skipHeaders.has(header)) return false;
+    return masterHeaderMap && masterHeaderMap[header] !== undefined;
+  });
+
+
+  headers.forEach(header => {
+    const masterValue = masterRow[masterHeaderMap[header]];
+    const demoValue = demoRow[demoHeaderMap[header]];
+
+
+    if (!valuesAreEqual_(masterValue, demoValue)) {
+      changes.push({
+        column: header,
+        masterValue: formatMergeAuditValueForDisplay_(masterValue),
+        demoValue: formatMergeAuditValueForDisplay_(demoValue)
+      });
+    }
+  });
+
+
+  return changes;
+}
+
+function formatMergeAuditValueForDisplay_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return formatDateDisplay_(value);
+  }
+
+
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function getMergeAuditParticipantName_(demoRows, demoHeaderMap, masterRows, masterHeaderMap) {
+  const demoName = getMergeAuditParticipantNameFromRows_(demoRows, demoHeaderMap);
+  if (demoName.lastName || demoName.firstName) return demoName;
+  return getMergeAuditParticipantNameFromRows_(masterRows, masterHeaderMap);
+}
+
+function getMergeAuditParticipantNameFromRows_(rows, headerMap) {
+  const lastIdx = headerMap ? headerMap["Last Name"] : undefined;
+  const firstIdx = headerMap ? headerMap["First Name"] : undefined;
+  const primaryIdx = headerMap ? headerMap["Primary PMR Row"] : undefined;
+
+
+  const primaryItem = (rows || []).find(item => {
+    const row = item.values || [];
+    return primaryIdx !== undefined && String(row[primaryIdx] || "").trim().toLowerCase() === "yes";
+  }) || (rows || [])[0];
+
+
+  const row = primaryItem && primaryItem.values ? primaryItem.values : [];
+
+
+  return {
+    lastName: lastIdx === undefined ? "" : String(row[lastIdx] || "").trim(),
+    firstName: firstIdx === undefined ? "" : String(row[firstIdx] || "").trim()
+  };
+}
+
+function buildMergeAuditContactSummary_(row, headerMap) {
+  if (!row || !headerMap) return "";
+
+
+  const parts = [];
+  const contactLast = getMergeRowValue_(row, headerMap, ["Contact - Last Name"]);
+  const contactFirst = getMergeRowValue_(row, headerMap, ["Contact - First Name"]);
+  const relationship = getMergeRowValue_(row, headerMap, ["Relationship"]);
+  const type = getMergeRowValue_(row, headerMap, ["Type of Contact"]);
+  const phone = getMergeRowValue_(row, headerMap, ["AD1 - Phone", "Phone Number", "Phone 1 - Value"]);
+  const notes = getMergeRowValue_(row, headerMap, ["Contact - Notes"]);
+
+
+  const name = [contactFirst, contactLast].map(v => String(v || "").trim()).filter(Boolean).join(" ");
+  if (name) parts.push(name);
+  if (relationship) parts.push("Relationship: " + relationship);
+  if (type) parts.push("Type: " + type);
+  if (phone) parts.push("Phone: " + phone);
+  if (notes) parts.push("Notes: " + notes);
+
+
+  return parts.join(" | ");
+}
+
+function getMergeAuditChangedFields_(masterRow, masterHeaderMap, demoRow, demoHeaderMap) {
+  const headersToCompare = [
+    "Contact - Last Name",
+    "Contact - First Name",
+    "Type of Contact",
+    "Contact - Primary Language",
+    "Relationship",
+    "AD1 - Phone",
+    "AD1 - Phone Valid Dates From",
+    "AD1 - Phone Valid Dates To",
+    "AD2 - Phone",
+    "AD2 - Phone Valid Dates From",
+    "AD2 - Phone Valid Dates To",
+    "AD3 - Phone",
+    "AD3 - Phone Valid Dates From",
+    "AD3 - Phone Valid Dates To",
+    "Company",
+    "Contact - Notes"
+  ];
+
+
+  return headersToCompare.filter(header => {
+    const masterIdx = masterHeaderMap[header];
+    const demoIdx = demoHeaderMap[header];
+    if (masterIdx === undefined && demoIdx === undefined) return false;
+
+
+    const masterValue = masterIdx === undefined ? "" : masterRow[masterIdx];
+    const demoValue = demoIdx === undefined ? "" : demoRow[demoIdx];
+    return !valuesAreEqual_(masterValue, demoValue);
+  });
+}
+
+function buildMergeRowsByPMRFromData_(data) {
+  const result = new Map();
+  if (!data || !data.values || !data.values.length) return result;
+
+
+  const pmrIdx = getPMRIndex_(data.headerMap);
+  if (pmrIdx === -1) return result;
+
+
+  data.values.forEach((row, offset) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (!result.has(pmr)) result.set(pmr, []);
+    result.get(pmr).push({
+      rowNumber: DATA_START_ROW + offset,
+      values: row,
+      blockOffset: result.get(pmr).length
+    });
+  });
+
+
+  return result;
+}
+
+function buildSecondaryMergeKeyMapForRows_(rows, headerMap, pmr) {
+  const result = new Map();
+  const primaryIdx = headerMap ? headerMap["Primary PMR Row"] : undefined;
+
+
+  (rows || []).forEach((item, idx) => {
+    const row = item.values || [];
+    const primaryValue = primaryIdx === undefined ? "" : String(row[primaryIdx] || "").trim().toLowerCase();
+    const isPrimary = primaryValue === "yes" || primaryValue === "true" || primaryValue === "primary";
+
+
+    if (isPrimary) return;
+    if (primaryIdx === undefined && idx === 0) return;
+
+
+    const key = buildContactMergeRowKey_(row, headerMap, pmr, idx + 1);
+
+
+    if (!result.has(key)) {
+      result.set(key, item);
+    } else {
+      const duplicateKey = key + "|DUP" + item.rowNumber;
+      result.set(duplicateKey, item);
+    }
+  });
+
+
+  return result;
+}
+
+function buildMergeKeyMapForRows_(rows, headerMap, pmr) {
+  const result = new Map();
+  const primaryIdx = headerMap["Primary PMR Row"];
+
+
+  (rows || []).forEach((item, idx) => {
+    const row = item.values || [];
+    const isPrimary = primaryIdx !== undefined && String(row[primaryIdx] || "").trim().toLowerCase() === "yes";
+    let key;
+
+
+    if (isPrimary || idx === 0) {
+      key = pmr + "|PRIMARY";
+    } else {
+      key = buildContactMergeRowKey_(row, headerMap, pmr, idx + 1);
+    }
+
+
+    if (!result.has(key)) {
+      result.set(key, item);
+    } else {
+      const duplicateKey = key + "|DUP" + item.rowNumber;
+      result.set(duplicateKey, item);
+    }
+  });
+
+
+  return result;
+}
+
+function buildContactMergeRowKey_(row, headerMap, pmr, fallbackPosition) {
+  const parts = [
+    pmr,
+    "CONTACT",
+    getMergeRowValue_(row, headerMap, ["Contact - Last Name"]),
+    getMergeRowValue_(row, headerMap, ["Contact - First Name"]),
+    getMergeRowValue_(row, headerMap, ["Relationship"]),
+    getMergeRowValue_(row, headerMap, ["Type of Contact"]),
+    getMergeRowValue_(row, headerMap, ["AD1 - Phone", "Phone Number", "Phone 1 - Value"])
+  ];
+
+
+  const cleanParts = parts.map(normalizeKeyPart_);
+  const hasContactIdentity = cleanParts.slice(2).some(Boolean);
+
+
+  if (!hasContactIdentity) {
+    return pmr + "|CONTACT|ROW" + String(fallbackPosition || "");
+  }
+
+
+  return cleanParts.join("|");
+}
+
+function getMergeRowValue_(row, headerMap, possibleHeaders) {
+  for (let i = 0; i < possibleHeaders.length; i++) {
+    const idx = headerMap[possibleHeaders[i]];
+    if (idx !== undefined) return row[idx];
+  }
+  return "";
+}
