@@ -13934,6 +13934,7 @@ function verifyFrameworkConfiguration() {
 const ML_MENU_CALLBACKS = Object.freeze({
   startUp: Object.freeze([
     "verifyFrameworkConfiguration",
+    "setupSystemSheets",
     "setupReportFormattingDashboardFromScriptDefaults_",
     "runDashboardQualityStartUp",
     "createOrRefreshAllReportTemplates",
@@ -13941,6 +13942,7 @@ const ML_MENU_CALLBACKS = Object.freeze({
   ]),
   setup: Object.freeze([
     "verifyFrameworkConfiguration",
+    "setupSystemSheets",
     "setupReportFormattingDashboardFromScriptDefaults_",
     "createOrRefreshAllReportTemplates"
   ]),
@@ -13984,12 +13986,14 @@ function onOpen() {
 
   const startUpMenu = ui.createMenu("Start-Up")
     .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
+    .addItem("Set up System Sheets", "setupSystemSheets")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
     .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
     .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates");
   const setupMenu = ui.createMenu("Setup")
     .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
+    .addItem("Set up System Sheets", "setupSystemSheets")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
 
