@@ -1859,6 +1859,12 @@ function runDashboardQualityWorkflowSyncVerification_() {
 // Framework startup verification entrypoint
 // -----------------------------------------------------------------------------
 
+function setupSystemSheets() {
+  const result = initializeSystemSheets_();
+  notify_("System sheets setup complete.");
+  return result;
+}
+
 function verifyFrameworkConfiguration() {
   return runFrameworkTimed_("Start Up / Verify Framework Configuration", function(timing) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();

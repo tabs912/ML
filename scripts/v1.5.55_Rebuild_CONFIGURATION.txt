@@ -25,6 +25,31 @@ const MASTER_LIST_MERGE_REBUILD_SECTION = "CONFIGURATION";
 const MASTER_LIST_MERGE_BASELINE_VERSION = "1.5.54";
 
 // -----------------------------------------------------------------------------
+// Shared runtime caches / compatibility constants
+// -----------------------------------------------------------------------------
+// Declared up front because Google Apps Script V8 throws ReferenceError for
+// undeclared globals referenced by split rebuild sections during startup.
+const ML_MONTHLY_SHEET_LOOKUP_CACHE_ = {};
+const ML_HEADER_CACHE_ = {};
+const ML_HEADER_MAP_CACHE_ = {};
+const ML_SHEET_DIMENSION_CACHE_ = {};
+
+const RFF_VERSION = MASTER_LIST_MERGE_ML_VERSION;
+const RFF_TIMING_MAX_ROWS = 5000;
+const RFF_TIMING_SUMMARY_LOOKBACK_ROWS = 750;
+const RFF_COMBINED_DASHBOARD_MAX_SOURCE_ROWS = 1000;
+
+const RFF_USE_TEMPLATE_SIGNATURE_CACHE = true;
+const RFF_TRUE_SMART_TEMPLATE_REFRESH = true;
+const RFF_SMART_TEMPLATE_REFRESH = true;
+const RFF_FORCE_FULL_TEMPLATE_REBUILD = false;
+const RFF_TEMPLATE_STAGED_BUILD_ENABLED = false;
+const RFF_TEMPLATE_STAGED_FIRST_BUILD_FOR_HIGH_RISK_ONLY = false;
+const RFF_FAST_TEMPLATE_REFRESH = true;
+const RFF_TEMPLATE_RESIZE_EXEMPT_TEMPLATE_NAMES = [];
+const RFF_TEMPLATE_ALWAYS_STAGED_TEMPLATE_NAMES = [];
+
+// -----------------------------------------------------------------------------
 // Shared user prompts / runtime feature flags
 // -----------------------------------------------------------------------------
 const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
@@ -63,6 +88,22 @@ const SHEET_TYPE = Object.freeze({
   DISENROLLED_EXCLUSION: "Disenrolled Exclusion"
 });
 
+const SHEET_BASE_COLORS = {
+  [SHEET_TYPE.RAW_DATA]: "#657FCC",
+  [SHEET_TYPE.CARE_PLAN_DUE]: "#65CC99",
+  [SHEET_TYPE.UNLOCKED]: "#65CCC3",
+  [SHEET_TYPE.BANNER]: "#65A9CC",
+  [SHEET_TYPE.DEMO_P]: "#657FCC",
+  [SHEET_TYPE.MASTER_LIST]: "#7665CC",
+  [SHEET_TYPE.MONTHLY_CHANGE]: "#A165CC",
+  [SHEET_TYPE.MASTER_LIST_CHANGE_LOG]: "#CC65CC",
+  [SHEET_TYPE.DISENROLLED_EXCLUSION]: "#CC65A1"
+};
+
+const MASTER_LIST_ADDED_HEADERS = [
+  // Runtime column additions are retired. Master List headers come from Dashboard Section C only.
+];
+
 // -----------------------------------------------------------------------------
 // Governed monthly sheet prefixes / canonical sheet names
 // -----------------------------------------------------------------------------
@@ -78,6 +119,26 @@ const MONTHLY_CHANGE_REPORT_PREFIX = "Monthly Change";
 const DISENROLLED_EXCLUSION_SHEET = "Disenrolled Exclusion List";
 const INDEX_SHEET = "Index";
 const MASTER_LIST_CHANGE_LOG_SHEET = "Master List Change Log";
+
+const SHEET_TAB_ORDER = [
+  "Index",
+  "Master List",
+  "Monthly Change Report",
+  "Demo P",
+  "Care Plan Due Date Report",
+  "Unlocked Care Plan Report",
+  "Banner Report",
+  "Disenrolled Exclusion List",
+  "Master List Change Log"
+];
+
+const INDEX_HEADERS = [
+  "Month",
+  "Sheet Name",
+  "Link",
+  "Sheet Type",
+  "Hidden?"
+];
 const MASTER_LIST_TEMPLATE_SHEET = "Master List Template";
 const DEMO_P_TEMPLATE_SHEET = "Demo P Template";
 const FORMAT_DEMO_P_TIMING_SHEET = "Format Demo P Timing";
