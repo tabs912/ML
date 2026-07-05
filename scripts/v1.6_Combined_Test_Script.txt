@@ -11202,6 +11202,819 @@ function showCurrentMasterListSourceColumns() {
   notify_("Master List columns shown.");
 }
 
+// -----------------------------------------------------------------------------
+// System sheet menu callbacks
+// -----------------------------------------------------------------------------
+
+function hideSystemSheetsNow() {
+  const count = hideSystemSheets_();
+  notify_("System/testing sheets hidden: " + count);
+}
+
+function showSystemSheetsNow() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const names = getSystemAndTestingSheetNames_();
+  let shownCount = 0;
+
+
+  ss.getSheets().forEach(function(sheet) {
+    const sheetName = String(sheet.getName() || "").trim();
+    if (!names.has(sheetName) && !isSystemOrTestingSheet_(sheet)) return;
+
+
+    try {
+      if (sheet.isSheetHidden()) {
+        sheet.showSheet();
+        shownCount++;
+      }
+    } catch (err) {
+      Logger.log("Could not show system/testing sheet " + sheetName + ": " + err.message);
+    }
+  });
+
+
+  notify_("System/testing sheets shown: " + shownCount);
+}
+
+// -----------------------------------------------------------------------------
+// Update Master List merge audit callbacks
+// -----------------------------------------------------------------------------
+
+function runUpdateMasterListMergeAudit() {
+  const monthParts = promptForLockedYearReportMonth_("Update Master List Merge Audit");
+  if (!monthParts) return;
+
+
+  const secondarySheet = buildUpdateMasterListMergeAuditForMonth_(monthParts);
+  const primarySheet = buildUpdateMasterListPrimaryRowAuditForMonth_(monthParts);
+
+
+  if (secondarySheet) secondarySheet.showSheet();
+  if (primarySheet) {
+    primarySheet.showSheet();
+    primarySheet.activate();
+  } else if (secondarySheet) {
+    secondarySheet.activate();
+  }
+
+
+  if (secondarySheet || primarySheet) {
+    notify_("Update Master List Merge Audit complete. Review the secondary-row audit and primary-row audit sheets.");
+  }
+}
+
+function buildUpdateMasterListMergeAuditForMonth_(monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const currentDemo = getCurrentDemoPSheet_(monthParts);
+  const sourceMaster = getPreviousMasterListSheet_(monthParts);
+
+
+  if (!currentDemo) {
+    notify_("Current month Demo P was not found. Format Demo P first.");
+    return null;
+  }
+
+
+  if (!sourceMaster) {
+    notify_("Previous month Master List was not found for merge audit.");
+    return null;
+  }
+
+
+  const reportSheet = getMonthlySheetByPrefixAndDate_(
+    ss,
+    MONTHLY_CHANGE_REPORT_PREFIX,
+    monthParts.firstDay,
+    monthParts.lastDay
+  );
+
+
+  if (!reportSheet) {
+    notify_("Monthly Change Report was not found. Create Monthly Change Report first.");
+    return null;
+  }
+
+
+  const changedInfo = getChangedPMRsFromMonthlyChangeReport_(reportSheet);
+  const contactChangePMRs = Array.from(changedInfo.keys())
+    .filter(pmr => changedInfo.get(pmr) && changedInfo.get(pmr).has("Contact Changes"))
+    .sort();
+
+
+  const demoData = getDataValues_(currentDemo, HEADER_ROW, DATA_START_ROW);
+  const masterData = getDataValues_(sourceMaster, HEADER_ROW, DATA_START_ROW);
+
+
+  const demoBlocks = buildMergeRowsByPMRFromData_(demoData);
+  const masterBlocks = buildMergeRowsByPMRFromData_(masterData);
+
+
+  const summaryRows = [];
+  const detailRows = [];
+
+
+  contactChangePMRs.forEach(pmr => {
+    const demoRows = demoBlocks.get(pmr) || [];
+    const masterRows = masterBlocks.get(pmr) || [];
+    const participantName = getMergeAuditParticipantName_(demoRows, demoData.headerMap, masterRows, masterData.headerMap);
+
+
+    const demoKeys = buildSecondaryMergeKeyMapForRows_(demoRows, demoData.headerMap, pmr);
+    const masterKeys = buildSecondaryMergeKeyMapForRows_(masterRows, masterData.headerMap, pmr);
+
+
+    const contactKeys = new Set(
+      [].concat(Array.from(demoKeys.keys()), Array.from(masterKeys.keys()))
+    );
+
+
+    let matchedCount = 0;
+    let updateCount = 0;
+    let addCount = 0;
+    let removeCount = 0;
+    let noActionCount = 0;
+
+
+    contactKeys.forEach(key => {
+      const demoItem = demoKeys.get(key);
+      const masterItem = masterKeys.get(key);
+      const masterSummary = masterItem ? buildMergeAuditContactSummary_(masterItem.values, masterData.headerMap) : "";
+      const demoSummary = demoItem ? buildMergeAuditContactSummary_(demoItem.values, demoData.headerMap) : "";
+
+
+      let auditAction = "";
+      let differenceFound = "";
+      let recommendedAction = "";
+
+
+      if (demoItem && masterItem) {
+        matchedCount++;
+        const changedFields = getMergeAuditChangedFields_(masterItem.values, masterData.headerMap, demoItem.values, demoData.headerMap);
+
+
+        if (changedFields.length > 0) {
+          auditAction = "Update";
+          differenceFound = "Contact exists in both; changed fields: " + changedFields.join(", ");
+          recommendedAction = "Update existing Master List contact row";
+          updateCount++;
+        } else {
+          auditAction = "No action";
+          differenceFound = "Contact exists in both; no compared field differences";
+          recommendedAction = "No Master List contact row change needed";
+          noActionCount++;
+        }
+      } else if (demoItem && !masterItem) {
+        auditAction = "Add";
+        differenceFound = "Contact exists in Demo P only";
+        recommendedAction = "Add new contact row to Master List";
+        addCount++;
+      } else if (!demoItem && masterItem) {
+        auditAction = "Remove";
+        differenceFound = "Contact exists in previous Master List only";
+        recommendedAction = "Remove contact row from Master List";
+        removeCount++;
+      }
+
+
+      detailRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        auditAction,
+        differenceFound,
+        recommendedAction,
+        masterItem ? masterItem.rowNumber : "",
+        demoItem ? demoItem.rowNumber : "",
+        "Secondary/Contact",
+        "Yes",
+        masterSummary,
+        demoSummary,
+        key
+      ]);
+    });
+
+
+    let recommendation = "No contact row change needed";
+    if (addCount || removeCount || updateCount) {
+      const pieces = [];
+      if (updateCount) pieces.push(updateCount + " update");
+      if (addCount) pieces.push(addCount + " add");
+      if (removeCount) pieces.push(removeCount + " remove");
+      recommendation = pieces.join(", ");
+    }
+
+
+    summaryRows.push([
+      pmr,
+      participantName.lastName,
+      participantName.firstName,
+      masterRows.length,
+      demoRows.length,
+      matchedCount,
+      updateCount,
+      addCount,
+      removeCount,
+      noActionCount,
+      recommendation
+    ]);
+  });
+
+
+  const auditName = "Update Master List Merge Audit";
+  let audit = ss.getSheetByName(auditName);
+  if (audit) ss.deleteSheet(audit);
+  audit = ss.insertSheet(auditName);
+
+
+  audit.getRange("A1").setValue(auditName);
+  audit.getRange("A2").setValue("Date");
+  audit.getRange("B2").setValue(monthParts.firstDay);
+  audit.getRange("C2").setValue("to");
+  audit.getRange("D2").setValue(monthParts.lastDay);
+  audit.getRange("A3").setValue("Audit Scope");
+  audit.getRange("B3").setValue("Contact Changes only - secondary rows only");
+  audit.getRange("C3").setValue("Source Master List");
+  audit.getRange("D3").setValue(sourceMaster.getName());
+  audit.getRange("E3").setValue("Source Demo P");
+  audit.getRange("F3").setValue(currentDemo.getName());
+
+
+  const summaryHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Master Row Count",
+    "Demo P Row Count",
+    "Contacts Matched",
+    "Contacts To Update",
+    "Contacts To Add",
+    "Contacts To Remove",
+    "Contacts With No Action",
+    "Merge Recommendation"
+  ];
+
+
+  audit.getRange(5, 1, 1, summaryHeaders.length).setValues([summaryHeaders]);
+  if (summaryRows.length) {
+    audit.getRange(6, 1, summaryRows.length, summaryHeaders.length).setValues(summaryRows);
+  } else {
+    audit.getRange(6, 1).setValue("No PMRs were found in the Contact Changes section of the Monthly Change Report.");
+  }
+
+
+  const detailStart = Math.max(8 + summaryRows.length, 8);
+  audit.getRange(detailStart, 1).setValue("Contact Change Details");
+  const detailHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Audit Action",
+    "Difference Found",
+    "Recommended Master List Action",
+    "Master Row #",
+    "Demo P Row #",
+    "Row Type",
+    "Secondary Row Only",
+    "Master Contact Summary",
+    "Demo P Contact Summary",
+    "Contact Match Key"
+  ];
+
+
+  audit.getRange(detailStart + 1, 1, 1, detailHeaders.length).setValues([detailHeaders]);
+  if (detailRows.length) {
+    audit.getRange(detailStart + 2, 1, detailRows.length, detailHeaders.length).setValues(detailRows);
+  }
+
+
+  applyStandardFormatting_(audit, {
+    sheetType: SHEET_TYPE.MASTER_LIST_CHANGE_LOG,
+    title: auditName,
+    startDate: monthParts.firstDay,
+    endDate: monthParts.lastDay,
+    renameSheet: false
+  });
+// v1.1.0 removed orphaned legacy formatting statement.
+  return audit;
+}
+
+function buildUpdateMasterListPrimaryRowAuditForMonth_(monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const currentDemo = getCurrentDemoPSheet_(monthParts);
+  const sourceMaster = getPreviousMasterListSheet_(monthParts);
+
+
+  if (!currentDemo || !sourceMaster) return null;
+
+
+  const reportSheet = getMonthlySheetByPrefixAndDate_(
+    ss,
+    MONTHLY_CHANGE_REPORT_PREFIX,
+    monthParts.firstDay,
+    monthParts.lastDay
+  );
+
+
+  if (!reportSheet) return null;
+
+
+  const changedInfo = getChangedPMRsFromMonthlyChangeReport_(reportSheet);
+  const primarySections = new Set(["Demographic Changes", "Caseload Changes", "Banner Changes"]);
+
+
+  const primaryChangePMRs = Array.from(changedInfo.keys())
+    .filter(pmr => {
+      const sections = changedInfo.get(pmr);
+      if (!sections) return false;
+      return Array.from(sections).some(section => primarySections.has(section));
+    })
+    .sort();
+
+
+  const demoData = getDataValues_(currentDemo, HEADER_ROW, DATA_START_ROW);
+  const masterData = getDataValues_(sourceMaster, HEADER_ROW, DATA_START_ROW);
+
+
+  const demoBlocks = buildMergeRowsByPMRFromData_(demoData);
+  const masterBlocks = buildMergeRowsByPMRFromData_(masterData);
+
+
+  const summaryRows = [];
+  const detailRows = [];
+
+
+  primaryChangePMRs.forEach(pmr => {
+    const demoRows = demoBlocks.get(pmr) || [];
+    const masterRows = masterBlocks.get(pmr) || [];
+    const participantName = getMergeAuditParticipantName_(demoRows, demoData.headerMap, masterRows, masterData.headerMap);
+    const sections = Array.from(changedInfo.get(pmr) || []).filter(section => primarySections.has(section)).join(" | ");
+
+
+    const demoPrimary = getPrimaryMergeRowItem_(demoRows, demoData.headerMap);
+    const masterPrimary = getPrimaryMergeRowItem_(masterRows, masterData.headerMap);
+
+
+    if (!demoPrimary && !masterPrimary) {
+      summaryRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        "",
+        "",
+        0,
+        "No primary row found in either source",
+        "Review PMR manually"
+      ]);
+      return;
+    }
+
+
+    if (demoPrimary && !masterPrimary) {
+      summaryRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        "",
+        demoPrimary.rowNumber,
+        0,
+        "Primary row exists in Demo P only",
+        "Add PMR block or add primary row to Master List"
+      ]);
+      return;
+    }
+
+
+    if (!demoPrimary && masterPrimary) {
+      summaryRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        masterPrimary.rowNumber,
+        "",
+        0,
+        "Primary row exists in previous Master List only",
+        "Review/remove PMR block"
+      ]);
+      return;
+    }
+
+
+    const changedColumns = getPrimaryRowChangedColumnDetails_(
+      masterPrimary.values,
+      masterData.headerMap,
+      demoPrimary.values,
+      demoData.headerMap
+    );
+
+
+    changedColumns.forEach(change => {
+      detailRows.push([
+        pmr,
+        participantName.lastName,
+        participantName.firstName,
+        sections,
+        masterPrimary.rowNumber,
+        demoPrimary.rowNumber,
+        change.column,
+        change.masterValue,
+        change.demoValue,
+        "Update Master List primary row column"
+      ]);
+    });
+
+
+    summaryRows.push([
+      pmr,
+      participantName.lastName,
+      participantName.firstName,
+      sections,
+      masterPrimary.rowNumber,
+      demoPrimary.rowNumber,
+      changedColumns.length,
+      changedColumns.map(item => item.column).join(", "),
+      changedColumns.length ? "Update primary row columns listed in detail section" : "No compared primary-row column differences found"
+    ]);
+  });
+
+
+  const auditName = "Update Master List Primary Row Audit";
+  let audit = ss.getSheetByName(auditName);
+  if (audit) ss.deleteSheet(audit);
+  audit = ss.insertSheet(auditName);
+
+
+  audit.getRange("A1").setValue(auditName);
+  audit.getRange("A2").setValue("Date");
+  audit.getRange("B2").setValue(monthParts.firstDay);
+  audit.getRange("C2").setValue("to");
+  audit.getRange("D2").setValue(monthParts.lastDay);
+  audit.getRange("A3").setValue("Audit Scope");
+  audit.getRange("B3").setValue("Primary rows only - Demographic, Caseload, and Banner Changes");
+  audit.getRange("C3").setValue("Source Master List");
+  audit.getRange("D3").setValue(sourceMaster.getName());
+  audit.getRange("E3").setValue("Source Demo P");
+  audit.getRange("F3").setValue(currentDemo.getName());
+
+
+  const summaryHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Monthly Change Sections",
+    "Master Primary Row #",
+    "Demo P Primary Row #",
+    "Columns To Update Count",
+    "Columns To Update",
+    "Primary Row Recommendation"
+  ];
+
+
+  audit.getRange(5, 1, 1, summaryHeaders.length).setValues([summaryHeaders]);
+  if (summaryRows.length) {
+    audit.getRange(6, 1, summaryRows.length, summaryHeaders.length).setValues(summaryRows);
+  } else {
+    audit.getRange(6, 1).setValue("No PMRs were found in Demographic, Caseload, or Banner Changes.");
+  }
+
+
+  const detailStart = Math.max(8 + summaryRows.length, 8);
+  audit.getRange(detailStart, 1).setValue("Primary Row Column Update Details");
+  const detailHeaders = [
+    "PMR #",
+    "Last Name",
+    "First Name",
+    "Monthly Change Sections",
+    "Master Row #",
+    "Demo P Row #",
+    "Column To Update",
+    "Current Master List Value",
+    "New Demo P Value",
+    "Recommended Master List Action"
+  ];
+
+
+  audit.getRange(detailStart + 1, 1, 1, detailHeaders.length).setValues([detailHeaders]);
+  if (detailRows.length) {
+    audit.getRange(detailStart + 2, 1, detailRows.length, detailHeaders.length).setValues(detailRows);
+  }
+
+
+  applyStandardFormatting_(audit, {
+    sheetType: SHEET_TYPE.MASTER_LIST_CHANGE_LOG,
+    title: auditName,
+    startDate: monthParts.firstDay,
+    endDate: monthParts.lastDay,
+    renameSheet: false
+  });
+// v1.1.0 removed orphaned legacy formatting statement.
+  return audit;
+}
+
+function getPrimaryMergeRowItem_(rows, headerMap) {
+  const primaryIdx = headerMap ? headerMap["Primary PMR Row"] : undefined;
+
+
+  if (primaryIdx !== undefined) {
+    const primaryItem = (rows || []).find(item => {
+      const row = item.values || [];
+      const value = String(row[primaryIdx] || "").trim().toLowerCase();
+      return value === "yes" || value === "true" || value === "primary";
+    });
+
+
+    if (primaryItem) return primaryItem;
+  }
+
+
+  return (rows || [])[0] || null;
+}
+
+function getPrimaryRowChangedColumnDetails_(masterRow, masterHeaderMap, demoRow, demoHeaderMap) {
+  const skipHeaders = new Set([
+    "Contact - Last Name",
+    "Contact - First Name",
+    "Type of Contact",
+    "Contact - Primary Language",
+    "Relationship",
+    "AD1 - Phone",
+    "AD1 - Phone Valid Dates From",
+    "AD1 - Phone Valid Dates To",
+    "AD2 - Phone",
+    "AD2 - Phone Valid Dates From",
+    "AD2 - Phone Valid Dates To",
+    "AD3 - Phone",
+    "AD3 - Phone Valid Dates From",
+    "AD3 - Phone Valid Dates To",
+    "Company",
+    "Contact - Notes",
+    "Contact - 1",
+    "Contact - 2",
+    "Contact - 3",
+    "Contact - 4",
+    "Contact - 5",
+    "Contact - 6",
+    "Contact - 7",
+    "Contact - 8",
+    "Contact - Summary",
+    "Phone 1 - Label",
+    "Phone 1 - Value",
+    "Phone 2 - Label",
+    "Phone 2 - Value",
+    "Phone 3 - Label",
+    "Phone 3 - Value",
+    "Phone 4 - Label",
+    "Phone 4 - Value",
+    "Address 1 - Street",
+    "Custom Field 1 - Label",
+    "Custom Field 1 - Value",
+    "Notes",
+    "Primary PMR Row",
+    "Sort Order",
+    "Master List Update Status",
+    "Master List Update Month",
+    "Master List Source Sheet"
+  ]);
+
+
+  const changes = [];
+  const headers = Object.keys(demoHeaderMap || {}).filter(header => {
+    if (!header) return false;
+    if (skipHeaders.has(header)) return false;
+    return masterHeaderMap && masterHeaderMap[header] !== undefined;
+  });
+
+
+  headers.forEach(header => {
+    const masterValue = masterRow[masterHeaderMap[header]];
+    const demoValue = demoRow[demoHeaderMap[header]];
+
+
+    if (!valuesAreEqual_(masterValue, demoValue)) {
+      changes.push({
+        column: header,
+        masterValue: formatMergeAuditValueForDisplay_(masterValue),
+        demoValue: formatMergeAuditValueForDisplay_(demoValue)
+      });
+    }
+  });
+
+
+  return changes;
+}
+
+function formatMergeAuditValueForDisplay_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return formatDateDisplay_(value);
+  }
+
+
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function getMergeAuditParticipantName_(demoRows, demoHeaderMap, masterRows, masterHeaderMap) {
+  const demoName = getMergeAuditParticipantNameFromRows_(demoRows, demoHeaderMap);
+  if (demoName.lastName || demoName.firstName) return demoName;
+  return getMergeAuditParticipantNameFromRows_(masterRows, masterHeaderMap);
+}
+
+function getMergeAuditParticipantNameFromRows_(rows, headerMap) {
+  const lastIdx = headerMap ? headerMap["Last Name"] : undefined;
+  const firstIdx = headerMap ? headerMap["First Name"] : undefined;
+  const primaryIdx = headerMap ? headerMap["Primary PMR Row"] : undefined;
+
+
+  const primaryItem = (rows || []).find(item => {
+    const row = item.values || [];
+    return primaryIdx !== undefined && String(row[primaryIdx] || "").trim().toLowerCase() === "yes";
+  }) || (rows || [])[0];
+
+
+  const row = primaryItem && primaryItem.values ? primaryItem.values : [];
+
+
+  return {
+    lastName: lastIdx === undefined ? "" : String(row[lastIdx] || "").trim(),
+    firstName: firstIdx === undefined ? "" : String(row[firstIdx] || "").trim()
+  };
+}
+
+function buildMergeAuditContactSummary_(row, headerMap) {
+  if (!row || !headerMap) return "";
+
+
+  const parts = [];
+  const contactLast = getMergeRowValue_(row, headerMap, ["Contact - Last Name"]);
+  const contactFirst = getMergeRowValue_(row, headerMap, ["Contact - First Name"]);
+  const relationship = getMergeRowValue_(row, headerMap, ["Relationship"]);
+  const type = getMergeRowValue_(row, headerMap, ["Type of Contact"]);
+  const phone = getMergeRowValue_(row, headerMap, ["AD1 - Phone", "Phone Number", "Phone 1 - Value"]);
+  const notes = getMergeRowValue_(row, headerMap, ["Contact - Notes"]);
+
+
+  const name = [contactFirst, contactLast].map(v => String(v || "").trim()).filter(Boolean).join(" ");
+  if (name) parts.push(name);
+  if (relationship) parts.push("Relationship: " + relationship);
+  if (type) parts.push("Type: " + type);
+  if (phone) parts.push("Phone: " + phone);
+  if (notes) parts.push("Notes: " + notes);
+
+
+  return parts.join(" | ");
+}
+
+function getMergeAuditChangedFields_(masterRow, masterHeaderMap, demoRow, demoHeaderMap) {
+  const headersToCompare = [
+    "Contact - Last Name",
+    "Contact - First Name",
+    "Type of Contact",
+    "Contact - Primary Language",
+    "Relationship",
+    "AD1 - Phone",
+    "AD1 - Phone Valid Dates From",
+    "AD1 - Phone Valid Dates To",
+    "AD2 - Phone",
+    "AD2 - Phone Valid Dates From",
+    "AD2 - Phone Valid Dates To",
+    "AD3 - Phone",
+    "AD3 - Phone Valid Dates From",
+    "AD3 - Phone Valid Dates To",
+    "Company",
+    "Contact - Notes"
+  ];
+
+
+  return headersToCompare.filter(header => {
+    const masterIdx = masterHeaderMap[header];
+    const demoIdx = demoHeaderMap[header];
+    if (masterIdx === undefined && demoIdx === undefined) return false;
+
+
+    const masterValue = masterIdx === undefined ? "" : masterRow[masterIdx];
+    const demoValue = demoIdx === undefined ? "" : demoRow[demoIdx];
+    return !valuesAreEqual_(masterValue, demoValue);
+  });
+}
+
+function buildMergeRowsByPMRFromData_(data) {
+  const result = new Map();
+  if (!data || !data.values || !data.values.length) return result;
+
+
+  const pmrIdx = getPMRIndex_(data.headerMap);
+  if (pmrIdx === -1) return result;
+
+
+  data.values.forEach((row, offset) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    if (!result.has(pmr)) result.set(pmr, []);
+    result.get(pmr).push({
+      rowNumber: DATA_START_ROW + offset,
+      values: row,
+      blockOffset: result.get(pmr).length
+    });
+  });
+
+
+  return result;
+}
+
+function buildSecondaryMergeKeyMapForRows_(rows, headerMap, pmr) {
+  const result = new Map();
+  const primaryIdx = headerMap ? headerMap["Primary PMR Row"] : undefined;
+
+
+  (rows || []).forEach((item, idx) => {
+    const row = item.values || [];
+    const primaryValue = primaryIdx === undefined ? "" : String(row[primaryIdx] || "").trim().toLowerCase();
+    const isPrimary = primaryValue === "yes" || primaryValue === "true" || primaryValue === "primary";
+
+
+    if (isPrimary) return;
+    if (primaryIdx === undefined && idx === 0) return;
+
+
+    const key = buildContactMergeRowKey_(row, headerMap, pmr, idx + 1);
+
+
+    if (!result.has(key)) {
+      result.set(key, item);
+    } else {
+      const duplicateKey = key + "|DUP" + item.rowNumber;
+      result.set(duplicateKey, item);
+    }
+  });
+
+
+  return result;
+}
+
+function buildMergeKeyMapForRows_(rows, headerMap, pmr) {
+  const result = new Map();
+  const primaryIdx = headerMap["Primary PMR Row"];
+
+
+  (rows || []).forEach((item, idx) => {
+    const row = item.values || [];
+    const isPrimary = primaryIdx !== undefined && String(row[primaryIdx] || "").trim().toLowerCase() === "yes";
+    let key;
+
+
+    if (isPrimary || idx === 0) {
+      key = pmr + "|PRIMARY";
+    } else {
+      key = buildContactMergeRowKey_(row, headerMap, pmr, idx + 1);
+    }
+
+
+    if (!result.has(key)) {
+      result.set(key, item);
+    } else {
+      const duplicateKey = key + "|DUP" + item.rowNumber;
+      result.set(duplicateKey, item);
+    }
+  });
+
+
+  return result;
+}
+
+function buildContactMergeRowKey_(row, headerMap, pmr, fallbackPosition) {
+  const parts = [
+    pmr,
+    "CONTACT",
+    getMergeRowValue_(row, headerMap, ["Contact - Last Name"]),
+    getMergeRowValue_(row, headerMap, ["Contact - First Name"]),
+    getMergeRowValue_(row, headerMap, ["Relationship"]),
+    getMergeRowValue_(row, headerMap, ["Type of Contact"]),
+    getMergeRowValue_(row, headerMap, ["AD1 - Phone", "Phone Number", "Phone 1 - Value"])
+  ];
+
+
+  const cleanParts = parts.map(normalizeKeyPart_);
+  const hasContactIdentity = cleanParts.slice(2).some(Boolean);
+
+
+  if (!hasContactIdentity) {
+    return pmr + "|CONTACT|ROW" + String(fallbackPosition || "");
+  }
+
+
+  return cleanParts.join("|");
+}
+
+function getMergeRowValue_(row, headerMap, possibleHeaders) {
+  for (let i = 0; i < possibleHeaders.length; i++) {
+    const idx = headerMap[possibleHeaders[i]];
+    if (idx !== undefined) return row[idx];
+  }
+  return "";
+}
+
 
 // ============================================================================
 // SOURCE: v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt
@@ -13063,6 +13876,56 @@ function runDashboardQualityWorkflowSyncVerification_() {
   });
 }
 
+// -----------------------------------------------------------------------------
+// Framework startup verification entrypoint
+// -----------------------------------------------------------------------------
+
+function verifyFrameworkConfiguration() {
+  return runFrameworkTimed_("Start Up / Verify Framework Configuration", function(timing) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    const systemSheets = initializeSystemSheets_();
+    const quality = systemSheets.dashboardQuality;
+    markFrameworkStep_(timing, "System sheets initialized");
+
+    const timingSheet = systemSheets.frameworkTiming;
+    markFrameworkStep_(timing, "Framework Timing Report verified");
+
+    const dashboard = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+
+    if (!dashboard) {
+      const missingRows = [
+        ["Verification Area", "Verification Item", "Expected Value", "Actual Value", "Status", "Severity", "Quality Notes"],
+        ["Format Dashboard", "Sheet Exists", RFF_DASHBOARD_SHEET, "Missing", "FAIL", "Critical", "Create or rebuild Format Dashboard before template creation."]
+      ];
+      saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, missingRows);
+      styleDashboardQualityReport_(quality);
+      writeCombinedFrameworkTimingReport_();
+      markFrameworkStep_(timing, "Format Dashboard missing");
+      return missingRows;
+    }
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, collectFormatDashboardGlobalInputVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section A Global Inputs verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_SHEETS_KEY, collectFormatDashboardSheetDefinitionVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section B Sheet Definitions verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_HEADERS_KEY, collectFormatDashboardSheetHeaderVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section C Sheet Headers verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_COLUMNS_KEY, collectFormatDashboardColumnDefinitionVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section D Column Definitions verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY, collectFormatDashboardSheetBehaviorVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section E Sheet Behaviors verification written");
+
+    styleDashboardQualityReport_(quality);
+    writeCombinedFrameworkTimingReport_();
+    markFrameworkStep_(timing, "Framework verification complete");
+  });
+}
+
 
 // ============================================================================
 // SOURCE: v1.5.55_Rebuild_MENU_FUNCTIONS.txt
@@ -13070,6 +13933,7 @@ function runDashboardQualityWorkflowSyncVerification_() {
 
 const ML_MENU_CALLBACKS = Object.freeze({
   startUp: Object.freeze([
+    "verifyFrameworkConfiguration",
     "setupSystemSheets",
     "setupReportFormattingDashboardFromScriptDefaults_",
     "runDashboardQualityStartUp",
@@ -13077,6 +13941,7 @@ const ML_MENU_CALLBACKS = Object.freeze({
     "runDashboardQualityValidateTemplates"
   ]),
   setup: Object.freeze([
+    "verifyFrameworkConfiguration",
     "setupSystemSheets",
     "setupReportFormattingDashboardFromScriptDefaults_",
     "createOrRefreshAllReportTemplates"
@@ -13120,12 +13985,14 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
   const startUpMenu = ui.createMenu("Start-Up")
+    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
     .addItem("Set up System Sheets", "setupSystemSheets")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
     .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
     .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates");
   const setupMenu = ui.createMenu("Setup")
+    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
     .addItem("Set up System Sheets", "setupSystemSheets")
     .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
