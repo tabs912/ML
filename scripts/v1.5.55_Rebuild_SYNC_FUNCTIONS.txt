@@ -8,6 +8,8 @@
  *
  * Purpose:
  * - Own cross-report synchronization for Demo P Banner fields and Master List monthly sources.
+ * - Keep Care Plan Due and Unlocked Care Plan synchronization owned by Master List.
+ * - Do not own Monthly Change metadata/hash generation; Monthly Change consumes Demo P metadata.
  * - Preserve Primary PMR row governance and month-matched source selection.
  * - Keep sync reads/writes batched through source maps and in-memory data where callers provide them.
  */
