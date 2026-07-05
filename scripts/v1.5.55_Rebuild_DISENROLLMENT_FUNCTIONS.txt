@@ -1,0 +1,382 @@
+/**
+ * Master List Framework v1.5.55 Rebuild Candidate - DISENROLLMENT FUNCTIONS Section
+ * Purpose: own Disenrolled Exclusion List creation/upsert/removal while sourcing processed Demo P rows when possible.
+ */
+// ============================================================================
+// DISENROLLMENT FUNCTIONS
+// ============================================================================
+
+// Public entrypoints
+
+function createDisenrolledList() {
+  const monthParts = promptForLockedYearReportMonth_("Create Disenrolled List");
+  if (!monthParts) return;
+  const timing = startRuntimeTiming_("Create Disenrolled List", monthParts);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const rawName = buildRawDataSheetName_(monthParts);
+    const rawSheet = ss.getSheetByName(rawName);
+    if (!rawSheet) {
+      throw new Error("Raw Data sheet was not found for " + Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy") + ". Expected sheet: " + rawName);
+    }
+    markRuntimeStep_(timing, "Locate Raw Data source sheet: " + rawName);
+    const rawData = getDataValues_(rawSheet, HEADER_ROW, DATA_START_ROW);
+    if (!rawData.values.length) {
+      throw new Error("Raw Data sheet has no participant rows: " + rawName);
+    }
+    markRuntimeStep_(timing, "Read Raw Data values");
+    const split = splitRawDataRowsIntoActiveAndDisenrolled_(rawData);
+    markRuntimeStep_(timing, "Identify disenrolled PMRs by sequential block scan");
+    const rowsCopied = appendDisenrolledRowsFromRawDataToExclusion_(
+      rawSheet,
+      rawData.headers,
+      split.disenrolledRowsByPMR,
+      monthParts
+    );
+    markRuntimeStep_(timing, "Write Disenrolled Exclusion primary rows only: " + rowsCopied);
+    const result = {
+      pmrsRemoved: split.disenrolledPMRs.size,
+      rowsRemoved: 0,
+      rowsCopied: rowsCopied,
+      primaryRowsOnly: true
+    };
+    setLastRawDataDisenrolledBuildResult_(result);
+    writeRuntimeTimingReport_(timing);
+    notify_(
+      "Disenrolled List created from " + rawName + " as " + buildDatedDisenrolledOutputName_(monthParts) + ".\n" +
+      "PMRs identified: " + split.disenrolledPMRs.size + "\n" +
+      "Primary rows written: " + rowsCopied + "\n" +
+      "Process Demo P no longer rebuilds this list automatically."
+    );
+    return result;
+  } catch (err) {
+    markRuntimeStep_(timing, "ERROR - " + err.message);
+    writeRuntimeTimingReport_(timing);
+    notify_("Create Disenrolled List stopped: " + err.message);
+    throw err;
+  }
+}
+
+function createDisenrollmentList() {
+  return createDisenrolledList();
+}
+
+// Classification
+
+function splitRawDataRowsIntoActiveAndDisenrolled_(rawData, disenrolledPMRSet) {
+  const headerMap = rawData.headerMap;
+  const pmrIdx = getPMRIndex_(headerMap);
+  const statusIdx = headerMap["Enrollment Status"];
+  const disenrollmentDateIdx = findHeaderIndex_(headerMap, ["Disenrollment Effective Date", "Disenrollment Date", "Date of Death"]);
+  const useExternalDisenrolledSet = !!(disenrolledPMRSet && disenrolledPMRSet.size);
+  const activeRows = [];
+  const disenrolledRows = [];
+  const disenrolledRowsByPMR = new Map();
+  const disenrolledPMRs = new Set();
+  const values = rawData.values || [];
+  let i = 0;
+  while (i < values.length) {
+    const firstRow = values[i];
+    const pmr = normalizePMR_(firstRow[pmrIdx]);
+    if (!pmr) {
+      i++;
+      continue;
+    }
+    const block = [];
+    let blockIsDisenrolled = useExternalDisenrolledSet && disenrolledPMRSet.has(pmr);
+    while (i < values.length && normalizePMR_(values[i][pmrIdx]) === pmr) {
+      const row = values[i];
+      block.push(row);
+      if (!useExternalDisenrolledSet) {
+        const status = statusIdx === undefined ? "" : String(row[statusIdx] || "").trim().toLowerCase();
+        const disenrollmentValue = disenrollmentDateIdx === -1 ? "" : row[disenrollmentDateIdx];
+        if (status === "disenrolled" || normalizeCompareValue_(disenrollmentValue) !== "") {
+          blockIsDisenrolled = true;
+        }
+      }
+      i++;
+    }
+    if (blockIsDisenrolled) {
+      disenrolledPMRs.add(pmr);
+      const primaryRow = block[0];
+      disenrolledRows.push(primaryRow);
+      disenrolledRowsByPMR.set(pmr, [primaryRow]);
+    } else {
+      for (let b = 0; b < block.length; b++) {
+        activeRows.push(block[b]);
+      }
+    }
+  }
+  return {
+    activeRows: activeRows,
+    disenrolledRows: disenrolledRows,
+    disenrolledRowsByPMR: disenrolledRowsByPMR,
+    disenrolledPMRs: disenrolledPMRs
+  };
+}
+
+function buildDisenrolledPMRSetFromDemoPValues_(demoValues, demoHeaderMap) {
+  const result = new Set();
+  const pmrIdx = getPMRIndex_(demoHeaderMap);
+  const disenrollEffectiveIdx = findHeaderIndex_(demoHeaderMap, ["Disenrollment Effective Date", "Disenrollment Date"]);
+  if (pmrIdx === -1 || disenrollEffectiveIdx === -1) {
+    return result;
+  }
+  demoValues.forEach(row => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    const disenrollDate = row[disenrollEffectiveIdx];
+    if (normalizeCompareValue_(disenrollDate) !== "") {
+      result.add(pmr);
+    }
+  });
+  return result;
+}
+
+function loadDisenrolledPMRSetForMonth_(monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const set = new Set();
+  const candidates = [];
+  if (monthParts && monthParts.firstDay) {
+    candidates.push(buildDatedDisenrolledOutputName_(monthParts));
+  }
+  candidates.push(DISENROLLED_EXCLUSION_SHEET);
+  for (let c = 0; c < candidates.length; c++) {
+    const name = candidates[c];
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) continue;
+    const data = getDataValues_(sheet, HEADER_ROW, DATA_START_ROW);
+    const pmrIdx = getPMRIndex_(data.headerMap);
+    if (pmrIdx === -1) continue;
+    (data.values || []).forEach(function(row) {
+      const pmr = normalizePMR_(row[pmrIdx]);
+      if (pmr) set.add(pmr);
+    });
+    if (set.size) return set;
+  }
+  return set;
+}
+
+// Exclusion list writes
+
+function appendDisenrolledRowsFromRawDataToExclusion_(rawSheet, rawHeaders, rowsByPMR, monthParts) {
+  if (!rowsByPMR || rowsByPMR.size === 0) return 0;
+  return appendDisenrolledPMRBlocksToExclusion_(rawSheet, rawHeaders, rowsByPMR, monthParts);
+}
+
+function moveDisenrolledPMRsFromDemoPToExclusion_(demoSheet, monthParts) {
+  const result = {
+    pmrsRemoved: 0,
+    rowsRemoved: 0,
+    rowsCopied: 0
+  };
+  if (!demoSheet) return result;
+  const lastRow = demoSheet.getLastRow();
+  const lastCol = demoSheet.getLastColumn();
+  if (lastRow < DATA_START_ROW || lastCol < 1) return result;
+  const headers = getHeaders_(demoSheet, HEADER_ROW);
+  const headerMap = buildHeaderIndexMap_(headers);
+  const pmrIdx = getPMRIndex_(headerMap);
+  const statusIdx = headerMap["Enrollment Status"];
+  if (pmrIdx === -1 || statusIdx === undefined) {
+    Logger.log("Demo P disenrolled split skipped: missing PMR or Enrollment Status header.");
+    return result;
+  }
+  const dataRange = demoSheet.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, lastCol);
+  const values = dataRange.getValues();
+  const disenrolledPMRs = new Set();
+  values.forEach(row => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr) return;
+    const status = String(row[statusIdx] || "").trim().toLowerCase();
+    if (status === "disenrolled") disenrolledPMRs.add(pmr);
+  });
+  if (disenrolledPMRs.size === 0) return result;
+  const rowsToRemove = [];
+  const rowsByPMR = new Map();
+  values.forEach((row, idx) => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (!pmr || !disenrolledPMRs.has(pmr)) return;
+    rowsToRemove.push(DATA_START_ROW + idx);
+    if (!rowsByPMR.has(pmr)) rowsByPMR.set(pmr, []);
+    rowsByPMR.get(pmr).push(row);
+  });
+  result.pmrsRemoved = disenrolledPMRs.size;
+  result.rowsRemoved = rowsToRemove.length;
+  result.rowsCopied = appendDisenrolledPMRBlocksToExclusion_(demoSheet, headers, rowsByPMR, monthParts);
+  deleteRowNumberBatches_(demoSheet, rowsToRemove);
+  clearSheetRuntimeCachesForSheet_(demoSheet);
+  return result;
+}
+
+function appendDisenrolledPMRBlocksToExclusion_(sourceSheet, sourceHeaders, rowsByPMR, monthParts) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DISENROLLED_EXCLUSION);
+  const template = ss.getSheetByName(sheetDef.templateName);
+  if (!template) {
+    throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh Disenrolled Exclusion List Template first.");
+  }
+  const exclusionHeaders = getHeadersForSheetType_(dashboard, SHEET_TYPE.DISENROLLED_EXCLUSION);
+  const sourceHeaderMap = buildHeaderIndexMap_(sourceHeaders || []);
+  const sourcePMRIdx = getPMRIndex_(sourceHeaderMap);
+  const exclusionHeaderMap = buildHeaderIndexMap_(exclusionHeaders);
+  const exclusionPMRIdx = getPMRIndex_(exclusionHeaderMap);
+  const sourceIndexes = exclusionHeaders.map(function(header) {
+    return Object.prototype.hasOwnProperty.call(sourceHeaderMap, header) ? sourceHeaderMap[header] : -1;
+  });
+  const rowsToWrite = [];
+  if (rowsByPMR && rowsByPMR.size) {
+    rowsByPMR.forEach(function(rows) {
+      const sourceRow = rows && rows.length ? rows[0] : null;
+      if (!sourceRow) return;
+      const output = sourceIndexes.map(function(sourceIdx) {
+        return sourceIdx === -1 ? "" : sourceRow[sourceIdx];
+      });
+      if (exclusionPMRIdx >= 0 && sourcePMRIdx >= 0 && !normalizePMR_(output[exclusionPMRIdx])) {
+        output[exclusionPMRIdx] = sourceRow[sourcePMRIdx];
+      }
+      rowsToWrite.push(output);
+    });
+  }
+  const outputSheetName = buildDatedDisenrolledOutputName_(monthParts);
+  const legacy = ss.getSheetByName(DISENROLLED_EXCLUSION_SHEET);
+  if (legacy && ss.getSheets().length > 1) ss.deleteSheet(legacy);
+  const existing = ss.getSheetByName(outputSheetName);
+  if (existing && ss.getSheets().length > 1) ss.deleteSheet(existing);
+  const sheet = template.copyTo(ss);
+  sheet.showSheet();
+  setUniqueSheetName_(sheet, outputSheetName);
+  const width = Math.max(exclusionHeaders.length, 1);
+  const startDate = monthParts && monthParts.firstDay ? monthParts.firstDay : getTodayLocalDate_();
+  const endDate = monthParts && monthParts.lastDay ? monthParts.lastDay : startDate;
+  // v1.5: The copied dashboard template already owns headers, row count, column count, and formatting.
+  // Do not force row count or clear blank data rows before the first output write.
+  sheet.getRange("A1").setValue(DISENROLLED_EXCLUSION_SHEET);
+  sheet.getRange("A2:D2").setValues([["Date:", startDate, "to", endDate]]);
+  sheet.getRange(HEADER_ROW, 1, 1, width).setValues([exclusionHeaders]);
+  if (rowsToWrite.length) {
+    sheet.getRange(DATA_START_ROW, 1, rowsToWrite.length, width).setValues(rowsToWrite);
+  }
+  applyFinalRowHeightLock_(sheet, 25);
+  try {
+    sheet.getRange("A1").setNote(
+      "Rows Processed: " + (rowsByPMR ? rowsByPMR.size : 0) + "\\n" +
+      "Rows Written: " + rowsToWrite.length + "\\n" +
+      "v1.5 Disenrolled single-write output"
+    );
+  } catch (err) {
+    Logger.log("Disenrolled output note skipped: " + err.message);
+  }
+  clearSheetRuntimeCachesForSheet_(sheet);
+  return rowsToWrite.length;
+}
+
+function createDisenrolledExclusionSheetFromDashboardTemplate_(ss, monthParts) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DISENROLLED_EXCLUSION);
+  const template = ss.getSheetByName(sheetDef.templateName);
+  if (!template) {
+    throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh All Templates first.");
+  }
+  const existing = ss.getSheetByName(DISENROLLED_EXCLUSION_SHEET);
+  if (existing) ss.deleteSheet(existing);
+  const sheet = template.copyTo(ss);
+  sheet.showSheet();
+  setUniqueSheetName_(sheet, DISENROLLED_EXCLUSION_SHEET);
+  const startDate = monthParts && monthParts.firstDay ? monthParts.firstDay : getTodayLocalDate_();
+  const endDate = monthParts && monthParts.lastDay ? monthParts.lastDay : startDate;
+  sheet.getRange("A1").setValue(DISENROLLED_EXCLUSION_SHEET);
+  sheet.getRange("A2").setValue("Date");
+  sheet.getRange("B2").setValue(startDate);
+  sheet.getRange("C2").setValue("to");
+  sheet.getRange("D2").setValue(endDate);
+  clearSheetRuntimeCachesForSheet_(sheet);
+  return sheet;
+}
+
+// Master List exclusion helpers
+
+function loadDisenrolledExclusionPMRsForPart3_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(DISENROLLED_EXCLUSION_SHEET);
+  const pmrs = new Set();
+  if (!sheet || sheet.getLastRow() < 2) return pmrs;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map(h => String(h || "").trim());
+  const headerMap = buildHeaderIndexMap_(headers);
+  const pmrIdx = getPMRIndex_(headerMap);
+  if (pmrIdx === -1) return pmrs;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  values.forEach(row => {
+    const pmr = normalizePMR_(row[pmrIdx]);
+    if (pmr) pmrs.add(pmr);
+  });
+  return pmrs;
+}
+
+function removeDisenrolledPMRBlocksFromMasterUsingDemoP_(masterSheet, demoSheet) {
+  if (!masterSheet || !demoSheet) return 0;
+  const demoHeaders = getHeaders_(demoSheet, HEADER_ROW);
+  const demoHeaderMap = buildHeaderIndexMap_(demoHeaders);
+  const demoLastRow = demoSheet.getLastRow();
+  const demoLastCol = demoSheet.getLastColumn();
+  if (demoLastRow < DATA_START_ROW || demoLastCol < 1) return 0;
+  const demoValues = demoSheet.getRange(DATA_START_ROW, 1, demoLastRow - DATA_START_ROW + 1, demoLastCol).getValues();
+  const disenrolledPMRs = buildDisenrolledPMRSetFromDemoPValues_(demoValues, demoHeaderMap);
+  const exclusionPMRs = loadDisenrolledExclusionPMRsForPart3_();
+  exclusionPMRs.forEach(pmr => disenrolledPMRs.add(pmr));
+  if (disenrolledPMRs.size === 0) return 0;
+  const masterHeaders = getHeaders_(masterSheet, HEADER_ROW);
+  const masterHeaderMap = buildHeaderIndexMap_(masterHeaders);
+  const masterPMRIdx = getPMRIndex_(masterHeaderMap);
+  if (masterPMRIdx === -1) return 0;
+  const masterLastRow = masterSheet.getLastRow();
+  const masterLastCol = masterSheet.getLastColumn();
+  if (masterLastRow < DATA_START_ROW || masterLastCol < 1) return 0;
+  const range = masterSheet.getRange(DATA_START_ROW, 1, masterLastRow - DATA_START_ROW + 1, masterLastCol);
+  const values = range.getValues();
+  const keepRows = [];
+  let removed = 0;
+  values.forEach(row => {
+    const pmr = normalizePMR_(row[masterPMRIdx]);
+    if (pmr && disenrolledPMRs.has(pmr)) {
+      removed++;
+      return;
+    }
+    keepRows.push(row);
+  });
+  if (removed === 0) return 0;
+  range.clearContent();
+  if (keepRows.length > 0) {
+    masterSheet.getRange(DATA_START_ROW, 1, keepRows.length, masterLastCol).setValues(keepRows);
+  }
+  return removed;
+}
+
+// Display handoff
+
+function applyDisenrolledExclusionCreateFormattingOnly_(sheet) {
+  if (!sheet) return;
+  const today = getTodayLocalDate_();
+  applyStandardFormattingAfterHeadersAndData_(
+    sheet,
+    SHEET_TYPE.DISENROLLED_EXCLUSION,
+    SHEET_TYPE.DISENROLLED_EXCLUSION,
+    today,
+    today,
+    ""
+  );
+  sheet.getRange("A2").setValue("Creation Date");
+  sheet.getRange("B2").setValue(today);
+  sheet.getRange("C2").setValue("to");
+  sheet.getRange("D2").setValue(today);
+  forceStandardTitleCellAlignment_(sheet);
+}
+
+function applyDisenrolledExclusionAlternatingColors_(sheet) {
+  // v1.1.0: Runtime disenrolled coloring removed. Dashboard templates are formatting authority.
+  return;
+}
