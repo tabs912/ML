@@ -1,130 +1,9 @@
-/**
- * Master List Framework v1.6 Combined Test Script
- * Generated from v1.5.55 rebuild sections for static/integration validation.
- * Load order follows configuration, dashboard defaults, helpers, framework, templates, formatters, workflows, quality, and menus.
- */
+const MASTER_LIST_MERGE_ML_VERSION = "1.6.1";
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_CONFIGURATION.txt
-// ============================================================================
+const MASTER_LIST_MERGE_REBUILD_SECTION = "FULL_SCRIPT";
 
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - CONFIGURATION Section
- *
- * Scope:
- * - Bootstrap/release constants only.
- * - Cross-section identifiers required before dashboard/template/runtime sections load.
- * - Fallback row constants retained only for bootstrap compatibility.
- *
- * Ownership boundaries:
- * - Format Dashboard owns template defaults, sheet definitions, headers, columns, behaviors, row heights, and formatting defaults.
- * - Dashboard Quality owns Dashboard Quality section registries, section titles, widths, shell definitions, summary, and signoff constants.
- * - Framework Timing owns timing section registries, benchmarks, severities, timing shell definitions, and recommendations.
- * - Business workflow sections own workflow-specific column lists and processing rules.
- */
+const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6";
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
-
-// -----------------------------------------------------------------------------
-// Release metadata
-// -----------------------------------------------------------------------------
-
- *
- * Generated from v1.5.55 rebuild section files in /scripts.
- * Duplicate top-level declarations are de-duplicated by rebuild load order; later owner sections win.
- * This is a combined test artifact only and does not promote a production script.
- */
-
-/*
-Combined source order:
- - v1.5.55_Rebuild_CONFIGURATION.txt
- - v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt
- - v1.5.55_Rebuild_HELPER_FUNCTIONS.txt
- - v1.5.55_Rebuild_FRAMEWORK_AND_TIMING_FUNCTIONS.txt
- - v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - v1.5.55_Rebuild_FORMATTERS.txt
- - v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - v1.5.55_Rebuild_SYNC_FUNCTIONS.txt
- - v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - v1.5.55_Rebuild_MONTHLY_CHANGE_FUNCTIONS.txt
- - v1.5.55_Rebuild_MASTER_LIST_FUNCTIONS.txt
- - v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt
- - v1.5.55_Rebuild_MENU_FUNCTIONS.txt
-*/
-
-/*
-Duplicate declarations skipped in favor of later owner sections:
- - loadDashboardConfig_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - buildDashboardSectionIndex_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - loadGlobalSettings_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - loadTitleRows_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - parseTitleRowConfigRow_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - getTitleRowConfigForSheet_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - getThemeFillForTitleRow_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - toWrapStrategy_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - loadSheetDefinitions_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - loadSheetHeaders_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - loadColumnDefinitions_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - loadSheetBehaviors_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - normalizeDashboardSectionTitle_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - readDashboardSectionRows_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - getBehaviorForSheetType_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - getDefaultBehavior_: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt -> v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
- - mapRowsToHeaders_: v1.5.55_Rebuild_HELPER_FUNCTIONS.txt -> v1.5.55_Rebuild_FORMATTERS.txt
- - writeChangedColumnsOnly_: v1.5.55_Rebuild_HELPER_FUNCTIONS.txt -> v1.5.55_Rebuild_FORMATTERS.txt
- - DEMO_P_RAW_HEADERS: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - DEMO_P_OPTIONAL_SYNC_HEADERS: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - DEMO_P_FORMAT_HEADERS: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - DEMO_P_TEMPLATE_DATE_HEADERS: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - DEMO_P_BANNER_SYNC_HEADERS: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - processDemoP: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - processDemoPAsWorkingSource_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - markPrimaryPMRRowsForSequentialData_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - assignPrimaryPMRRowsInData_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - formatDemoPStructure: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - buildRawDataSheetName_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - getOrCreateDemoPProcessingSheet_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - deleteSheetIfExistsForDemoPProcess_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - getLastRawDataDisenrolledBuildResult_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - setLastRawDataDisenrolledBuildResult_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - createActiveDemoPFromRawData_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - populateDemoPUpdateColumns_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - verifyPrimaryPMRColumnFromRawData_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - createOrRefreshDemoPTemplate_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - getOrCreateDemoPTemplate_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - initializeDemoPTemplateTitleRows_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - applyDemoPTemplateFormatting_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - applyDemoPTemplateToSheet_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - applyDemoPDateFormattingByHeader_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
- - createDisenrolledList: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - createDisenrollmentList: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - splitRawDataRowsIntoActiveAndDisenrolled_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - loadDisenrolledPMRSetForMonth_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - appendDisenrolledRowsFromRawDataToExclusion_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - moveDisenrolledPMRsFromDemoPToExclusion_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - appendDisenrolledPMRBlocksToExclusion_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - createDisenrolledExclusionSheetFromDashboardTemplate_: v1.5.55_Rebuild_FORMATTERS.txt -> v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
- - forceSheetRowCount_: v1.5.55_Rebuild_HELPER_FUNCTIONS.txt -> v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt
-*/
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_CONFIGURATION.txt
-// ============================================================================
-
-const MASTER_LIST_MERGE_ML_VERSION = "1.5.55";
-
-const MASTER_LIST_MERGE_REBUILD_SECTION = "CONFIGURATION";
-
-const MASTER_LIST_MERGE_BASELINE_VERSION = "1.5.54";
-
-// -----------------------------------------------------------------------------
-// Shared runtime caches / compatibility constants
-// -----------------------------------------------------------------------------
-// Declared up front because Google Apps Script V8 throws ReferenceError for
-// undeclared globals referenced by split rebuild sections during startup.
 
 const ML_MONTHLY_SHEET_LOOKUP_CACHE_ = {};
 
@@ -160,9 +39,6 @@ const RFF_TEMPLATE_RESIZE_EXEMPT_TEMPLATE_NAMES = [];
 
 const RFF_TEMPLATE_ALWAYS_STAGED_TEMPLATE_NAMES = [];
 
-// -----------------------------------------------------------------------------
-// Shared user prompts / runtime feature flags
-// -----------------------------------------------------------------------------
 
 const RFF_FORMATTER_DATE_PROMPT = "Enter any date in the report month. Example: 05/01/26";
 
@@ -182,24 +58,16 @@ const RFF_SKIP_DUPLICATE_TEMPLATE_FORMAT_ENFORCEMENT = false;
 
 const RFF_REPAIR_DATE_FORMATS_DURING_SECTION_G = true;
 
-// -----------------------------------------------------------------------------
-// Bootstrap row constants
-// -----------------------------------------------------------------------------
-// Fallback only. Runtime sheet/header ownership belongs to Format Dashboard.
 
 const HEADER_ROW = 4;
 
 const DATA_START_ROW = 5;
 
-// Fallback cleanup constants. Runtime row/column formatting is dashboard/template-owned.
 
 const FORMAT_ALLOWED_EMPTY_COLUMNS = 2;
 
 const FORMAT_DELETE_BLANK_ROWS_AFTER = 400;
 
-// -----------------------------------------------------------------------------
-// Governed sheet type identifiers
-// -----------------------------------------------------------------------------
 
 const SHEET_TYPE = Object.freeze({
   RAW_DATA: "Raw Data",
@@ -226,12 +94,9 @@ const SHEET_BASE_COLORS = {
 };
 
 const MASTER_LIST_ADDED_HEADERS = [
-  // Runtime column additions are retired. Master List headers come from Dashboard Section C only.
+
 ];
 
-// -----------------------------------------------------------------------------
-// Governed monthly sheet prefixes / canonical sheet names
-// -----------------------------------------------------------------------------
 
 const MASTER_LIST_PREFIX = "Master List";
 
@@ -281,9 +146,6 @@ const DEMO_P_TEMPLATE_SHEET = "Demo P Template";
 
 const FORMAT_DEMO_P_TIMING_SHEET = "Format Demo P Timing";
 
-// -----------------------------------------------------------------------------
-// Protected/system sheet names shared across sections
-// -----------------------------------------------------------------------------
 
 const SYSTEM_SHEETS_TO_HIDE = Object.freeze([
   DISENROLLED_EXCLUSION_SHEET,
@@ -296,19 +158,11 @@ const SYSTEM_SHEETS_TO_HIDE = Object.freeze([
   FORMAT_DEMO_P_TIMING_SHEET
 ]);
 
-// -----------------------------------------------------------------------------
-// Shared date display formats
-// -----------------------------------------------------------------------------
-// Sheet-specific date/number formatting remains owned by Format Dashboard/Templates.
 
 const DATE_DISPLAY_FORMAT = "mm/dd/yyyy";
 
 const DATE_SHEET_FORMAT = "MM.yy";
 
-// -----------------------------------------------------------------------------
-// Shared date semantic headers
-// -----------------------------------------------------------------------------
-// This is a semantic list used by processing/validation. Display formatting still belongs to Dashboard/Templates.
 
 const GLOBAL_DATE_FORMAT_HEADERS = Object.freeze([
   "AD1 - Phone Valid Dates From",
@@ -330,58 +184,12 @@ const GLOBAL_DATE_FORMAT_HEADERS = Object.freeze([
   "Master List Update Month"
 ]);
 
-// -----------------------------------------------------------------------------
-// CP title-info migration source cells
-// -----------------------------------------------------------------------------
-// Target placement is owned by the CP formatter/template workflow; source cleanup list is shared configuration.
 
 const TITLE_INFO_MOVE_CELLS = Object.freeze({
   [SHEET_TYPE.CARE_PLAN_DUE]: ["A2", "C2", "A3", "C3", "D3", "E3"],
   [SHEET_TYPE.UNLOCKED]: ["A2", "A3", "B3", "C3", "D2", "E2", "F2", "G2"]
 });
 
-// -----------------------------------------------------------------------------
-// Explicitly excluded from CONFIGURATION rebuild section
-// -----------------------------------------------------------------------------
-// - COLUMN_FORMATS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS.
-// - SHEET_BASE_COLORS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS.
-// - RFF_DEFAULTS: move to FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS / TEMPLATE FUNCTIONS AND VALIDATION.
-// - RFF_DASHBOARD_QUALITY_SECTIONS and DQ widths/styles: move to DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS.
-// - Framework Timing section registry, severities, benchmarks: move to FRAMEWORK AND TIMING FUNCTIONS.
-// - Workflow-specific hidden columns and sync lists: move to owning workflow/sync section.
-
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS Section
- *
- * Depends on:
- * - CONFIGURATION rebuild section for release constants, sheet type identifiers, and bootstrap rows.
- * - HELPER FUNCTIONS rebuild section for normalization, safe values, and row-width utilities.
- * - MENU FUNCTIONS calls setupReportFormattingDashboardFromScriptDefaults_ but does not own implementation.
- * - FRAMEWORK AND TIMING FUNCTIONS supplies timing wrappers used by dashboard setup.
- * - TEMPLATE FUNCTIONS AND VALIDATION supplies template-specific display helpers used by downstream consumers.
- *
- * Purpose:
- * - Own the Format Dashboard sheet, global defaults, sheet definitions, title rows, header definitions, column definitions, and behavior definitions.
- * - Own dashboard config loading/parsing and dashboard default writers.
- * - Do not own template creation, Dashboard Quality report sections, Framework Timing report sections, or business workflow processing.
- */
-
-// ============================================================================
-// FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// Dashboard constants, section names, and global defaults
-// ----------------------------------------------------------------------------
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt
-// ============================================================================
 
 const RFF_DASHBOARD_SHEET = "Format Dashboard";
 
@@ -470,14 +278,6 @@ const RFF_MONTHLY_CHANGE_SUBSECTIONS = [
   "Banner Summary Changes"
 ];
 
-// NOTE: Dashboard Quality section registry remains in DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS.
-// NOTE: Framework Timing registries/benchmarks remain in FRAMEWORK AND TIMING FUNCTIONS.
-// NOTE: Template creation and validation functions remain in TEMPLATE FUNCTIONS AND VALIDATION.
-
-
-// ----------------------------------------------------------------------------
-// Dashboard cache and section-name helpers
-// ----------------------------------------------------------------------------
 
 function clearDashboardConfigCache_() {
   RFF_DASHBOARD_CONFIG_CACHE_ = null;
@@ -526,10 +326,6 @@ function getRequiredFrameworkSheetTypes_() {
   ];
 }
 
-
-// ----------------------------------------------------------------------------
-// Default dashboard data builders
-// ----------------------------------------------------------------------------
 
 function getDefaultGlobalSettingsRows_() {
   return [
@@ -626,12 +422,8 @@ function getDefaultSheetHeaderRows_() {
 }
 
 function getDefaultHeaderSets_() {
-  /*
-   * v1.5.24:
-   * Dashboard Section C defaults mirror spec/Current Dashboard Settings.xlsx.
-   * Raw Data source columns are governed as Unformatted Data per production
-   * dashboard settings; runtime processing must not add or remove headers here.
-   */
+
+
   return {
     [RFF_SHEET_TYPES.BANNER]: [
       h_("Last Name", "Primary Data"),
@@ -1225,10 +1017,6 @@ function c_(width, fontSize, dateColumn, hideColumn) {
 }
 
 
-// ----------------------------------------------------------------------------
-// Dashboard writing and styling helpers
-// ----------------------------------------------------------------------------
-
 function writeDashboardTitle_(sheet, row) {
   const titleValues = [["Report Formatter Framework", "- v" + RFF_VERSION + " -", "Format Dashboard"]];
   sheet.getRange(row, 1, 1, 9).breakApart();
@@ -1292,7 +1080,6 @@ function styleDashboard_(sheet) {
     .setHorizontalAlignment("left");
 
 
-  // Fixed widths are faster and more stable than auto-resize.
   const widths = [250, 160, 240, 180, 130, 120, 160, 150, 140];
   widths.forEach(function(width, index) {
     try {
@@ -1424,6 +1211,10 @@ function writeDashboardDefaultsFast_(sheet) {
   sheet.setFrozenRows(1);
 }
 
+function rebuildFormatDashboardDefaults() {
+  return setupReportFormattingDashboardFromScriptDefaults_();
+}
+
 function setupReportFormattingDashboardFromScriptDefaults_() {
   return runFrameworkTimed_("Setup Report Formatting Dashboard", function(timing) {
     clearDashboardConfigCache_();
@@ -1438,10 +1229,6 @@ function setupReportFormattingDashboardFromScriptDefaults_() {
   });
 }
 
-
-// ----------------------------------------------------------------------------
-// Dashboard sheet type and production-order helpers
-// ----------------------------------------------------------------------------
 
 function normalizeDashboardSheetTypeKey_(sheetType) {
   const normalized = normalizeHeader_(sheetType);
@@ -1488,67 +1275,6 @@ function sortSheetDefinitionsByProductionOrder_(sheetDefinitions) {
   });
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: getDefaultBehavior_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadDashboardConfig_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: buildDashboardSectionIndex_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadGlobalSettings_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadTitleRows_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: parseTitleRowConfigRow_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: getTitleRowConfigForSheet_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: getThemeFillForTitleRow_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: toWrapStrategy_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadSheetDefinitions_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadSheetHeaders_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadColumnDefinitions_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: loadSheetBehaviors_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: normalizeDashboardSectionTitle_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: readDashboardSectionRows_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt: getBehaviorForSheetType_ (owned by v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt)
-
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_HELPER_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - HELPER FUNCTIONS Section
- *
- * Depends on: v1.5.55 CONFIGURATION rebuild section.
- * Purpose: shared low-level helpers only. Section-owned helpers are separated into review holding sections.
- *
- * Rebuild rule:
- * - Carry-forward helpers are shared and active in v1.5.54 static analysis.
- * - Review helpers remain isolated until menu, trigger, button, manual IDE, and section ownership checks are complete.
- * - No helper in this file should own Dashboard formatting, Dashboard Quality layout, Framework Timing layout, or business workflow policy.
- */
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-
-// ----------------------------------------------------------------------------
-// Notification / UI Helpers
-// ----------------------------------------------------------------------------
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_HELPER_FUNCTIONS.txt
-// ============================================================================
 
 function notify_(message) {
   try {
@@ -1559,17 +1285,10 @@ function notify_(message) {
 }
 
 
-// ----------------------------------------------------------------------------
-// Blank / Value Helpers - Carry Forward
-// ----------------------------------------------------------------------------
-
 function isBlankCell_(value) {
   return value === null || value === undefined || String(value).trim() === "";
 }
 
-// ----------------------------------------------------------------------------
-// Date / Month Helpers - Carry Forward
-// ----------------------------------------------------------------------------
 
 function coerceToValidDate_(value) {
   if (value instanceof Date && !isNaN(value.getTime())) {
@@ -1695,12 +1414,8 @@ function isSameMonth_(a, b) {
 }
 
 
-// ----------------------------------------------------------------------------
-// Sheet Name / Monthly Sheet Lookup Helpers - Carry Forward
-// ----------------------------------------------------------------------------
-
 function buildMonthlySheetName_(prefix, firstDay, lastDay) {
-  // v1.4.2: Standard monthly output names use mm.yy only.
+
   return buildStandardMonthlySheetName_(prefix, firstDay);
 }
 
@@ -1742,7 +1457,7 @@ function getNewestFormattedMonthlySheetByPrefix_(ss, prefix) {
 }
 
 function getMonthlySheetByPrefixAndDate_(ss, prefix, firstDay, lastDay) {
-  // v1.4.2: all production sync sources use the standardized monthly output name Prefix mm.yy.
+
   if (!ss || !prefix) return null;
 
 
@@ -1808,18 +1523,6 @@ function setUniqueSheetName_(sheet, desiredName) {
 }
 
 
-/**
- * Fast monthly output rename helper.
- * Deletes/replaces an existing monthly output with the same name before renaming,
- * then clears sheet lookup caches. This helper is required by Format Raw Data,
- * Demo P, Master List, and other monthly output functions.
- */
-
-
-// ----------------------------------------------------------------------------
-// Header Helpers - Carry Forward
-// ----------------------------------------------------------------------------
-
 function getHeaders_(sheet, headerRow) {
   headerRow = headerRow || HEADER_ROW;
   const key = getHeaderCacheKey_(sheet, headerRow);
@@ -1879,10 +1582,6 @@ function normalizeHeader_(value) {
 }
 
 
-// ----------------------------------------------------------------------------
-// PMR / Participant Key Helpers - Carry Forward
-// ----------------------------------------------------------------------------
-
 function normalizePMR_(value) {
   return String(value === null || value === undefined ? "" : value)
     .trim()
@@ -1913,10 +1612,6 @@ function normalizeKeyPart_(value) {
     .replace(/\s+/g, " ");
 }
 
-
-// ----------------------------------------------------------------------------
-// Data Read / Row Mapping Helpers - Carry Forward
-// ----------------------------------------------------------------------------
 
 function getDataValues_(sheet, headerRow, dataStartRow) {
   headerRow = headerRow || HEADER_ROW;
@@ -1955,7 +1650,6 @@ function getDataValues_(sheet, headerRow, dataStartRow) {
   };
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_HELPER_FUNCTIONS.txt: mapRowsToHeaders_ (owned by v1.5.55_Rebuild_FORMATTERS.txt)
 
 function normalizeCompareValue_(value) {
   if (value instanceof Date && !isNaN(value.getTime())) {
@@ -2007,10 +1701,6 @@ function parseBoolean_(value) {
   return ["true", "yes", "y", "1", "x"].indexOf(text) !== -1;
 }
 
-
-// ----------------------------------------------------------------------------
-// Cache Helpers - Carry Forward
-// ----------------------------------------------------------------------------
 
 function clearHeaderCacheForSheet_(sheet) {
   if (!sheet) return;
@@ -2082,12 +1772,6 @@ function getSheetDimensions_(sheet) {
 }
 
 
-// ----------------------------------------------------------------------------
-// Review Before Retention - Low Use or Section-Owned Helpers
-// ----------------------------------------------------------------------------
-
-// Holding section: used or low-use helpers that may belong to a future owner section. Do not delete until ownership is verified.
-
 function dateOnlyLocalClone_(date) {
   const d = coerceToValidDate_(date);
   if (!d) return null;
@@ -2153,7 +1837,6 @@ function buildRowsByPMR_(sheet, headerRow, dataStartRow) {
   return result;
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_HELPER_FUNCTIONS.txt: writeChangedColumnsOnly_ (owned by v1.5.55_Rebuild_FORMATTERS.txt)
 
 function safeSheetName_(value) {
   return normalizeText_(value)
@@ -2161,12 +1844,6 @@ function safeSheetName_(value) {
     .substring(0, 99);
 }
 
-
-// ----------------------------------------------------------------------------
-// Review Before Removal - No Static Direct Callers Found
-// ----------------------------------------------------------------------------
-
-// Holding section: no static direct callers found in v1.5.54. Keep isolated until dynamic Apps Script usage is ruled out.
 
 function compareValues_(left, right) {
   return normalizeText_(left) === normalizeText_(right);
@@ -2199,7 +1876,6 @@ function resizeSheetMinimum_(sheet, rowCount, colCount) {
   }
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_HELPER_FUNCTIONS.txt: forceSheetRowCount_ (owned by v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt)
 
 function getThemeColorsFromBase_(hex) {
   return {
@@ -2290,28 +1966,6 @@ function hslToRgb_(h, s, l) {
   };
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_FRAMEWORK_AND_TIMING_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - FRAMEWORK AND TIMING FUNCTIONS
- *
- * Scope:
- * - Runtime timing diagnostics and framework timed wrappers.
- * - Framework Timing Report shell, section registry, section replacement, styling, and retention.
- * - Timing detail aggregation, issue rows, optimization recommendations, and performance severity helpers.
- * - Menu-callable timing refresh / recommendation entry points.
- *
- * Diff hygiene:
- * - This file is intentionally limited to active scripts/ timing code.
- * - Do not add archive/report/spec/binary files to this diff.
- */
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_FRAMEWORK_AND_TIMING_FUNCTIONS.txt
-// ============================================================================
 
 function startRuntimeTiming_(processName, monthParts) {
   const now = new Date().getTime();
@@ -2839,12 +2493,7 @@ function getFrameworkTimingThresholdForSeverity_(severity) {
 function ensureFrameworkTimingReportShell_(sheet) {
   if (!sheet) return;
 
-  /*
-   * v1.5.11:
-   * Lifecycle refactor. Shell setup is initialization-only.
-   * This legacy wrapper now repairs only missing/incomplete structure and does
-   * not rebuild a valid report during population.
-   */
+
   if (!hasFrameworkTimingReportShell_(sheet)) {
     rebuildFrameworkTimingReportShellCompact_(sheet);
   }
@@ -3229,39 +2878,6 @@ function trimTimingReportRows_(sheet) {
   }
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild - TEMPLATE FUNCTIONS AND VALIDATION
- *
- * Purpose:
- *   Rebuild candidate section for governed template creation, refresh, visibility,
- *   metadata/signature validation, template structural validation, and template
- *   date/number-format validation.
- *
- * Ownership:
- *   - Creates and refreshes report templates from Format Dashboard configuration.
- *   - Validates template structure, headers, formatting signatures, and date/number formats.
- *   - Applies template-only formatting during template build; runtime report formatting
- *     remains template/dashboard-owned.
- *
- * Dependencies expected from other rebuild sections:
- *   CONFIGURATION, HELPER FUNCTIONS, FORMAT DASHBOARD AND GLOBAL DEFAULTS FUNCTIONS,
- *   DASHBOARD QUALITY, FRAMEWORK AND TIMING FUNCTIONS.
- *
- * Explicit exclusions from this section:
- *   - Format Dashboard default constants/data builders remain in FORMAT DASHBOARD AND GLOBAL DEFAULTS.
- *   - Operational formatters and report workflows remain in FORMATTERS / workflow sections.
- *   - Dashboard Quality section registry/report assembly remains in DASHBOARD QUALITY.
- *   - Framework Timing report writers/benchmarks remain in FRAMEWORK AND TIMING.
- */
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// ============================================================================
 
 function createOrRefreshAllReportTemplates() {
   return runFrameworkTimed_("Create / Refresh All Templates", function(timing) {
@@ -3295,7 +2911,7 @@ function createOrRefreshAllReportTemplates() {
     markFrameworkStep_(timing, "Template timing modes: " + summarizeTemplateRefreshModes_(templateResults));
     if (failedTemplates.length) {
       throw new Error("Template refresh completed with " + failedTemplates.length + " failed template(s): " + failedTemplates.map(function(result) {
-        return result.templateName;
+        return result.templateName + (result.issue ? " (" + result.issue + ")" : "");
       }).join(", "));
     }
     markFrameworkStep_(timing, "All report templates refreshed");
@@ -3322,13 +2938,8 @@ function showReportTemplates(dashboardOverride) {
 }
 
 function setReportTemplateVisibility_(dashboard, hidden) {
-  /*
-   * v1.5.30:
-   * The v1.5.28 Apps Script execution report showed standalone Hide/Show
-   * Templates above 10 seconds. Build a one-pass sheet map instead of repeatedly
-   * resolving every template by name, then only call hide/show when the current
-   * hidden state differs from the requested state.
-   */
+
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetMap = {};
   ss.getSheets().forEach(function(sheet) {
@@ -3519,7 +3130,7 @@ function parseTitleRowConfigRow_(row, globals, base) {
     purpose: String(row[2] || base.purpose || "").trim(),
     valueSource: String(row[3] || base.valueSource || "").trim(),
     label: String(row[4] === "" || row[4] === null || row[4] === undefined ? (base.label || "") : row[4]).trim(),
-    targetCell: String(row[5] || base.targetCell || ("Row " + rowNumber)).trim(),
+    targetCell: normalizeTitleTargetCell_(row[5] || base.targetCell, rowNumber),
     height: numberOrDefault_(row[6], base.height || RFF_DEFAULTS.dataRowHeight),
     fontSize: numberOrDefault_(row[7], base.fontSize || globals.standardFontSize || RFF_DEFAULTS.standardFontSize),
     fontWeight: fontWeight.toLowerCase() === "bold" ? "bold" : "normal",
@@ -3528,6 +3139,12 @@ function parseTitleRowConfigRow_(row, globals, base) {
     wrap: wrap,
     notes: String(row[12] || base.notes || "").trim()
   };
+}
+
+function normalizeTitleTargetCell_(value, rowNumber) {
+  const text = String(value || "").trim();
+  if (/^[A-Za-z]+[1-9][0-9]*$/.test(text)) return text.toUpperCase();
+  return "A" + Math.max(Number(rowNumber || 1), 1);
 }
 
 function getTitleRowConfigForSheet_(dashboard, sheetDef, rowNumber) {
@@ -3718,10 +3335,6 @@ function readDashboardSectionRows_(source, sectionName) {
 }
 
 
-/* ============================================================================
- * TEMPLATE BUILDING
- * ========================================================================== */
-
 function getBehaviorForSheetType_(dashboard, sheetType) {
   const normalized = normalizeDashboardSheetTypeKey_(sheetType);
   const behaviors = dashboard && dashboard.behaviors ? dashboard.behaviors : {};
@@ -3741,7 +3354,7 @@ function createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, timing) {
 
 
   const headers = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
-  const behavior = dashboard.behaviors[sheetDef.sheetType] || getDefaultBehavior_();
+  const behavior = getBehaviorForSheetType_(dashboard, sheetDef.sheetType);
   const globals = dashboard.globals;
   const colCount = Math.max(headers.length, 4);
   const rowCount = resolveTemplateRowCount_(sheetDef, globals);
@@ -3813,10 +3426,6 @@ function shouldRefreshTemplateMetadataOnly_(sheet, sheetDef, templateExisted, si
   if (!signatureMatches) return false;
 
 
-  // This intentionally avoids expensive row/column/header/filter/freeze checks.
-  // The stored dashboard signature is the source of truth for whether a full
-  // template rebuild is needed. Validation remains available to catch manual
-  // sheet edits or corruption when needed.
   return true;
 }
 
@@ -3844,9 +3453,6 @@ function refreshTemplateMetadataOnly_(sheet, dashboard, sheetDef, colCount, expe
   markFrameworkStep_(timing, "Metadata-only refresh; template unchanged: " + sheetDef.templateName);
 
 
-  // Do not hide/show, clear, resize, rebuild alternating colors, reapply widths,
-  // reapply filters, or re-freeze during metadata-only refresh. Those operations
-  // are intentionally reserved for full builds only.
   markFrameworkStep_(timing, "Complete metadata-only template refresh: " + sheetDef.templateName);
 }
 
@@ -3988,25 +3594,14 @@ function ensureSheetMinimumColumns_(sheet, colCount) {
 }
 
 function shouldUseCorrectedIndividualTemplateBuild_(sheetDef) {
-  /*
-   * v1.4.30:
-   * Individual template-build branches remain retired. All governed templates use
-   * the shared dashboard build sequence. Create and update are now separated by
-   * templateExisted inside buildTemplateFromDashboard_: brand-new blank sheets
-   * skip clear sheet/formats; existing templates clear only when a full rebuild
-   * is required after signature mismatch.
-   */
+
+
   return false;
 }
 
 function clearTemplateForFullBuild_(sheet, sheetDef, timing, templateExisted) {
-  /*
-   * v1.5.30:
-   * New templates are known blank immediately after insertSheet(). The v1.5.28
-   * timing report flagged the blank-sheet clear-skip branch as the only slow
-   * template step, so the create path avoids getLastRow()/getLastColumn() probes.
-   * Existing templates still clear before full rebuilds.
-   */
+
+
   if (!templateExisted) {
     markFrameworkStep_(timing, "Create template fast path - clear skipped for new sheet: " + sheetDef.templateName);
     return;
@@ -4028,12 +3623,8 @@ function clearTemplateForFullBuild_(sheet, sheetDef, timing, templateExisted) {
 }
 
 function applyTemplateRowHeights_(sheet, dashboard, sheetDef, rowCount, timing, stepPrefix) {
-  /*
-   * v1.5:
-   * Template row-height processing is intentionally disabled.
-   * Empty templates should not pay row-height cost; final output row-height locking
-   * belongs only to Raw Data, Demo P, Master List, and Disenrolled output workflows.
-   */
+
+
   markFrameworkStep_(timing, (stepPrefix || "Apply row heights") + " skipped for template: " + sheetDef.templateName);
 }
 
@@ -4154,8 +3745,8 @@ function resolveTemplateRowCount_(sheetDef, globals) {
 
 
   if (mode === "DYNAMIC") {
-    // Phase 1 templates do not yet receive source data counts. Use the dashboard
-    // minimum + buffer until the Phase 2+ report formatters pass actual data row counts.
+
+
     return Math.max(minRows + bufferRows, headerRow);
   }
 
@@ -4217,12 +3808,25 @@ function applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCo
   applyTemplateRowHeights_(sheet, dashboard, sheetDef, rowCount, timing, "Apply row heights");
 }
 
+function ensureTitleRowConfig_(config, rowNumber, globals) {
+  const safe = config || parseTitleRowConfigRow_([], globals || {}, { row: rowNumber });
+  safe.row = Math.max(Number(safe.row || rowNumber || 1), 1);
+  safe.targetCell = normalizeTitleTargetCell_(safe.targetCell, safe.row);
+  safe.height = Number(safe.height || (globals && globals.dataRowHeight) || RFF_DEFAULTS.dataRowHeight);
+  safe.fontSize = Number(safe.fontSize || (globals && globals.standardFontSize) || RFF_DEFAULTS.standardFontSize);
+  safe.fontWeight = String(safe.fontWeight || "normal").toLowerCase() === "bold" ? "bold" : "normal";
+  safe.fillLevel = safe.fillLevel || "Level 1";
+  safe.alignment = safe.alignment || (globals && globals.defaultHorizontalAlignment) || RFF_DEFAULTS.defaultHorizontalAlignment;
+  safe.wrap = safe.wrap || (globals && globals.defaultDataWrap) || RFF_DEFAULTS.defaultDataWrap;
+  return safe;
+}
+
 function applyTitleRows_(sheet, dashboard, sheetDef, theme, colCount) {
   const globals = dashboard.globals;
-  const row1 = getTitleRowConfigForSheet_(dashboard, sheetDef, 1);
-  const row2 = getTitleRowConfigForSheet_(dashboard, sheetDef, 2);
-  const row3 = getTitleRowConfigForSheet_(dashboard, sheetDef, 3);
-  const row4 = getTitleRowConfigForSheet_(dashboard, sheetDef, 4);
+  const row1 = ensureTitleRowConfig_(getTitleRowConfigForSheet_(dashboard, sheetDef, 1), 1, globals);
+  const row2 = ensureTitleRowConfig_(getTitleRowConfigForSheet_(dashboard, sheetDef, 2), 2, globals);
+  const row3 = ensureTitleRowConfig_(getTitleRowConfigForSheet_(dashboard, sheetDef, 3), 3, globals);
+  const row4 = ensureTitleRowConfig_(getTitleRowConfigForSheet_(dashboard, sheetDef, 4), 4, globals);
 
 
   [row1, row2, row3, row4].forEach(function(rowConfig) {
@@ -4390,13 +3994,10 @@ function enforceDateAndNumberFormatsForHeaders_(sheet, dashboard, headers, rowCo
 
 
     try {
-      // Apply the full template data range first.
+
       sheet.getRange(dataStartRow, col, dataRows, 1).setNumberFormat(googleSheetsFormat);
 
 
-      // Then reapply the first sample rows used by validation/testing. This prevents
-      // stale or partial number formats in the first data rows from causing false
-      // failures such as 0.############### on one date column.
       sheet.getRange(dataStartRow, col, sampleRows, 1).setNumberFormat(googleSheetsFormat);
     } catch (err) {
       Logger.log((logPrefix || "Date/number format") + " skipped for " + header + ": " + err.message);
@@ -4693,9 +4294,8 @@ function buildTemplateFormatSignature_(dashboard, sheetDef, headers, rowCount, c
 }
 
 function normalizeTemplateFormatSignature_(signature) {
-  // Keep signature comparisons stable across script-version-only updates.
-  // A new script version should not force expensive template rebuilds when dashboard
-  // structure, headers, widths, hidden columns, and behavior did not change.
+
+
   return String(signature || "")
     .split("|")
     .filter(function(part) { return String(part || "").indexOf("v=") !== 0; })
@@ -4861,13 +4461,7 @@ function resizeSheet_(sheet, rowCount, colCount, options) {
 function resizeSheetRows_(sheet, rowCount) {
   if (Number(rowCount) <= 1000) return;
 
-  /*
-   * v1.4.33:
-   * Row resizing is the dominant template-build slow step. New Google Sheets
-   * usually start with 1000 rows, so deleting rows down to 500/800 creates
-   * avoidable runtime. Only add rows when the sheet has fewer than the dashboard
-   * target. Do not delete extra blank rows during template creation.
-   */
+
   rowCount = Math.max(rowCount, 1);
   const currentRows = sheet.getMaxRows();
 
@@ -4931,12 +4525,6 @@ function hideSheetIfNeeded_(sheet, timing, stepName) {
   }
 }
 
-
-
-
-/* ============================================================================
- * PHASE 2A FORMATTER TOOLS - BANNER REPORT
- * ========================================================================== */
 
 function formatBannerReport() {
   return runFrameworkTimed_("Format Banner Report", function(timing) {
@@ -5159,7 +4747,6 @@ function copyRawBannerDataToOutput_(rawSheet, outputSheet) {
   }
 
 
-  // Bounded read: only read the actual used rows/columns instead of getDataRange().
   const rawValues = rawSheet.getRange(1, 1, rawLastRow, rawLastCol).getValues();
   const outputHeaderRow = RFF_DEFAULTS.headerRow;
   const outputDataStartRow = RFF_DEFAULTS.dataStartRow;
@@ -5196,7 +4783,7 @@ function copyRawBannerDataToOutput_(rawSheet, outputSheet) {
 
   if (mapped.length > 0) {
     ensureSheetHasAtLeastRows_(outputSheet, outputDataStartRow + mapped.length - 1);
-    // Do not clear the duplicated template data area first. setValues overwrites the target rows.
+
     outputSheet.getRange(outputDataStartRow, 1, mapped.length, outputLastCol).setValues(mapped);
   }
 }
@@ -5297,14 +4884,6 @@ function deleteArchiveSheetIfExists_(archiveSs, sheetName) {
 }
 
 
-
-
-
-
-/* ============================================================================
- * MONTHLY CHANGE SUBHEADER UTILITY FOR FUTURE PHASES
- * ========================================================================== */
-
 function formatMonthlyChangeSubheaderRow(sheet, rowNumber, label) {
   formatMonthlyChangeSubsectionBlock(sheet, rowNumber, label);
 }
@@ -5325,21 +4904,6 @@ function getMonthlyChangeSubsectionLabels() {
   return RFF_MONTHLY_CHANGE_SUBSECTIONS.slice();
 }
 
-
-
-
-/* ============================================================================
- * REMOVABLE FRAMEWORK TESTING SECTION
- *
- * These menu-driven framework tests are isolated from production formatter logic.
- * They can be removed later by deleting this full section and the three test menu
- * entries in onOpen(), plus the three RFF_TEST* sheet-name constants.
- * ========================================================================== */
-
-
-/* ============================================================================
- * FRAMEWORK TEST 6 - DATE FORMATTING
- * ========================================================================== */
 
 function runFrameworkTest6DateFormatting() {
   return runFrameworkTimed_("Framework Test 6 - Date Formatting", function(timing) {
@@ -5510,14 +5074,6 @@ function writeFrameworkTest6DateFormatReport_(results, options) {
 }
 
 
-
-
-
-
-/* ============================================================================
- * FRAMEWORK TEST 7 - INTENTIONAL VALIDATION FAILURE
- * ========================================================================== */
-
 function runFrameworkTest7IntentionalValidationFailure() {
   return runFrameworkTimed_("Framework Test 7 - Intentional Validation Failure", function(timing) {
     const dashboard = loadDashboardConfig_();
@@ -5578,14 +5134,8 @@ function runFrameworkTest7IntentionalValidationFailure() {
       const restoredIssuesText = String(restoredResult.issues || "");
       const restoredWidthMismatch = restoredIssuesText.indexOf("Width mismatch") !== -1;
       const restoredPass = restoredResult.status === "PASS" || (caughtFailure && !restoredWidthMismatch);
-      /*
-       * v1.5.1:
-       * Test 7 intentionally creates a temporary width mismatch. Template-level row
-       * height governance was retired, so strict row-height findings after the
-       * width restore must not keep Section D failed. Section D passes when the
-       * forced width mismatch is detected and no width mismatch remains after
-       * restore.
-       */
+
+
       status = restoredPass ? "PASS" : "FAIL";
       notes =
         "Intentional width mismatch forced from " + expectedWidth + " to " + forcedBadWidth +
@@ -5628,10 +5178,6 @@ function writeFrameworkTest7ValidationFailureReport_(results) {
 }
 
 
-/* ============================================================================
- * FRAMEWORK TEST 9 - MONTHLY CHANGE SUBHEADERS
- * ========================================================================== */
-
 function runFrameworkTest9MonthlyChangeSubheaders() {
   return runFrameworkTimed_("Framework Test 9 - Monthly Change Subheaders", function(timing) {
     const dashboard = loadDashboardConfig_();
@@ -5642,8 +5188,6 @@ function runFrameworkTest9MonthlyChangeSubheaders() {
     if (!sheetDef) throw new Error("Monthly Change sheet definition is missing.");
 
 
-    // v1.4.21: Test 9 no longer creates, formats, deletes, or repairs a separate
-    // Framework Test 9 sheet. The test is now dashboard-only and writes Section F.
     const theme = getThemeColorsFromBase_(sheetDef.baseColor);
     const results = RFF_MONTHLY_CHANGE_SUBSECTIONS.map(function(label) {
       return {
@@ -5726,7 +5270,6 @@ function writeFrameworkTest9Summary_(sheet, results, colCount) {
   sheet.getRange(startRow, 1, 1, 3).setFontWeight("bold").setBackground("#B7DEE8");
 
 
-  // Fixed widths avoid slow auto-resize during framework tests.
   const widths = [190, 90, 420, 120, 120, 120];
   for (let i = 0; i < Math.min(colCount, widths.length); i++) {
     try {
@@ -5738,19 +5281,13 @@ function writeFrameworkTest9Summary_(sheet, results, colCount) {
 }
 
 
-/* ============================================================================
- * VALIDATION
- * ========================================================================== */
-
 function normalizeNumberFormatForCompare_(format) {
   let text = String(format || "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "");
 
-  // Google Sheets may persist equivalent date formats with locale/currency/color
-  // sections or with trailing text sections. Normalize those wrappers before the
-  // governed date comparison so Section G does not fail on equivalent formats.
+
   text = text
     .replace(/\[\$-[^\]]+\]/g, "")
     .replace(/\[[^\]]+\]/g, "")
@@ -5780,7 +5317,7 @@ function validateTemplateFromDashboard_(dashboard, sheetDef, options) {
   const issues = [];
   const globals = dashboard.globals;
   const expectedHeaders = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
-  const behavior = dashboard.behaviors[sheetDef.sheetType] || getDefaultBehavior_();
+  const behavior = getBehaviorForSheetType_(dashboard, sheetDef.sheetType);
   const colCount = Math.max(expectedHeaders.length, 4);
   const rowCount = resolveTemplateRowCount_(sheetDef, globals);
   const expectedSignature = normalizeTemplateFormatSignature_(buildTemplateFormatSignature_(dashboard, sheetDef, expectedHeaders, rowCount, colCount, behavior));
@@ -5812,8 +5349,8 @@ function validateTemplateFromDashboard_(dashboard, sheetDef, options) {
           issues: "OK"
         };
       }
-      // Signature drift should trigger template refresh, not fail Section F structure validation.
-      // Structural checks below remain authoritative for Dashboard Quality Section F.
+
+
     } catch (err) {
       issues.push("Could not compare template signature: " + err.message);
     }
@@ -5836,7 +5373,6 @@ function validateTemplateFromDashboard_(dashboard, sheetDef, options) {
   } catch (err) {
     issues.push("Could not check frozen settings: " + err.message);
   }
-
 
 
   try {
@@ -5919,39 +5455,6 @@ function writeTemplateValidationReport_(results, options) {
   deleteLegacyQualityReportSheet_(RFF_VALIDATION_SHEET);
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_FORMATTERS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - FORMATTERS
- *
- * Scope:
- * - User-facing formatter workflows for Raw Data, Demo P, CP Due Date, and Unlocked Care Plan.
- * - Template-copy / fast-output handoff code used by formatter workflows.
- * - Formatter source-sheet preparation and approved sync-column updates.
- * - Final row-height lock calls so generated sheets retain governed global defaults.
- *
- * Diff hygiene:
- * - This file is intentionally limited to the formatter section only.
- * - Do not move archive/report/spec/binary files into this diff.
- * - Banners formatting remains owned by the dashboard/template authority module.
- */
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: DEMO_P_RAW_HEADERS (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: DEMO_P_OPTIONAL_SYNC_HEADERS (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: DEMO_P_FORMAT_HEADERS (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: DEMO_P_TEMPLATE_DATE_HEADERS (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: DEMO_P_BANNER_SYNC_HEADERS (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_FORMATTERS.txt
-// ============================================================================
 
 function formatRawData() {
   const sourceSheet = SpreadsheetApp.getActiveSheet();
@@ -6059,8 +5562,6 @@ function ensureRawDataHeaderRows_(sheet) {
   }
 
 
-  // If neither row clearly looks like the source header, do not destructively
-  // move rows. The existing formatter will surface missing-header errors later.
 }
 
 function rowLooksLikeParticipantHeader_(row) {
@@ -6081,11 +5582,8 @@ function getRawDataCurrentHeadersOrDefaults_(sheet) {
 }
 
 function enforceDemoPStrictDashboardSchema_(sheet) {
-  /*
-   * v1.4.24:
-   * This function no longer inserts or deletes columns. Dashboard Section C is
-   * the column authority; Template Header Audit reports drift.
-   */
+
+
   if (!sheet) return;
 
 
@@ -6126,25 +5624,11 @@ function enforceDemoPStrictDashboardSchema_(sheet) {
   clearSheetRuntimeCachesForSheet_(sheet);
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: processDemoP (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: processDemoPAsWorkingSource_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: markPrimaryPMRRowsForSequentialData_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: assignPrimaryPMRRowsInData_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: formatDemoPStructure (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: buildRawDataSheetName_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
 
 function buildRawDataSourceArchiveName_(monthParts) {
   return "Raw Data - Source " + Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy");
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: getOrCreateDemoPProcessingSheet_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: deleteSheetIfExistsForDemoPProcess_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
 
 const ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_ = {
   pmrsRemoved: 0,
@@ -6152,23 +5636,6 @@ const ML_LAST_RAW_DATA_DISENROLLED_BUILD_RESULT_ = {
   rowsCopied: 0
 };
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: getLastRawDataDisenrolledBuildResult_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: setLastRawDataDisenrolledBuildResult_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: createDisenrolledList (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: createDisenrollmentList (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: createActiveDemoPFromRawData_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: populateDemoPUpdateColumns_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: verifyPrimaryPMRColumnFromRawData_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: splitRawDataRowsIntoActiveAndDisenrolled_ (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: loadDisenrolledPMRSetForMonth_ (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
 
 function mapRowsToHeaders_(sourceRows, sourceHeaders, targetHeaders) {
   const sourceHeaderMap = buildHeaderIndexMap_(sourceHeaders || []);
@@ -6331,25 +5798,6 @@ function ensureOutputSheetHasFormattedRows_(sheet, requiredRows, width) {
   }
 }
 
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: appendDisenrolledRowsFromRawDataToExclusion_ (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: moveDisenrolledPMRsFromDemoPToExclusion_ (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: appendDisenrolledPMRBlocksToExclusion_ (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: createDisenrolledExclusionSheetFromDashboardTemplate_ (owned by v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: createOrRefreshDemoPTemplate_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: getOrCreateDemoPTemplate_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: initializeDemoPTemplateTitleRows_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: applyDemoPTemplateFormatting_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: applyDemoPTemplateToSheet_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
-
-// Duplicate declaration omitted from v1.5.55_Rebuild_FORMATTERS.txt: applyDemoPDateFormattingByHeader_ (owned by v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt)
 
 function syncDemoPBannerColumns_(demoSheet, monthParts) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -6474,8 +5922,6 @@ function buildSourceMapByCompositeKeyForDemoPBanner_(sheet, headerRow, dataStart
 }
 
 
-/* Removed duplicate function formatBannerReport; v1.0.1 uses dashboard/template authority implementation. */
-
 function formatCarePlanDueReport() {
   return formatCarePlanDueOrUnlockedFromDashboard_(
     RFF_SHEET_TYPES.CARE_PLAN_DUE,
@@ -6530,12 +5976,6 @@ function formatCarePlanDueOrUnlockedFromDashboard_(sheetType, promptTitle, endDa
     markFrameworkStep_(timing, "Move source title/date cells into dashboard title info");
 
 
-    /*
-     * v1.5.47:
-     * Read the active raw import without a local rename, create the governed
-     * formatted output, then archive/delete the raw source only after output
-     * creation succeeds. Formatting is owned by the verified hidden template.
-     */
     prepareCarePlanSourceSheetForDashboardFormat_(sourceSheetOriginal, sheetType, headers);
     markFrameworkStep_(timing, "Prepare raw source structure");
 
@@ -6639,22 +6079,15 @@ function collectAndClearMovedTitleInfoCells_(sheet, sheetType) {
 }
 
 function prepareCarePlanSourceSheetForDashboardFormat_(sheet, sheetType, headers) {
-  /*
-   * v1.4.25:
-   * Source sheet structural cleanup is restricted. This function may no longer
-   * unmerge, show columns, delete cells, or delete empty columns. Care Plan
-   * source/template column structure must come from Dashboard Section C.
-   */
+
+
   if (!sheet) return;
   clearSheetRuntimeCachesForSheet_(sheet);
 }
 
 function prepareRawDataSourceSheetForDashboardFormat_(sheet, headers) {
-  /*
-   * v1.4.24:
-   * Raw Data column additions/removals are dashboard-governed. Do not append
-   * approved columns here; the Format Dashboard Sheet Headers must define them.
-   */
+
+
   if (!sheet) return headers || [];
 
 
@@ -6667,11 +6100,8 @@ function prepareRawDataSourceSheetForDashboardFormat_(sheet, headers) {
 }
 
 function buildRawDataHeadersForFormatting_(sheet, fallbackHeaders) {
-  /*
-   * v1.4.24:
-   * Return current/template headers only. Do not append columns outside the
-   * dashboard Sheet Headers table.
-   */
+
+
   const currentHeaders = getHeaders_(sheet, HEADER_ROW)
     .map(function(header) { return String(header || "").trim(); })
     .filter(function(header) { return header !== ""; });
@@ -6706,12 +6136,6 @@ function processRawDataApprovedSyncColumns_(sheet, monthParts) {
   markPrimaryPMRRowsForSequentialData_(data);
 
 
-  /*
-   * v1.5.47 correction:
-   * Format Raw Data only owns Primary PMR Row. Banner safety fields are no
-   * longer populated from this formatter, so do not look up or notify on a
-   * Banners sheet during Raw Data formatting.
-   */
   writeChangedColumnsOnly_(sheet, data, beforeValues);
   clearSheetRuntimeCachesForSheet_(sheet);
 }
@@ -6764,9 +6188,8 @@ function writeChangedColumnsOnly_(sheet, data, beforeValues) {
 }
 
 function getRawDataDemoPSourceHeaders_() {
-  // v1.3.11 Raw Data source schema. This intentionally stops before
-  // Process Demo P output columns. Demo P may add working-source columns;
-  // Raw Data may not.
+
+
   return [
     "Last Name",
     "First Name",
@@ -6878,11 +6301,8 @@ function getRawDataDisallowedWorkingColumns_() {
 }
 
 function removeDisallowedRawDataWorkingColumns_(sheet) {
-  /*
-   * v1.4.24:
-   * Raw Data column removals are governed by Dashboard Section C/template
-   * rebuilds only. Runtime processing no longer deletes columns.
-   */
+
+
   return 0;
 }
 
@@ -6914,39 +6334,6 @@ function buildDashboardOutputSheetName_(sheetDef, monthParts) {
   return safeSheetName_(name);
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - DEMO P FUNCTIONS Section
- *
- * Depends on:
- * - CONFIGURATION rebuild section for shared constants and sheet-type values.
- * - HELPER FUNCTIONS rebuild section for dashboard, date, PMR, hash, and sheet helpers.
- * - FORMATTERS/TEMPLATE sections for dashboard-governed output formatting.
- *
- * Purpose:
- * - Build and update the ongoing Demo P processed participant source sheet.
- * - Preserve Raw Data as the import snapshot while Demo P becomes the active participant working source.
- * - Add universal metadata fields and PMR-level source hashes for future metadata-driven Monthly Change logic.
- * - Keep Care Plan Due and Unlocked Care Plan sync ownership out of Demo P; those remain Master List sync functions.
- */
-
-// ============================================================================
-// DEMO P FUNCTIONS
-// ============================================================================
-
-
-
-// -----------------------------------------------------------------------------
-// Demo P header sets and metadata columns
-// -----------------------------------------------------------------------------
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// ============================================================================
 
 const DEMO_P_RAW_HEADERS = [
   "Last Name",
@@ -7053,11 +6440,6 @@ const DEMO_P_BANNER_SYNC_HEADERS = [
 ];
 
 
-
-// -----------------------------------------------------------------------------
-// Dashboard Section C Demo P metadata headers
-// -----------------------------------------------------------------------------
-
 function getDefaultDemoPMetadataHeaderRows_v155_() {
   return [
     h_("Demo P Update Status", "Process"),
@@ -7074,11 +6456,6 @@ function getDefaultDemoPMetadataHeaderRows_v155_() {
   ];
 }
 
-
-
-// -----------------------------------------------------------------------------
-// Demo P build/update workflow
-// -----------------------------------------------------------------------------
 
 function processDemoP() {
   const monthParts = promptForLockedYearReportMonth_("Process Demo P");
@@ -7187,15 +6564,6 @@ function processDemoPAsWorkingSource_(sheet, monthParts, timing, sourceSheetName
   const data = getDataValues_(sheet, HEADER_ROW, DATA_START_ROW);
   markRuntimeStep_(timing, "Demo P Working Source - read Demo P data range");
   if (!data.values.length) return;
-
-
-  /*
-   * v1.4.23:
-   * Primary PMR Row is assigned during Format Raw Data and copied into Demo P.
-   * Do not verify, rescan, or reassign Primary PMR ownership here.
-   * Banner values are also sourced from Raw Data; do not sync a newest Banners sheet
-   * into Demo P memory during this process.
-   */
 
 
   updateBannerColumnData_(data, null);
@@ -7610,15 +6978,12 @@ function verifyPrimaryPMRColumnFromRawData_(data) {
   if (idx === undefined) {
     throw new Error("Demo P requires Primary PMR Row from Raw Data. Run Format Raw Data first.");
   }
-  // Do not rescan or reassign PMR blocks here. Raw Data is the source of truth.
+
 }
 
 function createOrRefreshDemoPTemplate_(ss) {
-  /*
-   * v1.4.25:
-   * Legacy Demo P template builder is restricted. All templates, including
-   * Demo P, must build through the shared dashboard template pipeline.
-   */
+
+
   const dashboard = loadDashboardConfig_();
   const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DEMO_P);
   return createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, null);
@@ -7677,7 +7042,7 @@ function applyDemoPTemplateToSheet_(targetSheet, monthParts) {
   const dashboard = loadDashboardConfig_();
   const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.DEMO_P);
   const headers = getHeadersForSheetType_(dashboard, SHEET_TYPE.DEMO_P);
-  const behavior = dashboard.behaviors[sheetDef.sheetType] || getDefaultBehavior_();
+  const behavior = getBehaviorForSheetType_(dashboard, sheetDef.sheetType);
 
 
   enforceDemoPStrictDashboardSchema_(targetSheet);
@@ -7739,41 +7104,6 @@ function applyDemoPDateFormattingByHeader_(sheet) {
   }
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_SYNC_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - SYNC FUNCTIONS Section
- *
- * Depends on:
- * - CONFIGURATION rebuild section for sheet names, row constants, and sync header constants.
- * - HELPER FUNCTIONS rebuild section for sheet lookup, header, data, PMR, and key normalization helpers.
- * - Workflow sections for source/output sheet creation and caller orchestration.
- *
- * Purpose:
- * - Own cross-report synchronization helpers for Master List monthly sources.
- * - Keep Banner fields available through upstream Raw Data / Demo P working-data processing.
- * - Keep Care Plan Due and Unlocked Care Plan synchronization owned by Master List.
- * - Do not own Monthly Change metadata/hash generation; Monthly Change consumes Demo P metadata.
- * - Preserve Primary PMR row governance and month-matched source selection.
- * - Keep sync reads/writes batched through source maps and in-memory data where callers provide them.
- */
-
-
-// ============================================================================
-// SYNC FUNCTIONS
-// ============================================================================
-
-
-// -----------------------------------------------------------------------------
-// Sync field definitions
-// -----------------------------------------------------------------------------
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_SYNC_FUNCTIONS.txt
-// ============================================================================
 
 const BANNER_SYNC_FIELDS = [
   "Safety - 2 Person",
@@ -7797,24 +7127,6 @@ const CARE_PLAN_DUE_SYNC_FIELDS = [
   "CP Type"
 ];
 
-// -----------------------------------------------------------------------------
-// Demo P / Banner synchronization governance
-// -----------------------------------------------------------------------------
-/*
- * Current v1.5.55 workflow decision:
- * - Demo P is the ongoing processed participant source.
- * - Demo P builds Banner Summary from Raw Data / Demo P working data.
- * - Do not sync the newest Banners sheet directly into Demo P during Demo P processing.
- * - If Banner fields must affect Monthly Change, the upstream Raw Data / Demo P workflow
- *   must expose those fields before Demo P metadata and source hashes are generated.
- *
- * This section therefore keeps Banner field definitions for Master List sync and
- * shared source-map use, but does not provide an active Demo P sheet-write sync.
- */
-
-// -----------------------------------------------------------------------------
-// In-memory Master List monthly source synchronization
-// -----------------------------------------------------------------------------
 
 function syncMasterListMonthlySourcesIntoData_(data, monthParts, pmrFilter) {
   syncBannerSourceIntoData_(data, monthParts, pmrFilter || null);
@@ -7959,9 +7271,6 @@ function syncRowsFromSourceMapData_(data, sourceMap, config, pmrFilter) {
   });
 }
 
-// -----------------------------------------------------------------------------
-// Source map builders
-// -----------------------------------------------------------------------------
 
 function buildSourceMapBySingleKeyForPart5_(sheet, headerRow, dataStartRow, keyHeader) {
   headerRow = headerRow || HEADER_ROW;
@@ -8042,9 +7351,6 @@ function buildSourceMapByCompositeKeyForPart5_(sheet, headerRow, dataStartRow, k
   return map;
 }
 
-// -----------------------------------------------------------------------------
-// Shared synchronization row/field helpers
-// -----------------------------------------------------------------------------
 
 function shouldProcessRowByPMR_(row, headerMap, pmrFilter) {
 
@@ -8078,9 +7384,6 @@ function normalizeSyncFieldPairs_(fields) {
   });
 }
 
-// -----------------------------------------------------------------------------
-// Sheet-write Master List synchronization (legacy / targeted callers)
-// -----------------------------------------------------------------------------
 
 function syncMasterListFromBanners_(masterSheet, monthParts, pmrFilter) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -8233,24 +7536,6 @@ function syncRowsFromSourceMap_(masterSheet, sourceMap, config, pmrFilter) {
   if (data.range) data.range.setValues(values);
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - DISENROLLMENT FUNCTIONS Section
- * Purpose: own Disenrolled Exclusion List creation/upsert/removal while sourcing processed Demo P rows when possible.
- */
-// ============================================================================
-// DISENROLLMENT FUNCTIONS
-// ============================================================================
-
-// Public entrypoints
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// ============================================================================
 
 function createDisenrolledList() {
   const monthParts = promptForLockedYearReportMonth_("Create Disenrolled List");
@@ -8305,7 +7590,6 @@ function createDisenrollmentList() {
   return createDisenrolledList();
 }
 
-// Classification
 
 function splitRawDataRowsIntoActiveAndDisenrolled_(rawData, disenrolledPMRSet) {
   const headerMap = rawData.headerMap;
@@ -8401,7 +7685,6 @@ function loadDisenrolledPMRSetForMonth_(monthParts) {
   return set;
 }
 
-// Exclusion list writes
 
 function appendDisenrolledRowsFromRawDataToExclusion_(rawSheet, rawHeaders, rowsByPMR, monthParts) {
   if (!rowsByPMR || rowsByPMR.size === 0) return 0;
@@ -8494,8 +7777,8 @@ function appendDisenrolledPMRBlocksToExclusion_(sourceSheet, sourceHeaders, rows
   const width = Math.max(exclusionHeaders.length, 1);
   const startDate = monthParts && monthParts.firstDay ? monthParts.firstDay : getTodayLocalDate_();
   const endDate = monthParts && monthParts.lastDay ? monthParts.lastDay : startDate;
-  // v1.5: The copied dashboard template already owns headers, row count, column count, and formatting.
-  // Do not force row count or clear blank data rows before the first output write.
+
+
   sheet.getRange("A1").setValue(DISENROLLED_EXCLUSION_SHEET);
   sheet.getRange("A2:D2").setValues([["Date:", startDate, "to", endDate]]);
   sheet.getRange(HEADER_ROW, 1, 1, width).setValues([exclusionHeaders]);
@@ -8540,7 +7823,6 @@ function createDisenrolledExclusionSheetFromDashboardTemplate_(ss, monthParts) {
   return sheet;
 }
 
-// Master List exclusion helpers
 
 function loadDisenrolledExclusionPMRsForPart3_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -8600,7 +7882,6 @@ function removeDisenrolledPMRBlocksFromMasterUsingDemoP_(masterSheet, demoSheet)
   return removed;
 }
 
-// Display handoff
 
 function applyDisenrolledExclusionCreateFormattingOnly_(sheet) {
   if (!sheet) return;
@@ -8621,44 +7902,10 @@ function applyDisenrolledExclusionCreateFormattingOnly_(sheet) {
 }
 
 function applyDisenrolledExclusionAlternatingColors_(sheet) {
-  // v1.1.0: Runtime disenrolled coloring removed. Dashboard templates are formatting authority.
+
   return;
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_MONTHLY_CHANGE_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - MONTHLY CHANGE FUNCTIONS Section
- *
- * Depends on:
- * - CONFIGURATION rebuild section for monthly prefixes, sheet type constants, and row constants.
- * - HELPER FUNCTIONS rebuild section for dates, PMR normalization, sheet lookup, and header helpers.
- * - DEMO P FUNCTIONS rebuild section for processed Demo P rows and metadata/hash fields.
- * - TEMPLATE FUNCTIONS AND VALIDATION for dashboard-governed Monthly Change template formatting.
- *
- * Purpose:
- * - Build and validate the Monthly Change Report as the governed delta/audit artifact.
- * - Preserve the current previous/current Demo P comparison path while preparing for metadata/hash-driven input.
- * - Populate Columns With Change so downstream Master List and audit workflows can consume section decisions.
- * - Do not own Master List mutation, Disenrolled output mutation, or Master List Change Log behavior.
- */
-
-
-// ============================================================================
-// MONTHLY CHANGE FUNCTIONS
-// ============================================================================
-
-
-// -----------------------------------------------------------------------------
-// Monthly Change constants and governed field groups
-// -----------------------------------------------------------------------------
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_MONTHLY_CHANGE_FUNCTIONS.txt
-// ============================================================================
 
 const CHANGE_SECTION_ENROLLMENTS = "Enrollments";
 
@@ -8745,9 +7992,6 @@ const RAW_DEMO_P_DISENROLLMENT_FIELDS = [
   "Date of Death"
 ];
 
-// -----------------------------------------------------------------------------
-// Monthly Change source sheet lookup
-// -----------------------------------------------------------------------------
 
 function getCurrentDemoPSheet_(monthParts) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -8759,9 +8003,6 @@ function getPreviousDemoPSheet_(monthParts) {
   return getMonthlySheetByPrefixAndDate_(ss, DEMO_P_PREFIX, monthParts.previousMonthFirstDay, monthParts.previousMonthLastDay);
 }
 
-// -----------------------------------------------------------------------------
-// Monthly Change report header and row helpers
-// -----------------------------------------------------------------------------
 
 function getMonthlyChangeReportHeaders_(sourceHeaders) {
   const headers = sourceHeaders.slice();
@@ -8825,38 +8066,32 @@ function buildMonthlyChangeReportRow_(sourceRow, sourceHeaders, reportHeaders, c
   return convertMonthlyChangeReportDateValues_(output, reportHeaders);
 }
 
-// -----------------------------------------------------------------------------
-// Dashboard-template formatting handoff stubs
-// -----------------------------------------------------------------------------
 
 function applyMonthlyChangeSubsectionFormat_(sheet, row, lastCol) {
-  // v1.1.0: Runtime Monthly Change subsection formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
 function applyMonthlyChangeStandardTopRows_(sheet, lastCol) {
-  // v1.1.0: Runtime Monthly Change top-row formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
 function applyMonthlyChangeAllSubsectionFormats_(sheet, lastCol) {
-  // v1.1.0: Runtime Monthly Change subsection formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
 function formatMonthlyChangeReportSectionSheet_(reportSheet) {
-  // v1.1.0: Runtime Monthly Change formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
 function formatMonthlyChangeDateColumns_(sheet) {
-  // v1.1.0: Runtime date formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
-// -----------------------------------------------------------------------------
-// Monthly Change report build workflow
-// -----------------------------------------------------------------------------
 
 function buildMonthlyChangeReportFromDemoP() {
   const monthParts = promptForLockedYearReportMonth_("Build Monthly Change Report");
@@ -9014,9 +8249,6 @@ function getOrBuildMonthlyChangeReport_(ss, monthParts, currentDemo, previousDem
   return reportSheet;
 }
 
-// -----------------------------------------------------------------------------
-// Demo P comparison and section classification
-// -----------------------------------------------------------------------------
 
 function compareRawDemoPForSectionReport_(previousDemo, currentDemo, monthParts) {
   const previousData = getRawDemoPDataForCompare_(previousDemo);
@@ -9566,9 +8798,6 @@ function displayValueForReport_(value) {
   return value === null || value === undefined ? "" : String(value);
 }
 
-// -----------------------------------------------------------------------------
-// Monthly Change sheet layout and section population
-// -----------------------------------------------------------------------------
 
 function buildMonthlyChangeReportSectionLayout_(reportSheet, sourceSheet, headers, monthParts) {
   const reportHeaders = getMonthlyChangeReportHeaders_(headers);
@@ -9612,7 +8841,7 @@ function buildMonthlyChangeReportSectionLayout_(reportSheet, sourceSheet, header
   for (let col = 1; col <= lastCol; col++) {
     try {
       if (col <= sourceSheet.getLastColumn()) {
-// v1.1.0 removed orphaned legacy formatting statement.
+
       } else {
         reportSheet;
       }
@@ -9930,9 +9159,6 @@ function findNextMonthlyChangeSectionTitleRow_(sheet, afterRow) {
   return -1;
 }
 
-// -----------------------------------------------------------------------------
-// Monthly Change report readers and validation
-// -----------------------------------------------------------------------------
 
 function getChangedPMRsFromMonthlyChangeReport_(reportSheet) {
   const result = new Map();
@@ -10180,24 +9406,6 @@ function writeDiagnosticReport_(sheetName, title, monthParts, summaryHeaders, su
   sheet.getRange(4, 1, Math.max(lastRow - 3, 1), lastCol);
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_MASTER_LIST_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - MASTER LIST FUNCTIONS Section
- * Purpose: create and update the governed Master List output from processed Demo P, Monthly Change, Disenrollment, and sync sources.
- */
-// ============================================================================
-// MASTER LIST FUNCTIONS
-// ============================================================================
-
-// Monthly update orchestration
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_MASTER_LIST_FUNCTIONS.txt
-// ============================================================================
 
 function runMonthlyUpdate() {
   const monthParts = promptForLockedYearReportMonth_("Monthly Update");
@@ -10320,7 +9528,6 @@ function updateMasterListForMonth_(monthParts) {
   }
 }
 
-// Create Master List
 
 function createMasterList() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -10450,14 +9657,8 @@ function copyPrimaryDemoPRowsToMasterListByHeader_(demoSheet, masterSheet, month
     return output;
   }
   let output = buildOutputRows_("primary");
-  /*
-   * v1.5.1:
-   * Master List creation depends on Primary PMR Row when available. Some v1.5
-   * runs produced processed Demo P sheets where the Primary PMR Row column existed
-   * but was blank, which caused an empty Master List. Preserve Primary PMR
-   * governance first, then fall back to one row per PMR using DOB/first-row
-   * selection only when no primary rows are detected.
-   */
+
+
   if (output.length === 0) output = buildOutputRows_("dob");
   if (output.length === 0) output = buildOutputRows_("first");
   if (output.length > 0) {
@@ -10508,24 +9709,17 @@ function fillMasterListMetadataColumns_(sheet, monthParts, sourceSheetName, stat
   });
 }
 
-// Template and sheet handoff
 
 function getMasterListTemplateHeaders_() {
-  /*
-   * v1.4.24:
-   * Legacy Master List template helper now defers to Dashboard/App C header
-   * defaults instead of COLUMN_FORMATS or MASTER_LIST_ADDED_HEADERS.
-   */
+
+
   return (getDefaultHeaderSets_()[RFF_SHEET_TYPES.MASTER_LIST] || [])
     .map(function(item) { return item.header; });
 }
 
 function createOrRefreshMasterListTemplate_(ss) {
-  /*
-   * v1.4.25:
-   * Legacy Master List template builder is restricted. All templates, including
-   * Master List, must build through the shared dashboard template pipeline.
-   */
+
+
   const dashboard = loadDashboardConfig_();
   const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MASTER_LIST);
   return createOrRefreshTemplateFromDashboard_(dashboard, sheetDef, null);
@@ -10548,8 +9742,8 @@ function createMasterListSheetFromTemplate_(ss, targetName, monthParts) {
   if (!template) {
     throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh Master List Template first.");
   }
-  // v1.4.19: monthly Master List creation must copy the verified template only.
-  // Do not rebuild dashboard formatting during monthly processing.
+
+
   const sheet = template.copyTo(ss);
   sheet.showSheet();
   setMonthlySheetNameFast_(sheet, targetName);
@@ -10571,7 +9765,7 @@ function createMasterListSheetFromTemplate_(ss, targetName, monthParts) {
 }
 
 function applyMasterListTemplateFormatting_(sheet) {
-  // v1.1.0: Legacy Master List template formatting removed. Dashboard template builder owns formatting.
+
   return;
 }
 
@@ -10603,7 +9797,7 @@ function copyDemoPHeaderRowsToMasterList_(demoSheet, masterSheet, monthParts) {
     if (missingColumns > 0) {
       masterSheet.insertColumnsAfter(masterSheet.getMaxColumns(), missingColumns);
     }
-// v1.1.0 removed orphaned legacy formatting statement.
+
   } catch (err) {
     Logger.log("Column growth skipped while copying Demo P headers: " + err.message);
   }
@@ -10645,7 +9839,7 @@ function formatMasterListSheet_(sheet) {
 }
 
 function applyMasterListTemplateModeUpdateDisplay_(sheet) {
-  // v1.1.0: Runtime Master List update display formatting removed.
+
   return;
 }
 
@@ -10670,11 +9864,10 @@ function updateCopiedMasterListHeader_(sheet, monthParts) {
 }
 
 function applyMasterListTemplateHeaderFormatting_(sheet) {
-  // v1.1.0: Runtime header formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
-// Index and organization
 
 function createIndexSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -10843,8 +10036,8 @@ function getSystemAndTestingSheetNames_() {
   ].forEach(function(name) {
     if (name) names.add(name);
   });
-  // Templates are intentionally excluded. Template visibility is controlled only
-  // by the existing Hide Report Templates / Show Report Templates workflow.
+
+
   return names;
 }
 
@@ -10853,8 +10046,8 @@ function isSystemOrTestingSheet_(sheet) {
   const sheetName = String(sheet.getName() || "").trim();
   const lower = sheetName.toLowerCase();
   const explicitNames = getSystemAndTestingSheetNames_();
-  // Do not treat Template - sheets as system sheets. Templates have their own
-  // separate show/hide menu actions and triggers.
+
+
   return explicitNames.has(sheetName) ||
     lower.indexOf("framework test") !== -1 ||
     lower.indexOf("template validation") !== -1 ||
@@ -10867,7 +10060,6 @@ function isSystemOrTestingSheet_(sheet) {
     lower.indexOf("timing") !== -1;
 }
 
-// Sort/group/display
 
 function assignSortOrderAndHideExtraRows() {
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -10961,11 +10153,8 @@ function assignSortOrderByParticipant_(sheet) {
 }
 
 function ensureSortOrderColumn_(sheet) {
-  /*
-   * v1.4.24:
-   * Do not create Sort Order at runtime. It must exist from the dashboard Sheet
-   * Headers/template definition when a workflow requires it.
-   */
+
+
   const headers = getHeaders_(sheet, HEADER_ROW);
   const idx = headers.indexOf("Sort Order");
   return idx !== -1 ? idx + 1 : -1;
@@ -11257,16 +10446,15 @@ function applyMasterListDisplaySettings_(sheet) {
 }
 
 function enforceMasterListFinalDisplay_(sheet) {
-  // v1.1.0: Runtime display formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
 function lockMasterListRowHeightsAndClip_(sheet) {
-  // v1.1.0: Runtime row-height/wrap formatting removed. Dashboard templates are formatting authority.
+
   return;
 }
 
-// Processing pipeline
 
 function processMasterListFull_(masterSheet, monthParts, pmrFilter, timing) {
   ensureHeaders_(masterSheet, MASTER_LIST_ADDED_HEADERS, HEADER_ROW);
@@ -11431,7 +10619,6 @@ function combineNotesSummaryData_(data, pmrFilter) {
   });
 }
 
-// Monthly Change update actions
 
 function rebuildChangedPMRsFromDemoP_(currentDemo, currentMaster, reportSheet, changedInfo, monthParts, runProcessing) {
   return rebuildChangedPMRsOnExistingMaster_(
@@ -11718,23 +10905,16 @@ function applyMasterListUpdateMetadataToRow_(rowValues, headerMap, monthParts, s
   if (sourceIdx !== undefined) rowValues[sourceIdx] = sourceSheetName || "";
 }
 
-// Source columns
 
 function hideMasterListSourceColumns_(sheet) {
-  /*
-   * v1.4.25:
-   * Runtime Master List column hiding is restricted. Hidden/show settings are
-   * applied only by the dashboard template builder from Section D.
-   */
+
+
   return 0;
 }
 
 function showMasterListSourceColumns_(sheet) {
-  /*
-   * v1.4.25:
-   * Runtime Master List column showing is restricted. Hidden/show settings are
-   * applied only by the dashboard template builder from Section D.
-   */
+
+
   return 0;
 }
 
@@ -11754,9 +10934,6 @@ function showCurrentMasterListSourceColumns() {
   notify_("Master List columns shown.");
 }
 
-// -----------------------------------------------------------------------------
-// System sheet menu callbacks
-// -----------------------------------------------------------------------------
 
 function hideSystemSheetsNow() {
   const count = hideSystemSheets_();
@@ -11788,9 +10965,6 @@ function showSystemSheetsNow() {
   notify_("System/testing sheets shown: " + shownCount);
 }
 
-// -----------------------------------------------------------------------------
-// Update Master List merge audit callbacks
-// -----------------------------------------------------------------------------
 
 function runUpdateMasterListMergeAudit() {
   const monthParts = promptForLockedYearReportMonth_("Update Master List Merge Audit");
@@ -12046,7 +11220,7 @@ function buildUpdateMasterListMergeAuditForMonth_(monthParts) {
     endDate: monthParts.lastDay,
     renameSheet: false
   });
-// v1.1.0 removed orphaned legacy formatting statement.
+
   return audit;
 }
 
@@ -12261,7 +11435,7 @@ function buildUpdateMasterListPrimaryRowAuditForMonth_(monthParts) {
     endDate: monthParts.lastDay,
     renameSheet: false
   });
-// v1.1.0 removed orphaned legacy formatting statement.
+
   return audit;
 }
 
@@ -12567,29 +11741,6 @@ function getMergeRowValue_(row, headerMap, possibleHeaders) {
   return "";
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS
- *
- * Scope:
- * - Dashboard Quality startup/workflow orchestration and Format Dashboard verification rows.
- * - Dashboard Quality report shell assembly, section storage, targeted section writes, and styling.
- * - Framework Dashboard summary/signoff/status helpers used by Dashboard Quality.
- * - Framework Health Check entry points and required-function audits.
- *
- * Ownership boundaries:
- * - Does not own Format Dashboard defaults or template builders.
- * - Does not move archive/report/spec/binary files into the active diff.
- * - Deep workflow-verification row collectors remain workflow-owned and are referenced from this section.
- */
-
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt
-// ============================================================================
 
 function runDashboardQualityStartUp() {
   return runFrameworkTimed_("Dashboard Quality Start Up", function(timing) {
@@ -12886,16 +12037,13 @@ function getDashboardQualitySectionLastRunMillis_(sectionKey) {
 }
 
 function dashboardQualitySectionRanWithinLastHour_(sectionKey) {
-  // v1.5: Caching retired; retained as a harmless compatibility helper.
+
   return false;
 }
 
 function runDashboardQualitySectionIfDue_(sectionKey, stepName, fn, timing) {
-  /*
-   * v1.5:
-   * Dashboard Quality caching removed. Quick and Workflow QA are separate menu paths,
-   * so each selected section runs when requested.
-   */
+
+
   fn();
   markFrameworkStep_(timing, stepName + " complete");
   return "RUN";
@@ -13071,12 +12219,6 @@ function repairAllTemplateDateFormats() {
   });
 }
 
-/**
- * v1.4.18: Consolidated Dashboard Quality Report data store.
- * Individual framework tests no longer create/erase separate report sheets.
- * They save compact rows here; the Dashboard Quality Report reads these rows
- * and rewrites only when the combined dashboard is explicitly built.
- */
 
 const RFF_MASTER_LIST_HEALTH_KEY = "Master List Health Check";
 
@@ -13126,13 +12268,6 @@ const RFF_SYSTEM_SHEET_SUBHEADER_COLOR = "#c6dfec";
 
 const RFF_SYSTEM_SHEET_BORDER_COLOR = "#cccccc";
 
-/*
- * v1.5.9 compact system sheet section helpers:
- * - Builds all Dashboard Quality and Framework Timing sections contiguously.
- * - Preserves each section's existing rows when the shell is reverified.
- * - Replaces only the target section body between its title row and the next
- *   section marker so later sections cannot be overwritten by Section A.
- */
 
 const RFF_DASHBOARD_QUALITY_MIN_SECTION_ROWS = 5;
 
@@ -13218,13 +12353,8 @@ function buildDefaultDashboardQualitySectionBlock_(section) {
 }
 
 function normalizeDashboardQualitySectionBlock_(section, block) {
-  /*
-   * v1.5.24:
-   * Dashboard Quality sections are dynamic subheader groups, not fixed blocks.
-   * Each group has one clear Arial 10 row above, a three-row subheader
-   * (section / last updated / detail header), writes data on group row 5,
-   * and keeps two clear rows below the section data.
-   */
+
+
   let rows = trimTrailingBlankRows_(block || []);
   let titleIndex = -1;
   for (let i = 0; i < rows.length; i++) {
@@ -13373,12 +12503,7 @@ function ensureDashboardQualityReportSheet_() {
 function ensureDashboardQualityTemplateShell_(sheet) {
   if (!sheet) return;
 
-  /*
-   * v1.5.11:
-   * Lifecycle refactor. Shell setup is initialization-only.
-   * This legacy wrapper now repairs only missing/incomplete structure and does
-   * not rebuild a valid report during population.
-   */
+
   if (!hasDashboardQualityTemplateShell_(sheet)) {
     rebuildDashboardQualityReportShellCompact_(sheet);
   }
@@ -13601,9 +12726,7 @@ function getMostRecentTimingDurationForSectionKey_(sectionKey) {
     for (let i = values.length - 1; i >= 0; i--) {
       if (String(values[i][1] || "") !== processName) continue;
 
-      // Timing Report columns:
-      // A Timestamp, B Process, C Step, D Step Seconds, E Total Seconds, F Severity, G Details.
-      // Dashboard Quality duration must summarize the process total, not the last step duration.
+
       return values[i][4] || values[i][3] || "";
     }
   } catch (err) {
@@ -14033,7 +13156,7 @@ function dashboardQualitySectionContentMatches_(range, output) {
     if (existing.length !== output.length) return false;
     for (let r = 0; r < output.length; r++) {
       for (let c = 0; c < output[r].length; c++) {
-        if (r === 2 && c === 1) continue; // Last Updated timestamp changes every run.
+        if (r === 2 && c === 1) continue;
         const oldValue = existing[r] && existing[r][c] instanceof Date ? existing[r][c].getTime() : String(existing[r] && existing[r][c] !== undefined ? existing[r][c] : "");
         const newValue = output[r] && output[r][c] instanceof Date ? output[r][c].getTime() : String(output[r] && output[r][c] !== undefined ? output[r][c] : "");
         if (oldValue !== newValue) return false;
@@ -14256,9 +13379,6 @@ function getReportFailureNotes_(sheetName, statusCol) {
   return notes.length ? notes.slice(0, 5).join(" ; ") : "OK";
 }
 
-/* ============================================================================
- * FRAMEWORK HEALTH CHECK
- * ========================================================================== */
 
 function runFrameworkHealthCheck() {
   return runFrameworkTimed_("Framework Health Check", function(timing) {
@@ -14421,18 +13541,6 @@ function getRequiredFrameworkDashboardFunctionNames_() {
   ];
 }
 
-/**
- * v1.5.54 Dashboard Quality Section N
- * Workflow & Synchronization Verification
- *
- * Purpose:
- * - Verify the downstream Demo P processing steps that were stable in v1.4.23.
- * - Verify month-matched CP Due / Unlocked CP synchronization using the Master List month.
- * - Verify Primary PMR assignment is completed on Demo P.
- *
- * This is verification only. It does not alter Demo P, Master List, CP Due, Unlocked CP,
- * Banner, Monthly Change, or Disenrolled data.
- */
 
 function runWorkflowSyncVerification() {
   return runDashboardQualityWorkflowSyncVerification_();
@@ -14447,9 +13555,6 @@ function runDashboardQualityWorkflowSyncVerification_() {
   });
 }
 
-// -----------------------------------------------------------------------------
-// Framework startup verification entrypoint
-// -----------------------------------------------------------------------------
 
 function setupSystemSheets() {
   const result = initializeSystemSheets_();
@@ -14503,54 +13608,18 @@ function verifyFrameworkConfiguration() {
   });
 }
 
-// ============================================================================
-// SOURCE SECTION: v1.5.55_Rebuild_MENU_FUNCTIONS.txt
-// ============================================================================
-
-/**
- * Master List Framework v1.5.55 Rebuild Candidate - MENU FUNCTIONS Section
- *
- * Depends on:
- * - CONFIGURATION rebuild section for release/version constants.
- * - Later owner sections for callback implementations.
- *
- * Purpose:
- * - Own only Apps Script menu construction and public menu callback registration.
- * - Do not own workflow implementation, dashboard logic, template logic, QA logic, or timing logic.
- * - Callback functions remain in their owning sections.
- */
-
-// ============================================================================
-// MENU FUNCTIONS
-// ============================================================================
-
-// -----------------------------------------------------------------------------
-// Menu callback registry
-// -----------------------------------------------------------------------------
-// This registry documents every callback used by onOpen(). It is validation metadata;
-// callback implementations belong to their owner sections, not this menu section.
 
 const ML_MENU_CALLBACKS = Object.freeze({
   startUp: Object.freeze([
-    "verifyFrameworkConfiguration",
-
-// ============================================================================
-// SOURCE: v1.5.55_Rebuild_MENU_FUNCTIONS.txt
-// ============================================================================
-
-const ML_MENU_CALLBACKS = Object.freeze({
-  startUp: Object.freeze([
-    "verifyFrameworkConfiguration",
     "setupSystemSheets",
-    "setupReportFormattingDashboardFromScriptDefaults_",
+    "rebuildFormatDashboardDefaults",
     "runDashboardQualityStartUp",
     "createOrRefreshAllReportTemplates",
     "runDashboardQualityValidateTemplates"
   ]),
   setup: Object.freeze([
-    "verifyFrameworkConfiguration",
     "setupSystemSheets",
-    "setupReportFormattingDashboardFromScriptDefaults_",
+    "rebuildFormatDashboardDefaults",
     "createOrRefreshAllReportTemplates"
   ]),
   quality: Object.freeze([
@@ -14584,24 +13653,19 @@ const ML_MENU_CALLBACKS = Object.freeze({
   ])
 });
 
-// -----------------------------------------------------------------------------
-// Apps Script open trigger
-// -----------------------------------------------------------------------------
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
   const startUpMenu = ui.createMenu("Start-Up")
-    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
     .addItem("Set up System Sheets", "setupSystemSheets")
-    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
+    .addItem("Rebuild Format Dashboard Defaults", "rebuildFormatDashboardDefaults")
     .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
     .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates");
   const setupMenu = ui.createMenu("Setup")
-    .addItem("Start Up / Verify Framework Configuration", "verifyFrameworkConfiguration")
     .addItem("Set up System Sheets", "setupSystemSheets")
-    .addItem("Rebuild Format Dashboard Defaults", "setupReportFormattingDashboardFromScriptDefaults_")
+    .addItem("Rebuild Format Dashboard Defaults", "rebuildFormatDashboardDefaults")
     .addItem("Create / Refresh All Templates", "createOrRefreshAllReportTemplates");
 
   const qualityMenu = ui.createMenu("Quality")
@@ -14650,58 +13714,3 @@ function onOpen() {
     .addSubMenu(sheetManagementMenu)
     .addToUi();
 }
-
-// ============================================================================
-// DUPLICATE DECLARATIONS OMITTED BY COMBINED SCRIPT GENERATOR
-// ============================================================================
-// getDefaultBehavior_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadDashboardConfig_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// buildDashboardSectionIndex_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadGlobalSettings_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadTitleRows_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// parseTitleRowConfigRow_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// getTitleRowConfigForSheet_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// getThemeFillForTitleRow_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// toWrapStrategy_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadSheetDefinitions_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadSheetHeaders_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadColumnDefinitions_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// loadSheetBehaviors_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// normalizeDashboardSectionTitle_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// readDashboardSectionRows_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// getBehaviorForSheetType_: omitted from v1.5.55_Rebuild_FORMAT_DASHBOARD_GLOBAL_DEFAULTS.txt; loaded from v1.5.55_Rebuild_TEMPLATE_FUNCTIONS_AND_VALIDATION.txt
-// mapRowsToHeaders_: omitted from v1.5.55_Rebuild_HELPER_FUNCTIONS.txt; loaded from v1.5.55_Rebuild_FORMATTERS.txt
-// writeChangedColumnsOnly_: omitted from v1.5.55_Rebuild_HELPER_FUNCTIONS.txt; loaded from v1.5.55_Rebuild_FORMATTERS.txt
-// forceSheetRowCount_: omitted from v1.5.55_Rebuild_HELPER_FUNCTIONS.txt; loaded from v1.5.55_Rebuild_DASHBOARD_QUALITY_AND_FRAMEWORK_DASHBOARD_FUNCTIONS.txt
-// DEMO_P_RAW_HEADERS: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// DEMO_P_OPTIONAL_SYNC_HEADERS: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// DEMO_P_FORMAT_HEADERS: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// DEMO_P_TEMPLATE_DATE_HEADERS: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// DEMO_P_BANNER_SYNC_HEADERS: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// processDemoP: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// processDemoPAsWorkingSource_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// markPrimaryPMRRowsForSequentialData_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// assignPrimaryPMRRowsInData_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// formatDemoPStructure: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// buildRawDataSheetName_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// getOrCreateDemoPProcessingSheet_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// deleteSheetIfExistsForDemoPProcess_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// getLastRawDataDisenrolledBuildResult_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// setLastRawDataDisenrolledBuildResult_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// createDisenrolledList: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// createDisenrollmentList: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// createActiveDemoPFromRawData_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// populateDemoPUpdateColumns_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// verifyPrimaryPMRColumnFromRawData_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// splitRawDataRowsIntoActiveAndDisenrolled_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// loadDisenrolledPMRSetForMonth_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// appendDisenrolledRowsFromRawDataToExclusion_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// moveDisenrolledPMRsFromDemoPToExclusion_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// appendDisenrolledPMRBlocksToExclusion_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// createDisenrolledExclusionSheetFromDashboardTemplate_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DISENROLLMENT_FUNCTIONS.txt
-// createOrRefreshDemoPTemplate_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// getOrCreateDemoPTemplate_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// initializeDemoPTemplateTitleRows_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// applyDemoPTemplateFormatting_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// applyDemoPTemplateToSheet_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
-// applyDemoPDateFormattingByHeader_: omitted from v1.5.55_Rebuild_FORMATTERS.txt; loaded from v1.5.55_Rebuild_DEMO_P_FUNCTIONS.txt
