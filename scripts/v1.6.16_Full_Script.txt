@@ -141,7 +141,7 @@ const BANNER_REPORT_ALT_PREFIX = "Banner Report";
 
 const UNLOCKED_PREFIX = "Unlock CP";
 
-const CARE_PLAN_DUE_PREFIX = "CP Due Date";
+const CARE_PLAN_DUE_PREFIX = "CP Due";
 
 const CARE_PLAN_DUE_DATE_ALT_PREFIX = "Care Plan Due Date Report";
 
@@ -2337,7 +2337,8 @@ function buildFrameworkTimingProcessSummaryRows_(detailRows) {
         worstSeverity: "OK",
         firstTimestamp: runInfo.started || timestamp,
         lastTimestamp: timestamp,
-        mode: ""
+        mode: "",
+        hasError: false
       };
     }
 
@@ -2346,6 +2347,7 @@ function buildFrameworkTimingProcessSummaryRows_(detailRows) {
     item.runtime += stepSeconds;
     item.lastTimestamp = timestamp || item.lastTimestamp;
     item.mode = mergeFrameworkTimingModes_(item.mode, mode);
+    if (/^error\b/i.test(normalizedStep)) item.hasError = true;
     if (severity !== "OK") item.slowSteps += 1;
     item.worstSeverity = worseTimingSeverity_(item.worstSeverity, severity);
   });
@@ -2361,10 +2363,10 @@ function buildFrameworkTimingProcessSummaryRows_(detailRows) {
     const benchmark = getFrameworkTimingBenchmarkForProcess_(item.process, item.mode);
     const variance = benchmark ? item.runtime - benchmark : "";
     const benchmarkSeverity = getFrameworkTimingBenchmarkSeverity_(item.runtime, benchmark);
-    const status = worseTimingSeverity_(item.worstSeverity, benchmarkSeverity);
+    const status = item.hasError ? "CRITICAL" : (benchmark ? benchmarkSeverity : item.worstSeverity);
     const notes = [];
     if (item.firstTimestamp) notes.push("Run Started: " + formatTimingTimestampForSummary_(item.firstTimestamp));
-    if (item.mode) notes.push("Mode: " + item.mode);
+    if (item.mode) notes.push("Mode: " + item.mode + " benchmark applied");
     if (variance !== "" && variance > 0) notes.push("Exceeded benchmark by " + Number(variance.toFixed(3)) + " sec");
     if (item.slowSteps) notes.push(item.slowSteps + " slow/bottleneck/critical step(s)");
     if (!notes.length) notes.push("Within target");
@@ -7423,6 +7425,14 @@ function removeDisallowedRawDataWorkingColumns_(sheet) {
   return 0;
 }
 
+function isOngoingOutputSheetType_(sheetType) {
+  const value = String(sheetType || "").trim();
+  return value === SHEET_TYPE.DEMO_P ||
+    value === RFF_SHEET_TYPES.DEMO_P ||
+    value === SHEET_TYPE.DISENROLLED_EXCLUSION ||
+    value === RFF_SHEET_TYPES.DISENROLLED;
+}
+
 function buildDashboardOutputSheetName_(sheetDef, monthParts) {
   const pattern = String(sheetDef.outputNamingPattern || sheetDef.reportTitle || sheetDef.sheetType || "").trim();
   const monthText = Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy");
@@ -7443,7 +7453,7 @@ function buildDashboardOutputSheetName_(sheetDef, monthParts) {
     .replace(/end/gi, fullEnd);
 
 
-  if (name === pattern && name.toLowerCase().indexOf(monthText.toLowerCase()) === -1 && sheetDef.usePromptDate) {
+  if (name === pattern && name.toLowerCase().indexOf(monthText.toLowerCase()) === -1 && sheetDef.usePromptDate && !isOngoingOutputSheetType_(sheetDef.sheetType)) {
     name = name + " " + monthText;
   }
 
