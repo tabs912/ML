@@ -1086,7 +1086,10 @@ function normalizeKeyPart_(value) {
 
 
   if (value instanceof Date && !isNaN(value.getTime())) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyyMMdd");
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return String(year) + month + day;
   }
 
 
@@ -1322,7 +1325,7 @@ function trimOutputSheetToDataSize_(sheet, rowCount, sheetType) {
   if (!sheet) return;
   const dashboard = loadDashboardConfig_();
   const sheetDef = getSheetDefinitionByType_(dashboard, sheetType);
-  const globals = loadGlobalSettings_(dashboard && dashboard.dashboardIndex ? dashboard.dashboardIndex : null);
+  const globals = loadGlobalSettings_(dashboard && dashboard.sectionIndex ? dashboard.sectionIndex : null);
   const templateRows = resolveTemplateRowCount_(sheetDef || { templateRowMode: "FIXED" }, globals || {});
   const desiredRows = Math.max(DATA_START_ROW + Number(rowCount || 0) + 50, templateRows || DATA_START_ROW);
   forceSheetRowCount_(sheet, desiredRows);
@@ -1371,7 +1374,10 @@ function applyFinalRowHeightLock_(sheet, height) {
 
 function normalizeCompareValue_(value) {
   if (value instanceof Date && !isNaN(value.getTime())) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return String(year) + "-" + month + "-" + day;
   }
 
 
@@ -1384,7 +1390,10 @@ function normalizeCompareValue_(value) {
 
   const parsed = coerceToValidDate_(text);
   if (parsed && /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/.test(text)) {
-    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    return String(year) + "-" + month + "-" + day;
   }
 
 
@@ -3359,7 +3368,7 @@ function buildDashboardSectionIndex_(sheet) {
 }
 
 function loadGlobalSettings_(sheet) {
-  sheet = sheet || loadDashboardConfig_().dashboardIndex;
+  sheet = sheet || loadDashboardConfig_().sectionIndex;
   const rows = readDashboardSectionRows_(sheet, RFF_SECTION_GLOBAL);
   const settings = {};
 
@@ -5310,7 +5319,9 @@ function appendMasterListChangeLog_(logRows) {
   const rows = logRows.map(function(row) {
     return Array.isArray(row) ? row : [new Date(), JSON.stringify(row)];
   });
-  const width = Math.max.apply(null, rows.map(function(row) { return row.length; }));
+  const width = rows.reduce(function(maxWidth, row) {
+    return Math.max(maxWidth, row.length);
+  }, 0);
   const normalized = rows.map(function(row) {
     const copy = row.slice();
     while (copy.length < width) copy.push("");
@@ -6777,16 +6788,6 @@ function createRawDataOutputSheetFromTemplateFast_(sheetType, outputName, output
     Logger.log("Raw Data template data-row formatting copy skipped for " + outputName + ": " + err.message);
   }
 
-  try {
-    for (let col = 1; col <= width; col++) {
-      sheet.setColumnWidth(col, template.getColumnWidth(col));
-    }
-    sheet.setFrozenRows(template.getFrozenRows());
-    sheet.setFrozenColumns(template.getFrozenColumns());
-    if (template.getTabColor()) sheet.setTabColor(template.getTabColor());
-  } catch (err) {
-    Logger.log("Raw Data template sheet settings copy skipped for " + outputName + ": " + err.message);
-  }
 
   try {
     sheet.getRange("A1").setValue(sheetDef.reportTitle || normalizedSheetType || outputName);
@@ -14328,7 +14329,9 @@ function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
   ranges = mergeDashboardQualityStyleRanges_(ranges);
 
   const startRow = Math.min.apply(null, ranges.map(function(item) { return item.startRow; }));
-  const endRow = Math.max.apply(null, ranges.map(function(item) { return item.startRow + item.rowCount - 1; }));
+  const endRow = ranges.reduce(function(maxRow, item) {
+    return Math.max(maxRow, item.startRow + item.rowCount - 1);
+  }, 0);
   const rowCount = Math.max(1, Math.min(endRow, lastRow) - startRow + 1);
 
   try {
