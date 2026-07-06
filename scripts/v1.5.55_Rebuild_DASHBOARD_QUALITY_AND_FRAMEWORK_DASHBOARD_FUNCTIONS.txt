@@ -1854,3 +1854,59 @@ function runDashboardQualityWorkflowSyncVerification_() {
     return rows;
   });
 }
+
+// -----------------------------------------------------------------------------
+// Framework startup verification entrypoint
+// -----------------------------------------------------------------------------
+
+function setupSystemSheets() {
+  const result = initializeSystemSheets_();
+  notify_("System sheets setup complete.");
+  return result;
+}
+
+function verifyFrameworkConfiguration() {
+  return runFrameworkTimed_("Start Up / Verify Framework Configuration", function(timing) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    const systemSheets = initializeSystemSheets_();
+    const quality = systemSheets.dashboardQuality;
+    markFrameworkStep_(timing, "System sheets initialized");
+
+    const timingSheet = systemSheets.frameworkTiming;
+    markFrameworkStep_(timing, "Framework Timing Report verified");
+
+    const dashboard = ss.getSheetByName(RFF_DASHBOARD_SHEET);
+
+    if (!dashboard) {
+      const missingRows = [
+        ["Verification Area", "Verification Item", "Expected Value", "Actual Value", "Status", "Severity", "Quality Notes"],
+        ["Format Dashboard", "Sheet Exists", RFF_DASHBOARD_SHEET, "Missing", "FAIL", "Critical", "Create or rebuild Format Dashboard before template creation."]
+      ];
+      saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, missingRows);
+      styleDashboardQualityReport_(quality);
+      writeCombinedFrameworkTimingReport_();
+      markFrameworkStep_(timing, "Format Dashboard missing");
+      return missingRows;
+    }
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_GLOBAL_KEY, collectFormatDashboardGlobalInputVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section A Global Inputs verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_SHEETS_KEY, collectFormatDashboardSheetDefinitionVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section B Sheet Definitions verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_HEADERS_KEY, collectFormatDashboardSheetHeaderVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section C Sheet Headers verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_COLUMNS_KEY, collectFormatDashboardColumnDefinitionVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section D Column Definitions verification written");
+
+    saveDashboardQualitySectionRows_(RFF_DASHBOARD_VERIFY_BEHAVIORS_KEY, collectFormatDashboardSheetBehaviorVerificationRows_(dashboard));
+    markFrameworkStep_(timing, "Section E Sheet Behaviors verification written");
+
+    styleDashboardQualityReport_(quality);
+    writeCombinedFrameworkTimingReport_();
+    markFrameworkStep_(timing, "Framework verification complete");
+  });
+}
