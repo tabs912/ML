@@ -2805,8 +2805,8 @@ function getDefaultSheetDefinitionRows_() {
   ["CP Due Date", "Care Plan Due Date Report", "Template - Care Plan Due", "CP Due mm.yy", "#65CC99", true, "Pulled From Spreadsheet", 500, "FIXED", 365, 135, 500, false],
   ["Unlock CP", "Unlocked Care Plan Report", "Template - Unlocked Care Plan", "Unlock CP mm.yy", "#65CCC3", true, "Pulled From Spreadsheet", 500, "FIXED", 365, 135, 500, false],
   ["Raw Data", "Raw Data", "Template - Raw Data", "Raw Data mm.yy", "#657FCC", true, "Last Day of Prompt Month", 6500, "FIXED", 5937, 563, 6500, false],
-  ["Demo P", "Demo P", "Template - Demo P", "Demo P mm.yy", "#657FCC", true, "Last Day of Prompt Month", 2500, "FIXED", 2125, 375, 2500, false],
-  ["Disenrolled Exclusion", "Disenrolled Exclusion List", "Template - Disenrolled Exclusion", "Disenrolled mm.yy", "#CC65A1", true, "Last Day of Prompt Month", 1000, "FIXED", 725, 75, 1000, false],
+  ["Demo P", "Demo P", "Template - Demo P", "Demo P", "#657FCC", true, "Last Day of Prompt Month", 2500, "FIXED", 2125, 375, 2500, false],
+  ["Disenrolled Exclusion", "Disenrolled Exclusion List", "Template - Disenrolled Exclusion", "Disenrolled", "#CC65A1", true, "Last Day of Prompt Month", 1000, "FIXED", 725, 75, 1000, false],
   ["Master List", "Master List", "Template - Master List", "Master List mm.yy", "#7665CC", true, "Last Day of Prompt Month", 500, "FIXED", 343, 157, 500, false],
   ["Monthly Change", "Monthly Change Report", "Template - Monthly Change", "Monthly Change mm.yy", "#A165CC", true, "Last Day of Prompt Month", 1000, "FIXED", 900, 100, 1000, false],
   ["Master List Change Log", "Master List Change Log", "Template - Master List Change Log", "ML Change Log", "#CC65CC", false, "Last Day Updated", 1000, "FIXED", 750, 250, 1000, false]
@@ -12255,12 +12255,11 @@ function createDisenrolledList() {
     const demoSheet = getCurrentDemoPSheet_(monthParts);
     if (!demoSheet) throw new Error("Demo P sheet was not found. Run Process Demo P first.");
     markRuntimeStep_(timing, "Locate ongoing Demo P sheet");
-    processBlankContactSummariesOnDemoP_(demoSheet, timing);
     const result = moveDisenrolledPMRsFromDemoPToExclusion_(demoSheet, monthParts);
-    markRuntimeStep_(timing, "Copy disenrolled primary rows and remove disenrolled secondary rows: " + result.rowsCopied + " copied, " + result.rowsRemoved + " secondary rows removed");
+    markRuntimeStep_(timing, "Copy disenrolled primary rows and remove all disenrolled Demo P rows: " + result.rowsCopied + " copied, " + result.rowsRemoved + " rows removed");
     setLastRawDataDisenrolledBuildResult_(result);
     writeRuntimeTimingReport_(timing);
-    notify_("Disenrolled List updated from ongoing Demo P.\n" + "PMRs identified: " + result.pmrsRemoved + "\n" + "Primary rows written: " + result.rowsCopied + "\n" + "Secondary Demo P rows removed: " + result.rowsRemoved);
+    notify_("Disenrolled List updated from ongoing Demo P.\n" + "PMRs identified: " + result.pmrsRemoved + "\n" + "Primary rows written: " + result.rowsCopied + "\n" + "Disenrolled Demo P rows removed: " + result.rowsRemoved);
     return result;
   } catch (err) {
     markRuntimeStep_(timing, "ERROR - " + err.message);
@@ -12434,11 +12433,10 @@ function moveDisenrolledPMRsFromDemoPToExclusion_(demoSheet, monthParts) {
   values.forEach(function(row, idx) {
     const pmr = normalizePMR_(row[pmrIdx]);
     if (!pmr || !disenrolledPMRs.has(pmr)) return;
-    if (isPrimaryPMRRowValue_(row[primaryIdx])) {
-      if (!rowsByPMR.has(pmr)) rowsByPMR.set(pmr, [row]);
-    } else {
-      rowsToRemove.push(DATA_START_ROW + idx);
+    if (isPrimaryPMRRowValue_(row[primaryIdx]) && !rowsByPMR.has(pmr)) {
+      rowsByPMR.set(pmr, [row]);
     }
+    rowsToRemove.push(DATA_START_ROW + idx);
   });
   result.pmrsRemoved = disenrolledPMRs.size;
   result.rowsRemoved = rowsToRemove.length;
@@ -13293,12 +13291,12 @@ function runDashboardQualityFull() {
     ensureDashboardQualityReportSheet_();
 
     runDashboardQualitySectionIfDue_(RFF_HEALTH_CHECK_SHEET, "Section H Framework Health Check", runFrameworkHealthCheck, timing);
-    runDashboardQualitySectionIfDue_("Signoff", "Section N Signoff", updateDashboardQualitySignoffSection_, timing);
-    runDashboardQualitySectionIfDue_("Summary", "Section M Summary", updateDashboardQualitySummarySection_, timing);
     runDashboardQualitySectionIfDue_(RFF_PERFORMANCE_SUMMARY_KEY, "Section I Performance Summary", runDashboardQualityPerformanceSummary_, timing);
     runDashboardQualitySectionIfDue_(RFF_MASTER_LIST_HEALTH_KEY, "Section J Master List Health Check", runDashboardQualityMasterListHealthCheck_, timing);
     runDashboardQualitySectionIfDue_(RFF_CP_SYNC_DIAGNOSTICS_KEY, "Section K Care Plan Sync Diagnostics", runDashboardQualityCarePlanSyncDiagnostics_, timing);
     runDashboardQualitySectionIfDue_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, "Section L Workflow & Synchronization Verification", runDashboardQualityWorkflowSyncVerification_, timing);
+    runDashboardQualitySectionIfDue_("Summary", "Section M Summary", updateDashboardQualitySummarySection_, timing);
+    runDashboardQualitySectionIfDue_("Signoff", "Section N Signoff", updateDashboardQualitySignoffSection_, timing);
 
     styleDashboardQualityReport_(ensureDashboardQualityReportSheet_());
     writeCombinedFrameworkTimingReport_();
@@ -14099,8 +14097,8 @@ function buildCombinedFrameworkTestDashboard() {
 }
 
 function updateDashboardQualitySummaryTimingAndSignoffSections_() {
-  updateDashboardQualitySignoffSection_();
   updateDashboardQualitySummarySection_();
+  updateDashboardQualitySignoffSection_();
   writeCombinedFrameworkTimingReport_();
 }
 
@@ -14396,7 +14394,9 @@ function appendCombinedDashboardSignOffRows_(rows) {
   const dashboardAudit = getLiveDashboardAuditStatus_();
   const templateValidation = getLiveTemplateValidationStatus_();
   const frameworkHealth = getLiveFrameworkHealthStatus_();
+  const performance = getStoredSectionStatusAndNotes_(RFF_PERFORMANCE_SUMMARY_KEY, 5);
   const masterHealth = getStoredSectionStatusAndNotes_(RFF_MASTER_LIST_HEALTH_KEY, 2);
+  const carePlanSync = getStoredSectionStatusAndNotes_(RFF_CP_SYNC_DIAGNOSTICS_KEY, 2);
   const workflowVerification = getStoredSectionStatusAndNotes_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, 2);
 
   rows.push([""]);
@@ -14405,7 +14405,9 @@ function appendCombinedDashboardSignOffRows_(rows) {
   rows.push(["Template Validation", templateValidation.status, templateValidation.notes]);
   rows.push(["Date Formatting", getReportOverallStatus_(RFF_TEST6_DATE_FORMAT_SHEET, 7), getReportFailureNotes_(RFF_TEST6_DATE_FORMAT_SHEET, 7)]);
   rows.push(["Framework Health Check", frameworkHealth.status, frameworkHealth.notes]);
+  rows.push(["Performance Summary", performance.status, performance.notes]);
   rows.push(["Master List Health Check", masterHealth.status, masterHealth.notes]);
+  rows.push(["Care Plan Sync Diagnostics", carePlanSync.status, carePlanSync.notes]);
   rows.push(["Workflow & Synchronization Verification", workflowVerification.status, workflowVerification.notes]);
 }
 
@@ -14503,7 +14505,7 @@ function runFrameworkHealthCheck() {
     const results = collectFrameworkHealthCheckRows_();
 
     writeFrameworkHealthCheckReport_(results);
-    markFrameworkStep_(timing, "Dashboard Quality Section I saved");
+    markFrameworkStep_(timing, "Dashboard Quality Section H saved");
 
     const issues = getFrameworkHealthCheckIssueRows_(results);
     if (issues.length) {
@@ -14668,7 +14670,7 @@ function runDashboardQualityWorkflowSyncVerification_() {
   return runFrameworkTimed_("Workflow & Synchronization Verification", function(timing) {
     const rows = collectWorkflowSyncVerificationRows_();
     saveDashboardQualitySectionRows_(RFF_WORKFLOW_SYNC_VERIFICATION_KEY, rows);
-    markFrameworkStep_(timing, "Dashboard Quality Section N saved");
+    markFrameworkStep_(timing, "Dashboard Quality Section L saved");
     return rows;
   });
 }
