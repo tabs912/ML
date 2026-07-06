@@ -4160,9 +4160,9 @@ function applyTitleRows_(sheet, dashboard, sheetDef, theme, colCount) {
 
   sheet.getRange("A2").setValue("Date");
   if (row2.label) sheet.getRange("A2").setValue(row2.label);
-  sheet.getRange("B2").setValue("").setNumberFormat(DATE_SHEET_FORMAT);
+  sheet.getRange("B2").setValue("").setNumberFormat(globals.defaultDateFormat);
   sheet.getRange("C2").setValue("to").setHorizontalAlignment("center");
-  sheet.getRange("D2").setValue("").setNumberFormat(DATE_SHEET_FORMAT);
+  sheet.getRange("D2").setValue("").setNumberFormat(globals.defaultDateFormat);
 }
 
 function applyHeaderRow_(sheet, dashboard, sheetDef, headers, theme, colCount) {
@@ -5111,8 +5111,8 @@ function applyStandardFormatting_(sheet, options) {
   const title = String(options.title || options.sheetType || sheet.getName() || "").trim();
   try {
     if (title) sheet.getRange(1, 1).setValue(title).setFontWeight("bold").setFontSize(14);
-    if (options.startDate) sheet.getRange(2, 2).setValue(options.startDate).setNumberFormat(DATE_SHEET_FORMAT);
-    if (options.endDate) sheet.getRange(2, 4).setValue(options.endDate).setNumberFormat(DATE_SHEET_FORMAT);
+    if (options.startDate) sheet.getRange(2, 2).setValue(options.startDate).setNumberFormat("m/d/yy");
+    if (options.endDate) sheet.getRange(2, 4).setValue(options.endDate).setNumberFormat("m/d/yy");
     if (lastCol > 1) {
       sheet.getRange(1, 1, Math.min(3, lastRow), lastCol)
         .setFontFamily("Arial")
@@ -5690,9 +5690,9 @@ function ensureStandardTitleRows_(sheet) {
     const monthParts = getMonthPartsFromTitleRows_(sheet) || getMonthDateParts_(new Date());
     if (monthParts) {
       sheet.getRange("A2").setValue("Date:");
-      sheet.getRange("B2").setValue(monthParts.firstDay).setNumberFormat(DATE_SHEET_FORMAT);
+      sheet.getRange("B2").setValue(monthParts.firstDay).setNumberFormat("m/d/yy");
       sheet.getRange("C2").setValue("to").setHorizontalAlignment("center");
-      sheet.getRange("D2").setValue(monthParts.lastDay).setNumberFormat(DATE_SHEET_FORMAT);
+      sheet.getRange("D2").setValue(monthParts.lastDay).setNumberFormat("m/d/yy");
     }
   } catch (err) {
     Logger.log("Title row check skipped for " + sheet.getName() + ": " + err.message);
@@ -5767,8 +5767,8 @@ function writeBannerReportDates_(sheet, reportDate) {
   const endDate = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
 
 
-  sheet.getRange("B2").setValue(startDate).setNumberFormat(DATE_SHEET_FORMAT);
-  sheet.getRange("D2").setValue(endDate).setNumberFormat(DATE_SHEET_FORMAT);
+  sheet.getRange("B2").setValue(startDate).setNumberFormat("m/d/yyyy");
+  sheet.getRange("D2").setValue(endDate).setNumberFormat("m/d/yyyy");
 }
 
 function copyRawBannerDataToOutput_(rawSheet, outputSheet) {
@@ -6848,7 +6848,6 @@ function syncRawDataBannerColumns_(rawSheet, monthParts) {
   const rawHeaders = getHeaders_(rawSheet, HEADER_ROW);
   const rawHeaderMap = buildHeaderIndexMap_(rawHeaders);
   const rawPMRIdx = getPMRIndex_(rawHeaderMap);
-  const rawPrimaryIdx = rawHeaderMap["Primary PMR Row"];
   const rawLastNameIdx = rawHeaderMap["Last Name"];
   const rawFirstNameIdx = rawHeaderMap["First Name"];
   if (rawPMRIdx === -1 || rawLastNameIdx === undefined || rawFirstNameIdx === undefined) {
@@ -6872,7 +6871,6 @@ function syncRawDataBannerColumns_(rawSheet, monthParts) {
 
 
   values.forEach(function(row) {
-    if (rawPrimaryIdx !== undefined && !isPrimaryPMRRowValue_(row[rawPrimaryIdx])) return;
     const key = [
       normalizeKeyPart_(row[rawPMRIdx]),
       normalizeKeyPart_(row[rawLastNameIdx]),
@@ -7225,7 +7223,6 @@ function processRawDataApprovedSyncColumns_(sheet, monthParts) {
   if (!sheet) return;
 
 
-  ensurePrimaryPMRRowColumn_(sheet);
   const data = getDataValues_(sheet, HEADER_ROW, DATA_START_ROW);
   if (!data.values.length) return;
 
@@ -11049,9 +11046,9 @@ function combineNotesSummaryData_(data, pmrFilter) {
   const notesIdx = headerMap["Notes"];
   if (notesIdx === undefined) return;
   const sourceHeaders = [
-    "Additional Important Information",
+    "Banner Summary",
     "Contact - Summary",
-    "Banner Summary"
+    "Additional Important Information"
   ];
   data.values.forEach(row => {
     if (!shouldProcessRowByPMR_(row, headerMap, pmrFilter)) return;
@@ -12653,8 +12650,6 @@ const RAW_DEMO_P_DISENROLLMENT_FIELDS = [
 
 function getCurrentDemoPSheet_(monthParts) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const workingDemo = ss.getSheetByName(DEMO_P_PREFIX);
-  if (workingDemo) return workingDemo;
   return getMonthlySheetByPrefixAndDate_(ss, DEMO_P_PREFIX, monthParts.firstDay, monthParts.lastDay);
 }
 
