@@ -21,6 +21,10 @@ Thumbs.db
 
 # Archive and report files - managed in ML-Archive repo
 .codexignore/Archive/
-.codexignore/Reports/
+.codexignore/Report/
+.codexignore/Scripts/
+.codexignore/Spec/
+
+
 Report/
 Governance/
