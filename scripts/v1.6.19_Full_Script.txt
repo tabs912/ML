@@ -10585,6 +10585,7 @@ function createIndexSheet() {
 
   addSection_("Templates");
   [
+    RFF_BASE_TEMPLATE_NAME,
     "Template - Banner Report",
     "Template - Care Plan Due",
     "Template - Unlocked Care Plan",
