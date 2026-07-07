@@ -1,5 +1,5 @@
 /**
- * Master List Framework v1.6.16 Full Script
+ * Master List Framework v1.6.17 Full Script
  *
  * Required section structure for this and all future full-script rebuilds:
  * 1. CONFIGURATION
@@ -29,11 +29,11 @@
 // CONFIGURATION
 // ============================================================================
 
-const MASTER_LIST_MERGE_ML_VERSION = "1.6.16";
+const MASTER_LIST_MERGE_ML_VERSION = "1.6.17";
 
 const MASTER_LIST_MERGE_REBUILD_SECTION = "FULL_SCRIPT";
 
-const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6.15";
+const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6.16";
 
 
 const ML_MONTHLY_SHEET_LOOKUP_CACHE_ = {};
@@ -1850,7 +1850,7 @@ function findFrameworkTimingSectionRow_(sheet, sectionTitle) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return 0;
 
-  const values = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  const values = sheet.getRange(1, 1, lastRow, 1).getValues();
   for (let i = 0; i < values.length; i++) {
     if (String(values[i][0] || "").trim() === target) return i + 1;
   }
@@ -1862,7 +1862,7 @@ function findNextFrameworkTimingSectionRow_(sheet, startRow) {
   const lastRow = sheet.getLastRow();
   if (startRow > lastRow) return 0;
 
-  const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getDisplayValues();
+  const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getValues();
   for (let i = 0; i < values.length; i++) {
     const value = String(values[i][0] || "").trim();
     if (/^SECTION [A-Z] - /.test(value)) return startRow + i;
@@ -6861,13 +6861,11 @@ function syncRawDataBannerColumns_(rawSheet, monthParts) {
   }
 
 
-  const rawLastRow = rawSheet.getLastRow();
-  const rawLastCol = rawSheet.getLastColumn();
-  if (rawLastRow < DATA_START_ROW || rawLastCol < 1) return 0;
+  const data = getDataValues_(rawSheet, HEADER_ROW, DATA_START_ROW);
+  if (!data.values.length) return 0;
 
 
-  const rawHeaders = getHeaders_(rawSheet, HEADER_ROW);
-  const rawHeaderMap = buildHeaderIndexMap_(rawHeaders);
+  const rawHeaderMap = data.headerMap;
   const rawPMRIdx = getPMRIndex_(rawHeaderMap);
   const rawPrimaryPMRRowIdx = rawHeaderMap["Primary PMR Row"];
   const rawLastNameIdx = rawHeaderMap["Last Name"];
@@ -6887,13 +6885,21 @@ function syncRawDataBannerColumns_(rawSheet, monthParts) {
   if (bannerMap.size === 0) return 0;
 
 
-  const range = rawSheet.getRange(DATA_START_ROW, 1, rawLastRow - DATA_START_ROW + 1, rawLastCol);
-  const values = range.getValues();
+  const beforeValues = {};
+  BANNER_SYNC_FIELDS.forEach(function(header) {
+    const idx = rawHeaderMap[header];
+    if (idx !== undefined) {
+      beforeValues[idx] = data.values.map(function(row) { return row[idx]; });
+    }
+  });
+
+
   let updatedRows = 0;
 
 
-  values.forEach(function(row) {
+  data.values.forEach(function(row) {
     if (rawPrimaryPMRRowIdx !== undefined && !isPrimaryPMRRowValue_(row[rawPrimaryPMRRowIdx])) return;
+
 
     const key = [
       normalizeKeyPart_(row[rawPMRIdx]),
@@ -6910,7 +6916,9 @@ function syncRawDataBannerColumns_(rawSheet, monthParts) {
       if (targetIdx === undefined) return;
       if (!Object.prototype.hasOwnProperty.call(source, field)) return;
       const newValue = source[field];
-      if (!valuesAreEqual_(row[targetIdx], newValue)) {
+      const cleanOld = String(row[targetIdx] || "").trim().toUpperCase();
+      const cleanNew = String(newValue || "").trim().toUpperCase();
+      if (cleanOld !== cleanNew) {
         row[targetIdx] = newValue;
         changed = true;
       }
@@ -6920,91 +6928,10 @@ function syncRawDataBannerColumns_(rawSheet, monthParts) {
 
 
   if (updatedRows > 0) {
-    range.setValues(values);
+    writeChangedColumnsOnly_(rawSheet, data, beforeValues);
     clearSheetRuntimeCachesForSheet_(rawSheet);
   }
   return updatedRows;
-}
-
-function syncDemoPBannerColumns_(demoSheet, monthParts) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const bannerSheet = getCurrentBannersSheet_(monthParts);
-
-
-  if (!bannerSheet) {
-    notify_("Banners sheet was not found. Demo P Banner sync skipped.");
-    return;
-  }
-
-
-  const demoLastRow = demoSheet.getLastRow();
-  const demoLastCol = demoSheet.getLastColumn();
-
-
-  if (demoLastRow < DATA_START_ROW || demoLastCol < 1) return;
-
-
-  const demoHeaders = getHeaders_(demoSheet, HEADER_ROW);
-  const demoHeaderMap = buildHeaderIndexMap_(demoHeaders);
-
-
-  const demoPMRIdx = getPMRIndex_(demoHeaderMap);
-  const demoLastNameIdx = demoHeaderMap["Last Name"];
-  const demoFirstNameIdx = demoHeaderMap["First Name"];
-
-
-  if (demoPMRIdx === -1 || demoLastNameIdx === undefined || demoFirstNameIdx === undefined) {
-    notify_("Demo P Banner sync skipped: missing Participant PMR#, Last Name, or First Name.");
-    return;
-  }
-
-
-  const bannerMap = buildSourceMapByCompositeKeyForDemoPBanner_(
-    bannerSheet,
-    HEADER_ROW,
-    DATA_START_ROW,
-    ["Participant PMR#", "Last Name", "First Name"]
-  );
-
-
-  if (bannerMap.size === 0) {
-    notify_("Demo P Banner sync skipped: no matching Banner records were found.");
-    return;
-  }
-
-
-  const range = demoSheet.getRange(DATA_START_ROW, 1, demoLastRow - DATA_START_ROW + 1, demoLastCol);
-  const values = range.getValues();
-
-
-  values.forEach(row => {
-    const demoDOBIdx = getDOBIndex_(demoHeaderMap);
-    if (demoDOBIdx !== -1 && normalizeCompareValue_(row[demoDOBIdx]) === "") return;
-
-
-    const key = [
-      normalizeKeyPart_(row[demoPMRIdx]),
-      normalizeKeyPart_(row[demoLastNameIdx]),
-      normalizeKeyPart_(row[demoFirstNameIdx])
-    ].join("|||");
-
-
-    if (!bannerMap.has(key)) return;
-
-
-    const source = bannerMap.get(key);
-
-
-    DEMO_P_BANNER_SYNC_HEADERS.forEach(header => {
-      const targetIdx = demoHeaderMap[header];
-      if (targetIdx === undefined) return;
-      if (!Object.prototype.hasOwnProperty.call(source, header)) return;
-      row[targetIdx] = source[header];
-    });
-  });
-
-
-  range.setValues(values);
 }
 
 function buildSourceMapByCompositeKeyForDemoPBanner_(sheet, headerRow, dataStartRow, keyHeaders) {
@@ -8750,7 +8677,8 @@ function buildMonthlyChangeReportFromDemoPForMonth_(monthParts) {
   const dashboard = loadDashboardConfig_();
   const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MONTHLY_CHANGE);
   const template = ss.getSheetByName(sheetDef.templateName);
-  reportSheet = template ? template.copyTo(ss) : ss.insertSheet(reportName);
+  if (!template) throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh All Templates first.");
+  reportSheet = template.copyTo(ss);
   reportSheet.showSheet();
   setUniqueSheetName_(reportSheet, reportName);
 
@@ -8820,7 +8748,8 @@ function getOrBuildMonthlyChangeReport_(ss, monthParts, currentDemo, previousDem
   const dashboard = loadDashboardConfig_();
   const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MONTHLY_CHANGE);
   const template = ss.getSheetByName(sheetDef.templateName);
-  reportSheet = template ? template.copyTo(ss) : ss.insertSheet(reportName);
+  if (!template) throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh All Templates first.");
+  reportSheet = template.copyTo(ss);
   reportSheet.showSheet();
   setUniqueSheetName_(reportSheet, reportName);
 
@@ -14191,7 +14120,7 @@ function getDashboardQualitySectionBoundsMap_(sheet) {
   if (!sheet) return bounds;
 
   const lastRow = Math.max(sheet.getLastRow(), 1);
-  const values = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  const values = sheet.getRange(1, 1, lastRow, 1).getValues();
   const sectionRows = [];
 
   for (let i = 0; i < values.length; i++) {
@@ -14303,7 +14232,7 @@ function findDashboardQualitySectionRow_(sheet, sectionTitle) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return 0;
 
-  const values = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  const values = sheet.getRange(1, 1, lastRow, 1).getValues();
   for (let i = 0; i < values.length; i++) {
     if (String(values[i][0] || "").trim() === target) return i + 1;
   }
@@ -14313,7 +14242,7 @@ function findDashboardQualitySectionRow_(sheet, sectionTitle) {
 function findNextDashboardQualitySectionRow_(sheet, startRow) {
   const lastRow = sheet.getLastRow();
   if (startRow > lastRow) return 0;
-  const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getDisplayValues();
+  const values = sheet.getRange(startRow, 1, lastRow - startRow + 1, 1).getValues();
   for (let i = 0; i < values.length; i++) {
     const value = String(values[i][0] || "").trim();
     if (/^SECTION [A-Z] - /.test(value)) return startRow + i;
@@ -14368,10 +14297,6 @@ function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
     return section.title;
   });
   const bounds = getDashboardQualitySectionBoundsMap_(sheet);
-  const sectionMap = {};
-  RFF_DASHBOARD_QUALITY_SECTIONS.forEach(function(section) {
-    sectionMap[section.title] = true;
-  });
 
   let ranges = [];
   requested.forEach(function(title) {
@@ -14391,17 +14316,19 @@ function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
 
   try {
     const range = sheet.getRange(startRow, 1, rowCount, width);
-    const values = range.getDisplayValues();
+    const values = range.getValues();
     const backgrounds = [];
     const fontWeights = [];
     const fontStyles = [];
     const fontSizes = [];
 
+    const titleRows = new Set();
+    Object.keys(bounds).forEach(function(key) {
+      titleRows.add(bounds[key].titleRow);
+    });
+
     for (let r = 0; r < rowCount; r++) {
       const absoluteRow = startRow + r;
-      const first = String((values[r] || [])[0] || "").trim();
-      const previousFirst = r > 0 ? String((values[r - 1] || [])[0] || "").trim() : "";
-      const twoBackFirst = r > 1 ? String((values[r - 2] || [])[0] || "").trim() : "";
       let background = "#FFFFFF";
       let weight = "normal";
       let style = "normal";
@@ -14411,13 +14338,13 @@ function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
         background = RFF_SYSTEM_SHEET_TITLE_COLOR;
         weight = "bold";
         size = 12;
-      } else if (sectionMap[first]) {
+      } else if (titleRows.has(absoluteRow)) {
         background = RFF_SYSTEM_SHEET_SECTION_COLOR;
         weight = "bold";
-      } else if (sectionMap[previousFirst]) {
+      } else if (titleRows.has(absoluteRow - 1)) {
         background = RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
         style = "italic";
-      } else if (sectionMap[twoBackFirst]) {
+      } else if (titleRows.has(absoluteRow - 2)) {
         background = RFF_SYSTEM_SHEET_SUBHEADER_COLOR;
         weight = "bold";
       }
@@ -14874,7 +14801,3 @@ function trimTimingReportRows_(sheet) {
     Logger.log("Timing row trim skipped: " + err.message);
   }
 }
-
-
-
-
