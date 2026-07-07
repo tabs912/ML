@@ -13,22 +13,17 @@ git restore --staged . || true
 git reset --hard HEAD
 git clean -fdx
 
-# 2) Remove only untracked noisy directories/files. Tracked artifacts are left in
-# place so this helper does not create hidden unstaged deletions for excluded
-# directories or binary reference files.
-git clean -fdx -- Archive Report Governance .codexignore node_modules dist build __pycache__ || true
-
-# 3) Detect newest script artifact. Stage exact files only; never stage dirs.
+# 2) Detect newest script artifact. Stage exact files only; never stage dirs.
 NEW_SCRIPT="$(ls -1 scripts/v*_Full_Script.txt 2>/dev/null | sort -V | tail -n 1 || true)"
 
-echo "Newest script: ${NEW_SCRIPT:-none}"
+echo "Newest script found: ${NEW_SCRIPT:-none}"
 
 git restore --staged . || true
 [ -f AGENT.md ] && git add AGENT.md
 [ -f README.md ] && git add README.md
 [ -n "${NEW_SCRIPT:-}" ] && [ -f "$NEW_SCRIPT" ] && git add "$NEW_SCRIPT"
 
-# 4) Enforce STOP policy.
+# 3) Enforce STOP policy.
 FILES=$(git diff --cached --name-only | sed '/^\s*$/d' | wc -l | tr -d ' ')
 LINES=$(git diff --cached --numstat | awk '{a+=$1;d+=$2} END {print a+d+0}')
 
