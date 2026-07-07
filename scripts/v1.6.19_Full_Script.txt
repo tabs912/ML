@@ -1,5 +1,5 @@
 /**
- * Master List Framework v1.6.18 Full Script
+ * Master List Framework v1.6.19 Full Script
  *
  * Required section structure for this and all future full-script rebuilds:
  * 1. CONFIGURATION
@@ -29,11 +29,11 @@
 // CONFIGURATION
 // ============================================================================
 
-const MASTER_LIST_MERGE_ML_VERSION = "1.6.18";
+const MASTER_LIST_MERGE_ML_VERSION = "1.6.19";
 
 const MASTER_LIST_MERGE_REBUILD_SECTION = "FULL_SCRIPT";
 
-const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6.17";
+const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6.18";
 
 
 const ML_MONTHLY_SHEET_LOOKUP_CACHE_ = {};
@@ -13909,9 +13909,8 @@ function applyDashboardQualityReportColumnSettings_(sheet, options) {
       .setBorder(true, true, true, true, true, true, RFF_SYSTEM_SHEET_BORDER_COLOR, SpreadsheetApp.BorderStyle.DOTTED);
 
     sheet.getRange(1, 1, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
-    RFF_DASHBOARD_QUALITY_WRAP_COLUMNS.forEach(function(col) {
-      sheet.getRange(1, col, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
-    });
+    // OPTIMIZATION: Format columns 2 through 7 in one batch API call
+    sheet.getRange(1, 2, lastRow, 6).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
 
     sheet.setFrozenRows(1);
   } catch (err) {
@@ -14621,6 +14620,10 @@ function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
       .setFontWeights(fontWeights)
       .setFontStyles(fontStyles)
       .setFontSizes(fontSizes);
+
+    sheet.getRange(startRow, 1, rowCount, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+    // OPTIMIZATION: Format columns 2 through 8 in one batch API call
+    sheet.getRange(startRow, 2, rowCount, 7).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
   } catch (err) {
     Logger.log("Dashboard Quality section styling skipped: " + err.message);
   }
