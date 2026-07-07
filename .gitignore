@@ -1,10 +1,20 @@
-
 # Codex generated files
 Archive/
+Report/
+Governance/
 .codexignore/
+.codexignore/**
+
 nu.pdf
 *.pdf
 *.log
+*.xlsx
+*.docx
+*.pptx
+*.png
+*.jpg
+*.jpeg
+*.zip
 
 # Build and cache
 node_modules/
@@ -19,12 +29,8 @@ Thumbs.db
 .idea/
 *.swp
 
-# Archive and report files - managed in ML-Archive repo
+# Archive/report mirrors under .codexignore
 .codexignore/Archive/
 .codexignore/Report/
 .codexignore/Scripts/
 .codexignore/Spec/
-
-
-Report/
-Governance/
