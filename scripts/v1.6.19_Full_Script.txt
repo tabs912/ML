@@ -12683,12 +12683,11 @@ function moveDisenrolledPMRsFromDemoPToExclusion_(demoSheet, monthParts) {
   }
 
 
-  // 3. OPTIMIZATION: Skip expensive physical row deletion. Clear trailing rows to drop UI rendering lag.
   if (removedCount > 0) {
     const newLastRow = DATA_START_ROW + keepRows.length - 1;
-    const maxRows = demoSheet.getMaxRows();
-    if (maxRows > newLastRow) {
-      demoSheet.getRange(newLastRow + 1, 1, maxRows - newLastRow, lastCol).clearContent().breakApart();
+    const rowsToDelete = (lastRow - DATA_START_ROW + 1) - keepRows.length;
+    if (rowsToDelete > 0) {
+      demoSheet.deleteRows(newLastRow + 1, rowsToDelete);
     }
   }
 
