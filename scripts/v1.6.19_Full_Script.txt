@@ -1,5 +1,5 @@
 /**
- * Master List Framework v1.6.18 Full Script
+ * Master List Framework v1.6.19 Full Script
  *
  * Required section structure for this and all future full-script rebuilds:
  * 1. CONFIGURATION
@@ -29,11 +29,11 @@
 // CONFIGURATION
 // ============================================================================
 
-const MASTER_LIST_MERGE_ML_VERSION = "1.6.18";
+const MASTER_LIST_MERGE_ML_VERSION = "1.6.19";
 
 const MASTER_LIST_MERGE_REBUILD_SECTION = "FULL_SCRIPT";
 
-const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6.17";
+const MASTER_LIST_MERGE_BASELINE_VERSION = "1.6.18";
 
 
 const ML_MONTHLY_SHEET_LOOKUP_CACHE_ = {};
@@ -1125,7 +1125,8 @@ function getDataValues_(sheet, headerRow, dataStartRow) {
   }
 
 
-  const range = sheet.getRange(dataStartRow, 1, lastRow - dataStartRow + 1, lastCol);
+  // OPTIMIZATION: Restrict rows read to the explicit header boundary column count to eliminate empty cell processing
+  const range = sheet.getRange(dataStartRow, 1, lastRow - dataStartRow + 1, headers.length);
 
 
   return {
@@ -4531,18 +4532,8 @@ function applyAlternatingColorRules_(sheet, range, theme) {
 }
 
 function applyMonthlyChangeSubheaderGuide_(sheet, dashboard, sheetDef, colCount) {
-  const globals = dashboard.globals;
-
-
-  try {
-    let row = globals.dataStartRow + 2;
-    getMonthlyChangeSubsectionLabels().forEach(function(label) {
-      formatMonthlyChangeSubsectionBlock_(sheet, row, label, colCount, dashboard, sheetDef, true);
-      row += 3;
-    });
-  } catch (err) {
-    Logger.log("Monthly Change subheader guide skipped: " + err.message);
-  }
+  // Disabled: Handled natively by the dynamic post-processing engine to prevent structural template corruption.
+  return;
 }
 
 function applyMonthlyChangeSpacerRow3Format_(sheet, spacerRow, colCount, globals) {
@@ -6846,33 +6837,24 @@ function createRawDataOutputSheetFromTemplateFast_(sheetType, outputName, output
   const template = ss.getSheetByName(sheetDef.templateName);
 
   if (!template) {
-    throw new Error("Template not found: " + sheetDef.templateName + ". Run Create / Refresh All Templates first.");
+    throw new Error("Template not found: " + sheetDef.templateName);
   }
 
   deleteSheetIfExists_(ss, outputName, sourceName, sheetDef.templateName);
-  const sheet = template.copyTo(ss);
+
+  // 1. FAST CANVAS: Insert a perfectly blank sheet (zero overhead)
+  const sheet = ss.insertSheet(outputName);
   sheet.showSheet();
-  setUniqueSheetName_(sheet, outputName);
   ss.setActiveSheet(sheet);
 
   const width = Math.max(headers.length, 1);
   const rows = outputRows || [];
   const requiredRows = rows.length ? DATA_START_ROW + rows.length - 1 : DATA_START_ROW;
 
+  // 2. RIGHT-SIZE GRID: Force dimensions before writing to save rendering ticks
   resizeSheetGrid_(sheet, requiredRows, width);
 
-
-  // Template copy already carries title, header, data-row, border, and color formatting.
-  // Do not repaint the full Raw Data grid here.
-  try {
-    sheet.getRange("A1").setValue(sheetDef.reportTitle || normalizedSheetType || outputName);
-    if (firstDay) sheet.getRange("B2").setValue(firstDay);
-    if (endDate) sheet.getRange("D2").setValue(endDate);
-    if (headers.length) sheet.getRange(HEADER_ROW, 1, 1, width).setValues([headers]);
-  } catch (err) {
-    Logger.log("Raw Data output metadata skipped for " + outputName + ": " + err.message);
-  }
-
+  // 3. NAKED WRITE: Set raw values instantly on unformatted cells (~2-3 seconds)
   if (rows.length) {
     sheet.getRange(DATA_START_ROW, 1, rows.length, width).setValues(rows.map(function(row) {
       const out = (row || []).slice(0, width);
@@ -6881,12 +6863,40 @@ function createRawDataOutputSheetFromTemplateFast_(sheetType, outputName, output
     }));
   }
 
+  // 4. BATCH PAINT: Copy title structures, headers, and grid formatting from Template AFTER values exist
   try {
+    // Copy top metadata structure (Rows 1-3)
+    template.getRange(1, 1, DATA_START_ROW - 2, width).copyTo(sheet.getRange(1, 1, DATA_START_ROW - 2, width));
+
+    // Copy Header row style & validation rules (Row 4)
+    template.getRange(HEADER_ROW, 1, 1, width).copyTo(sheet.getRange(HEADER_ROW, 1, 1, width));
+
+    // Copy data rows template formatting rules down over all populated data rows
+    if (rows.length) {
+      template.getRange(DATA_START_ROW, 1, 1, width)
+        .copyTo(sheet.getRange(DATA_START_ROW, 1, rows.length, width), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    }
+
+    // Explicitly stamp governed title text variables
+    sheet.getRange("A1").setValue(sheetDef.reportTitle || normalizedSheetType || outputName);
+    if (firstDay) sheet.getRange("B2").setValue(firstDay);
+    if (endDate) sheet.getRange("D2").setValue(endDate);
+    if (headers.length) sheet.getRange(HEADER_ROW, 1, 1, width).setValues([headers]);
+  } catch (err) {
+    Logger.log("Raw Data output style paint skipped for " + outputName + ": " + err.message);
+  }
+
+  // 5. ENFORCE SYSTEM ENVIRONMENT: Set frozen attributes, filters, and color palettes
+  try {
+    sheet.setFrozenRows(template.getFrozenRows());
+    sheet.setFrozenColumns(Math.min(template.getFrozenColumns(), width));
+    sheet.setTabColor(template.getTabColor());
+
     const existingFilter = sheet.getFilter && sheet.getFilter();
     if (existingFilter) existingFilter.remove();
     sheet.getRange(HEADER_ROW, 1, Math.max(sheet.getMaxRows() - HEADER_ROW + 1, 1), width).createFilter();
   } catch (err) {
-    Logger.log("Raw Data output filter creation skipped for " + outputName + ": " + err.message);
+    Logger.log("Raw Data environmental configurations skipped for " + outputName + ": " + err.message);
   }
 
   clearSheetRuntimeCachesForSheet_(sheet);
@@ -7282,7 +7292,6 @@ function processRawDataApprovedSyncColumns_(sheet, monthParts) {
 function writeChangedColumnsOnly_(sheet, data, beforeValues) {
   if (!sheet || !data || !data.values || !data.values.length) return 0;
 
-
   const indexes = Object.keys(beforeValues || {})
     .map(function(key) { return Number(key); })
     .filter(function(idx) {
@@ -7292,16 +7301,14 @@ function writeChangedColumnsOnly_(sheet, data, beforeValues) {
     })
     .sort(function(a, b) { return a - b; });
 
-
   if (!indexes.length) return 0;
 
-
+  // OPTIMIZATION: Merge targeted ranges with a proximity gap of 5 columns or less to reduce grid write transactions
   const groups = [];
   let current = [indexes[0]];
 
-
   for (let i = 1; i < indexes.length; i++) {
-    if (indexes[i] === current[current.length - 1] + 1) {
+    if (indexes[i] <= current[current.length - 1] + 5) {
       current.push(indexes[i]);
     } else {
       groups.push(current);
@@ -7310,18 +7317,16 @@ function writeChangedColumnsOnly_(sheet, data, beforeValues) {
   }
   groups.push(current);
 
-
   groups.forEach(function(group) {
     const startIdx = group[0];
-    const width = group.length;
+    const endIdx = group[group.length - 1];
+    const width = endIdx - startIdx + 1;
     const values = data.values.map(function(row) {
       return row.slice(startIdx, startIdx + width);
     });
 
-
     sheet.getRange(DATA_START_ROW, startIdx + 1, values.length, width).setValues(values);
   });
-
 
   return indexes.length;
 }
@@ -8074,6 +8079,9 @@ function processDemoP() {
     }
 
 
+    // OPTIMIZATION: Force layout engine to commit values before altering properties to drop UI rendering lag
+    SpreadsheetApp.flush();
+
     setUniqueSheetName_(sheet, DEMO_P_PREFIX);
     markRuntimeStep_(timing, "Maintain ongoing Demo P sheet name");
 
@@ -8401,12 +8409,11 @@ function createActiveDemoPFromRawData_(rawSheet, targetName, monthParts, timing)
     pmrsRemoved: 0,
     rowsRemoved: 0,
     rowsCopied: 0,
-    primaryRowsOnly: true
+    primaryRowsOnly: true,
+    outputRowsWritten: rawData.values.length
   };
 
   setLastRawDataDisenrolledBuildResult_(movedResult);
-
-  movedResult.outputRowsWritten = rawData.values.length;
   markRuntimeStep_(timing, "Raw Data rows prepared for Demo P without disenrollment exclusion | Rows Read: " + rawData.values.length + "; Rows Written: " + rawData.values.length);
 
   const dashboard = loadDashboardConfig_();
@@ -8425,23 +8432,63 @@ function createActiveDemoPFromRawData_(rawSheet, targetName, monthParts, timing)
   populateUniversalMetadataColumns_(workingData, monthParts, rawSheet.getName(), "Demo P", "Created");
   markRuntimeStep_(timing, "Demo P Working Source - populate Demo P update tracking columns | Rows Processed: " + workingData.values.length + "; Write Mode: in-memory only");
 
-  const demoSheet = createOutputSheetFromDashboardTemplate_(
-    SHEET_TYPE.DEMO_P,
-    targetName,
-    workingData.values,
-    monthParts.firstDay,
-    monthParts.lastDay
-  );
+  // ==========================================================================
+  // OPTIMIZED HYPERSPEED NAKED CANVAS DUMP FOR DEMO P
+  // ==========================================================================
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const template = ss.getSheetByName(sheetDef.templateName);
+  if (!template) throw new Error("Template not found: " + sheetDef.templateName);
+
+  deleteSheetIfExists_(ss, targetName, rawSheet.getName(), sheetDef.templateName);
+
+  // 1. Insert blank, unpainted canvas
+  const demoSheet = ss.insertSheet(targetName);
+  demoSheet.showSheet();
+  ss.setActiveSheet(demoSheet);
+
+  const width = Math.max(headers.length, 1);
+  const requiredRows = workingData.values.length ? DATA_START_ROW + workingData.values.length - 1 : DATA_START_ROW;
+
+  // 2. Force grid boundaries
+  resizeSheetGrid_(demoSheet, requiredRows, width);
+
+  // 3. Ultra-fast data dump onto unstyled cells
+  if (workingData.values.length) {
+    demoSheet.getRange(DATA_START_ROW, 1, workingData.values.length, width).setValues(workingData.values.map(function(row) {
+      const out = (row || []).slice(0, width);
+      while (out.length < width) out.push("");
+      return out;
+    }));
+  }
   markRuntimeStep_(timing, "Demo P Working Source - copy active Raw Data rows to Demo P template | Rows Read: " + rawData.values.length + "; Rows Written: " + workingData.values.length + "; Write Mode: single output write");
 
+  // 4. Block copy styles from template over the data canvas
   try {
+    template.getRange(1, 1, DATA_START_ROW - 2, width).copyTo(demoSheet.getRange(1, 1, DATA_START_ROW - 2, width));
+    template.getRange(HEADER_ROW, 1, 1, width).copyTo(demoSheet.getRange(HEADER_ROW, 1, 1, width));
+
+    if (workingData.values.length) {
+      template.getRange(DATA_START_ROW, 1, 1, width)
+        .copyTo(demoSheet.getRange(DATA_START_ROW, 1, workingData.values.length, width), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    }
+
     demoSheet.getRange("A1").setValue(sheetDef.reportTitle || "Demo P");
   } catch (err) {
-    Logger.log("Could not set Demo P title: " + err.message);
+    Logger.log("Demo P layout structural paint skipped: " + err.message);
+  }
+
+  // 5. Apply environmental rules
+  try {
+    demoSheet.setFrozenRows(template.getFrozenRows());
+    demoSheet.setFrozenColumns(Math.min(template.getFrozenColumns(), width));
+    demoSheet.setTabColor(template.getTabColor());
+  } catch (err) {
+    Logger.log("Demo P environment settings skipped: " + err.message);
   }
 
   clearSheetRuntimeCachesForSheet_(demoSheet);
 
+  // Execute processing rules via memory arrays
   processDemoPAsWorkingSource_(demoSheet, monthParts, timing, rawSheet.getName(), "Created");
 
   return {
@@ -12626,11 +12673,12 @@ function moveDisenrolledPMRsFromDemoPToExclusion_(demoSheet, monthParts) {
   }
 
 
+  // 3. OPTIMIZATION: Skip expensive physical row deletion. Clear trailing rows to drop UI rendering lag.
   if (removedCount > 0) {
     const newLastRow = DATA_START_ROW + keepRows.length - 1;
-    const rowsToDelete = (lastRow - DATA_START_ROW + 1) - keepRows.length;
-    if (rowsToDelete > 0) {
-      demoSheet.deleteRows(newLastRow + 1, rowsToDelete);
+    const maxRows = demoSheet.getMaxRows();
+    if (maxRows > newLastRow) {
+      demoSheet.getRange(newLastRow + 1, 1, maxRows - newLastRow, lastCol).clearContent().breakApart();
     }
   }
 
@@ -13007,9 +13055,70 @@ function applyMonthlyChangeAllSubsectionFormats_(sheet, lastCol) {
   return;
 }
 
-function formatMonthlyChangeReportSectionSheet_(reportSheet) {
+function formatMonthlyChangeReportSectionSheet_(reportSheet, sourceHeaders) {
+  if (!reportSheet) return;
+  const dashboard = loadDashboardConfig_();
+  const reportHeaders = getMonthlyChangeReportHeaders_(sourceHeaders);
+  const lastCol = reportHeaders.length;
 
-  return;
+  // CRITICAL: Forcefully rip out any Alternating Colors (Bandings) causing bleed
+  const bandings = reportSheet.getBandings();
+  if (bandings) {
+    bandings.forEach(function(banding) {
+      banding.remove();
+    });
+  }
+
+  const titles = ["Enrollments", "Disenrollments", "Demographic Changes", "Caseload Changes", "Contact Changes", "Banner Summary Changes"];
+
+  // STEP 1: Process buffer row installations from the BOTTOM up
+  for (let i = titles.length - 1; i >= 0; i--) {
+    const titleText = titles[i];
+    const headerRowIdx = findMonthlyChangeSectionTitleRow_(reportSheet, titleText);
+
+    if (headerRowIdx !== -1) {
+      const line3HeaderRow = headerRowIdx + 2;
+      const rowImmediatelyBelow = line3HeaderRow + 1;
+
+      const sampleValue = reportSheet.getRange(rowImmediatelyBelow, 1).getValue();
+      const nextTitleRowIdx = (i < titles.length - 1) ? findMonthlyChangeSectionTitleRow_(reportSheet, titles[i + 1]) : reportSheet.getLastRow() + 1;
+
+      if (sampleValue !== "" || rowImmediatelyBelow >= nextTitleRowIdx) {
+        reportSheet.insertRowsBefore(rowImmediatelyBelow, 1);
+        reportSheet.getRange(rowImmediatelyBelow, 1, 1, lastCol).setValue("");
+        safeSetRowHeights_(reportSheet, rowImmediatelyBelow, 1, 25, "Monthly Change Injected Buffer Row");
+      }
+    }
+  }
+
+  // STEP 2: Regenerate the layout maps post-injection
+  const lastRow = reportSheet.getLastRow();
+  const headerRows = [1, 2, 3, 4]; // Lock out Top Rows 1-4
+
+  titles.forEach(function(titleText) {
+    const r = findMonthlyChangeSectionTitleRow_(reportSheet, titleText);
+    if (r !== -1) {
+      headerRows.push(r);     // Line 1
+      headerRows.push(r + 1); // Line 2
+      headerRows.push(r + 2); // Line 3
+      headerRows.push(r + 3); // Line 4 (No Fill Shield)
+    }
+  });
+
+  // STEP 3: Uniformly strip bad fill colors from the remaining active data fields
+  for (let row = 5; row <= lastRow; row++) {
+    if (headerRows.indexOf(row) === -1) {
+      reportSheet.getRange(row, 1, 1, lastCol)
+        .setBackground("#FFFFFF")
+        .setFontSize(10)
+        .setFontWeight("normal")
+        .setFontColor("#000000");
+    }
+  }
+
+  applyColumnWidths_(reportSheet, dashboard, reportHeaders);
+  applyHiddenColumnSettings_(reportSheet, dashboard, reportHeaders);
+  SpreadsheetApp.flush();
 }
 
 function formatMonthlyChangeDateColumns_(sheet) {
@@ -13909,9 +14018,8 @@ function applyDashboardQualityReportColumnSettings_(sheet, options) {
       .setBorder(true, true, true, true, true, true, RFF_SYSTEM_SHEET_BORDER_COLOR, SpreadsheetApp.BorderStyle.DOTTED);
 
     sheet.getRange(1, 1, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
-    RFF_DASHBOARD_QUALITY_WRAP_COLUMNS.forEach(function(col) {
-      sheet.getRange(1, col, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
-    });
+    // OPTIMIZATION: Format columns 2 through 7 in one batch API call
+    sheet.getRange(1, 2, lastRow, 6).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
 
     sheet.setFrozenRows(1);
   } catch (err) {
@@ -14621,6 +14729,10 @@ function styleDashboardQualityUpdatedSections_(sheet, sectionTitles, options) {
       .setFontWeights(fontWeights)
       .setFontStyles(fontStyles)
       .setFontSizes(fontSizes);
+
+    sheet.getRange(startRow, 1, rowCount, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+    // OPTIMIZATION: Format columns 2 through 8 in one batch API call
+    sheet.getRange(startRow, 2, rowCount, 7).setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
   } catch (err) {
     Logger.log("Dashboard Quality section styling skipped: " + err.message);
   }
@@ -15047,4 +15159,98 @@ function trimTimingReportRows_(sheet) {
   } catch (err) {
     Logger.log("Timing row trim skipped: " + err.message);
   }
+}
+
+function rebuildProductionMonthlyChangeTemplate() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dashboard = loadDashboardConfig_();
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MONTHLY_CHANGE);
+  if (!sheetDef) return notify_("Error: Monthly Change sheet definition not found in dashboard.");
+
+  const templateName = sheetDef.templateName; // Usually "Template - Monthly Change"
+  let template = ss.getSheetByName(templateName);
+  if (template) ss.deleteSheet(template);
+
+  const rawHeaders = getHeadersForSheetType_(dashboard, SHEET_TYPE.RAW_DATA);
+  const reportHeaders = getMonthlyChangeReportHeaders_(rawHeaders);
+  const lastCol = reportHeaders.length;
+  const theme = getThemeColorsFromBase_(SHEET_BASE_COLORS[SHEET_TYPE.MONTHLY_CHANGE] || "#A165CC");
+
+  template = ss.insertSheet(templateName);
+
+  // 1. Base Canvas Reset
+  template.getRange(1, 1, 250, lastCol)
+    .setFontFamily("Arial")
+    .setFontSize(10)
+    .setFontColor("#000000")
+    .setFontWeight("normal")
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP)
+    .setHorizontalAlignment("left")
+    .setVerticalAlignment("middle")
+    .setBackground("#FFFFFF");
+
+  template.getRange(1, 1, 250, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+  for (let r = 1; r <= 250; r++) safeSetRowHeights_(template, r, 1, 25, "Monthly Change Reset Row");
+
+  // 2. Clone Legacy applyMonthlyChangeStandardTopRows_ (Rows 1-4)
+  template.getRange(1, 1, 1, lastCol).setBackground(theme.level3);
+  template.getRange(2, 1, 1, lastCol).setBackground(theme.level3);
+  template.getRange(3, 1, 1, lastCol).setBackground(theme.level1);
+  template.getRange(4, 1, 1, lastCol).setBackground(theme.level2);
+
+  template.getRange("A1").setValue("Monthly Change Report").setFontSize(14).setFontWeight("bold");
+  template.getRange("A2").setValue("Date");
+  template.getRange("C2").setValue("to").setHorizontalAlignment("center");
+
+  const mainHeaderRange = template.getRange(4, 1, 1, lastCol);
+  mainHeaderRange.setFontSize(10).setFontWeight("bold").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top");
+  if (reportHeaders.length) mainHeaderRange.setValues([reportHeaders]);
+
+  safeSetRowHeights_(template, 1, 1, 25, "Legacy Row 1");
+  safeSetRowHeights_(template, 2, 1, 25, "Legacy Row 2");
+  safeSetRowHeights_(template, 3, 1, 25, "Legacy Row 3");
+  safeSetRowHeights_(template, 4, 1, 40, "Legacy Header Row");
+
+  // 3. Strip Dashboard Alternating Colors
+  const bandings = template.getBandings();
+  if (bandings) {
+    bandings.forEach(function(banding) {
+      banding.remove();
+    });
+  }
+
+  // 4. Clone Legacy applyMonthlyChangeSubsectionFormat_ (Row 5+)
+  const sections = ["Enrollments", "Disenrollments", "Demographic Changes", "Caseload Changes", "Contact Changes", "Banner Summary Changes"];
+  let currentRow = 5;
+
+  sections.forEach(function(titleText) {
+    // Line 1: Title (Legacy used Level 3, Font 14, Height 25)
+    template.getRange(currentRow, 1, 1, lastCol).setBackground(theme.level3).setFontWeight("bold");
+    template.getRange(currentRow, 1).setValue(titleText).setFontSize(14);
+    safeSetRowHeights_(template, currentRow, 1, 25, "Legacy Title");
+
+    // Line 2: Spacer (Legacy used Level 1, Height 7)
+    template.getRange(currentRow + 1, 1, 1, lastCol).setBackground(theme.level1);
+    safeSetRowHeights_(template, currentRow + 1, 1, 7, "Legacy Spacer");
+
+    // Line 3: Table Headers (Legacy used Level 2, Font 8, Height 10)
+    const line3Range = template.getRange(currentRow + 2, 1, 1, lastCol);
+    line3Range.setFontSize(8).setFontWeight("bold").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top").setBackground(theme.level2);
+    if (reportHeaders.length) line3Range.setValues([reportHeaders]);
+    safeSetRowHeights_(template, currentRow + 2, 1, 10, "Legacy Subheaders");
+
+    // Line 4: The Modern Shield Row (Forces white data lines)
+    template.getRange(currentRow + 3, 1, 1, lastCol).setBackground("#FFFFFF");
+    safeSetRowHeights_(template, currentRow + 3, 1, 25, "Shield Row");
+
+    currentRow += 8;
+  });
+
+  template.setFrozenRows(4);
+  template.setFrozenColumns(2);
+  template.setTabColor(theme.level1);
+  template.hideSheet(); // Hide the pristine blueprint
+
+  resizeSheetGrid_(template, currentRow + 20, lastCol);
+  notify_("SUCCESS: Production 'Template - Monthly Change' completely restored to legacy v1.6.18 layout!");
 }
