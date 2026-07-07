@@ -16,7 +16,7 @@ git clean -fdx
 # 2) Remove only untracked noisy directories/files. Tracked artifacts are left in
 # place so this helper does not create hidden unstaged deletions for excluded
 # directories or binary reference files.
-git clean -fdx -- Archive Report Governance .codexignore node_modules dist build __pycache__ || true
+git clean -fdx -- 'Archive' 'Report' 'Governance' '.codexignore' 'node_modules' 'dist' 'build' '__pycache__' || true
 
 # 3) Detect newest script artifact. Stage exact files only; never stage dirs.
 NEW_SCRIPT="$(ls -1 scripts/v*_Full_Script.txt 2>/dev/null | sort -V | tail -n 1 || true)"
