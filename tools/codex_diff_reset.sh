@@ -13,6 +13,12 @@ git restore --staged . || true
 git reset --hard HEAD
 git clean -fdx
 
+<<<<<<< HEAD
+=======
+rm -rf Archive Report Governance .codexignore node_modules dist build __pycache__ || true
+find . -type f \( -iname "*.pdf" -o -iname "*.xlsx" -o -iname "*.docx" -o -iname "*.pptx" -o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.zip" -o -iname "*.log" \) -delete || true
+
+>>>>>>> origin/main
 # 2) Detect newest script artifact. Stage exact files only; never stage dirs.
 NEW_SCRIPT="$(ls -1 scripts/v*_Full_Script.txt 2>/dev/null | sort -V | tail -n 1 || true)"
 

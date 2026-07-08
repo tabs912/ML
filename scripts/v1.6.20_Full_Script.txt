@@ -1,5 +1,9 @@
 /**
+<<<<<<< HEAD
  * Master List Framework v1.6.20 Full Script
+=======
+ * Master List Framework v1.6.20.3 Full Script
+>>>>>>> origin/main
  *
  * Required section structure for this and all future full-script rebuilds:
  * 1. CONFIGURATION
@@ -29,7 +33,11 @@
 // CONFIGURATION
 // ============================================================================
 
+<<<<<<< HEAD
 const MASTER_LIST_MERGE_ML_VERSION = "1.6.20";
+=======
+const MASTER_LIST_MERGE_ML_VERSION = "1.6.20.3";
+>>>>>>> origin/main
 
 const MASTER_LIST_MERGE_REBUILD_SECTION = "FULL_SCRIPT";
 
@@ -105,6 +113,7 @@ const FORMAT_DELETE_BLANK_ROWS_AFTER = 400;
 
 
 const SHEET_TYPE = Object.freeze({
+<<<<<<< HEAD
   RAW_DATA: "Raw Data",
   CARE_PLAN_DUE: "CP Due Date",
   UNLOCKED: "Unlock CP",
@@ -114,6 +123,17 @@ const SHEET_TYPE = Object.freeze({
   MONTHLY_CHANGE: "Monthly Change",
   MASTER_LIST_CHANGE_LOG: "Master List Change Log",
   DISENROLLED_EXCLUSION: "Disenrolled Exclusion"
+=======
+  BANNER: "Banners",
+  CARE_PLAN_DUE: "CP Due Date",
+  UNLOCKED: "Unlock CP",
+  RAW_DATA: "Raw Data",
+  DEMO_P: "Demo P",
+  DISENROLLED_EXCLUSION: "Disenrolled Exclusion",
+  MASTER_LIST: "Master List",
+  MONTHLY_CHANGE: "Monthly Change",
+  MASTER_LIST_CHANGE_LOG: "Master List Change Log"
+>>>>>>> origin/main
 });
 
 const SHEET_BASE_COLORS = {
@@ -149,7 +169,11 @@ const CARE_PLAN_DUE_DATE_ALT_PREFIX = "Care Plan Due Date Report";
 
 const MONTHLY_CHANGE_REPORT_PREFIX = "Monthly Change";
 
+<<<<<<< HEAD
 const DISENROLLED_EXCLUSION_SHEET = "Disenrolled Exclusion List";
+=======
+const DISENROLLED_EXCLUSION_SHEET = "Disenrolled Exclusion";
+>>>>>>> origin/main
 
 const INDEX_SHEET = "Index";
 
@@ -163,7 +187,11 @@ const SHEET_TAB_ORDER = [
   "Care Plan Due Date Report",
   "Unlocked Care Plan Report",
   "Banner Report",
+<<<<<<< HEAD
   "Disenrolled Exclusion List",
+=======
+  "Disenrolled Exclusion",
+>>>>>>> origin/main
   "Master List Change Log"
 ];
 
@@ -174,9 +202,15 @@ const INDEX_HEADERS = [
   "Hidden?"
 ];
 
+<<<<<<< HEAD
 const MASTER_LIST_TEMPLATE_SHEET = "Master List Template";
 
 const DEMO_P_TEMPLATE_SHEET = "Demo P Template";
+=======
+const MASTER_LIST_TEMPLATE_SHEET = "Template - Master List";
+
+const DEMO_P_TEMPLATE_SHEET = "Template - Demo P";
+>>>>>>> origin/main
 
 const FORMAT_DEMO_P_TIMING_SHEET = "Format Demo P Timing";
 
@@ -624,7 +658,11 @@ function writeDashboardDefaultsFast_(sheet) {
   const rows = [];
   rows.push(normalizeSectionRowForWidth_(["Report Formatter Framework", "- v" + RFF_VERSION + " -", "Format Dashboard"], width));
   rows.push(normalizeSectionRowForWidth_([], width));
+<<<<<<< HEAD
   appendDashboardSectionRows_(rows, RFF_SECTION_GLOBAL, ["Setting", "Value"], getDefaultGlobalSettingsRows_(), width);
+=======
+  appendDashboardSectionRows_(rows, RFF_SECTION_GLOBAL, ["Setting", "Value", "Options"], getDefaultGlobalSettingsRows_(), width);
+>>>>>>> origin/main
   appendDashboardSectionRows_(rows, RFF_SECTION_TITLE_ROWS, ["Sheet Type", "Row", "Purpose", "Value Source", "Label", "Target Cell", "Height", "Font Size", "Font Weight", "Fill Level", "Alignment", "Wrap", "Notes"], getDefaultTitleRowRows_(), width);
   appendDashboardSectionRows_(rows, RFF_SECTION_SHEETS, ["Sheet Type", "Report Title", "Template Name", "Output Naming Pattern", "Base Color", "Use Prompt Date", "End Date Source", "Template Row Count", "Template Column Count", "Template Row Mode", "Minimum Rows", "Buffer Rows", "Test Rows", "Use Test Rows"], getDefaultSheetDefinitionRowsWithColumnCounts_(), width);
   appendDashboardSectionRows_(rows, RFF_SECTION_COLUMNS, ["Header", "Width", "Header Font Size", "Date Column", "Hide Column", "Data Wrap", "Horizontal Alignment", "Vertical Alignment", "Number Format"], getResolvedDefaultColumnDefinitionRows_(), width);
@@ -783,7 +821,11 @@ function coerceToValidDate_(value) {
   if (!text) return null;
 
 
+<<<<<<< HEAD
   const monthYearMatch = text.match(/^(\d{1,2})\.(\d{2}|\d{4})$/);
+=======
+  const monthYearMatch = text.match(/^(\d{1,2})[\.\/-](\d{2}|\d{4})$/);
+>>>>>>> origin/main
   if (monthYearMatch) {
     const month = Number(monthYearMatch[1]) - 1;
     let year = Number(monthYearMatch[2]);
@@ -1608,6 +1650,7 @@ function resizeSheetMinimum_(sheet, rowCount, colCount) {
 }
 
 
+<<<<<<< HEAD
 function getThemeColorsFromBase_(hex) {
   return {
     base: normalizeHex_(hex),
@@ -1618,6 +1661,24 @@ function getThemeColorsFromBase_(hex) {
   };
 }
 
+=======
+function getThemeColorsFromBase_(hex, globals) {
+  globals = globals || {};
+  return {
+    base: normalizeHex_(hex),
+    level1: hexWithHslLightness_(hex, numberOrDefault_(globals.hslLevel1, 60)),
+    level2: hexWithHslLightness_(hex, numberOrDefault_(globals.hslLevel2, 75)),
+    level3: hexWithHslLightness_(hex, numberOrDefault_(globals.hslLevel3, 85)),
+    level4: hexWithHslLightness_(hex, numberOrDefault_(globals.hslLevel4, 97))
+  };
+}
+
+function getGlobalBorderStyle_(globals) {
+  const styleName = String((globals && globals.globalBorderStyle) || "SOLID").trim().toUpperCase();
+  return SpreadsheetApp.BorderStyle[styleName] || SpreadsheetApp.BorderStyle.SOLID;
+}
+
+>>>>>>> origin/main
 function normalizeHex_(hex) {
   let value = String(hex || "").trim();
   if (!value) value = "#65A9CC";
@@ -2544,15 +2605,25 @@ function writeFrameworkTimingPerformanceRecommendations() {
 
 const ML_MENU_CALLBACKS = Object.freeze({
   dataProcessing: Object.freeze([
+<<<<<<< HEAD
     "formatMonthlySheets",
     "updateDemoPMonthlySync",
     "createDisenrolledList",
     "createMasterList"
+=======
+    "createIndexSheet",
+    "formatMonthlySheets",
+    "updateDemoPMonthlySync",
+    "createDisenrolledList",
+    "createMasterList",
+    "buildMonthlyChangeReport"
+>>>>>>> origin/main
   ]),
   sheetLayout: Object.freeze([
     "generateArchiveFileIndex_",
     "enforceGlobalSheetSortOrder_",
     "archiveMonthlyImportSheets",
+<<<<<<< HEAD
     "archiveMonthlyActiveSheets"
   ]),
   templatesSystem: Object.freeze([
@@ -2567,12 +2638,38 @@ const ML_MENU_CALLBACKS = Object.freeze({
     "formatDashboard",
     "saveActiveLayoutToDashboardSettings",
     "createOrRefreshAllReportTemplates"
+=======
+    "archiveMonthlyActiveSheets",
+    "hideTemplates_",
+    "showTemplates_",
+    "hideSystemSheets_",
+    "showSystemSheets_",
+    "clearDiagnosticsAndTimingLogs",
+    "toggleFrameworkTiming"
+  ]),
+  maintenanceRebuild: Object.freeze([
+    "buildDemoPFromScratch",
+    "formatBannerReport",
+    "formatCarePlanDueReport",
+    "formatUnlockedCarePlanReport",
+    "formatRawData"
+  ]),
+  startUp: Object.freeze([
+    "setupSystemSheets",
+    "rebuildFormatDashboardDefaults",
+    "saveActiveLayoutToDashboardSettings",
+    "createOrRefreshAllReportTemplates",
+    "runDashboardQualityStartUp",
+    "runDashboardQualityValidateTemplates",
+    "runDashboardQualityFull"
+>>>>>>> origin/main
   ])
 });
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
 
+<<<<<<< HEAD
   ui.createMenu("Framework")
     .addSubMenu(ui.createMenu("🚀 Data & Processing Engine")
       .addItem("📋 Format Monthly Sheets", "formatMonthlySheets")
@@ -2601,6 +2698,84 @@ function onOpen() {
     .addToUi();
 }
 
+=======
+  const dataProcessingMenu = ui.createMenu("📁 Data & Processing Engine")
+    .addItem("📊 Format Monthly Sheets", "formatMonthlySheets")
+    .addItem("🔄 Update Demo P", "updateDemoPMonthlySync")
+    .addItem("⛔ Create / Update Disenrolled List", "createDisenrolledList")
+    .addItem("💡 Create Master List", "createMasterList")
+    .addItem("🗓️ Monthly Change Report", "buildMonthlyChangeReport");
+
+  const templatesMenu = ui.createMenu("🦑 Templates")
+    .addItem("Hide Templates", "hideTemplates_")
+    .addItem("Show Templates", "showTemplates_");
+
+  const systemSheetsMenu = ui.createMenu("😎 System Sheets")
+    .addItem("Hide System Sheets", "hideSystemSheets_")
+    .addItem("Show System Sheets", "showSystemSheets_");
+
+  const sheetLayoutMenu = ui.createMenu("📁 Sheet & Layout Management")
+    .addItem("📇 Create Index", "createIndexSheet")
+    .addItem("🗂️ Update Archive File Index", "generateArchiveFileIndex_")
+    .addItem("🧭 Enforce Global Tab Sorting Order", "enforceGlobalSheetSortOrder_")
+    .addItem("🗄️ Archive Monthly Import Sheets", "archiveMonthlyImportSheets")
+    .addItem("🗄️ Archive Monthly Active Sheets", "archiveMonthlyActiveSheets")
+    .addSubMenu(templatesMenu)
+    .addSubMenu(systemSheetsMenu)
+    .addItem("🪄 Clear Timing & Quality Logs", "clearDiagnosticsAndTimingLogs")
+    .addItem("⏱️ Framework Timing on/off", "toggleFrameworkTiming");
+
+  const formatSheetsMenu = ui.createMenu("📝 Format Sheets")
+    .addItem("Banner", "formatBannerReport")
+    .addItem("CP Due Date", "formatCarePlanDueReport")
+    .addItem("Unlocked CP", "formatUnlockedCarePlanReport")
+    .addItem("Raw Data", "formatRawData");
+
+  const maintenanceMenu = ui.createMenu("📁 Maintenance/Rebuild")
+    .addItem("🛠️ Build Demo P", "buildDemoPFromScratch")
+    .addSubMenu(formatSheetsMenu);
+
+  const formatDashboardMenu = ui.createMenu("🎨 Format Dashboard")
+    .addItem("Format Dashboard", "rebuildFormatDashboardDefaults")
+    .addItem("💾 Save Active Layout as Rebuild Default", "saveActiveLayoutToDashboardSettings");
+
+  const qualityMenu = ui.createMenu("👌 Quality")
+    .addItem("Dashboard Quality Start up", "runDashboardQualityStartUp")
+    .addItem("Dashboard Quality Validate Templates", "runDashboardQualityValidateTemplates")
+    .addItem("Dashboard Quality Workflow", "runDashboardQualityFull");
+
+  const startUpMenu = ui.createMenu("📁 Start-up")
+    .addItem("📜 Set up System Sheets", "setupSystemSheets")
+    .addSubMenu(formatDashboardMenu)
+    .addItem("🖼️ Create / Refresh All Templates", "createOrRefreshAllReportTemplates")
+    .addSubMenu(qualityMenu);
+
+  ui.createMenu("Master List")
+    .addSubMenu(dataProcessingMenu)
+    .addSubMenu(sheetLayoutMenu)
+    .addSubMenu(maintenanceMenu)
+    .addSubMenu(startUpMenu)
+    .addToUi();
+}
+
+function isFrameworkTimingEnabled_() {
+  try {
+    return PropertiesService.getDocumentProperties().getProperty("RFF_FRAMEWORK_TIMING_ENABLED") !== "false";
+  } catch (err) {
+    Logger.log("Framework timing toggle read skipped: " + err.message);
+    return true;
+  }
+}
+
+function toggleFrameworkTiming() {
+  const enabled = isFrameworkTimingEnabled_();
+  const nextValue = enabled ? "false" : "true";
+  PropertiesService.getDocumentProperties().setProperty("RFF_FRAMEWORK_TIMING_ENABLED", nextValue);
+  notify_("Framework Timing is now " + (nextValue === "true" ? "ON" : "OFF") + ".");
+  return nextValue === "true";
+}
+
+>>>>>>> origin/main
 function hideTemplates_() {
   return hideReportTemplates();
 }
@@ -2642,7 +2817,11 @@ function saveActiveLayoutToDashboardSettings() {
       return null;
     }
 
+<<<<<<< HEAD
     const snapshot = captureActiveSheetLayoutSnapshot_(activeSheet, sheetDef);
+=======
+    const snapshot = captureActiveSheetLayoutSnapshot_(activeSheet, sheetDef, dashboard);
+>>>>>>> origin/main
     if (!snapshot.columnRows.length) {
       notify_("No header columns were found to save for " + activeSheet.getName() + ".");
       return null;
@@ -2681,7 +2860,12 @@ function resolveSheetDefinitionForLayoutSnapshot_(dashboard, sheet) {
   return null;
 }
 
+<<<<<<< HEAD
 function captureActiveSheetLayoutSnapshot_(sheet, sheetDef) {
+=======
+function captureActiveSheetLayoutSnapshot_(sheet, sheetDef, dashboard) {
+  const globals = (dashboard && dashboard.globals) ? dashboard.globals : loadGlobalSettings_();
+>>>>>>> origin/main
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const lastRow = Math.max(sheet.getLastRow(), HEADER_ROW);
   const headerValues = sheet.getRange(HEADER_ROW, 1, 1, lastCol).getValues()[0];
@@ -2694,8 +2878,13 @@ function captureActiveSheetLayoutSnapshot_(sheet, sheetDef) {
   const wrapStrategies = sampleRange.getWrapStrategies()[0];
   const hiddenColumns = getHiddenColumnFlags_(sheet, lastCol);
   const baseColor = normalizeHex_(sheet.getTabColor && sheet.getTabColor() ? sheet.getTabColor() : (sheetDef.baseColor || SHEET_BASE_COLORS[sheetDef.sheetType] || "#65A9CC"));
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(baseColor);
   const borderConfig = getDefaultLayoutSnapshotBorderConfig_();
+=======
+  const theme = getThemeColorsFromBase_(baseColor, globals);
+  const borderConfig = getDefaultLayoutSnapshotBorderConfig_(globals);
+>>>>>>> origin/main
   const columnRows = [];
 
   for (let col = 1; col <= lastCol; col++) {
@@ -2722,6 +2911,15 @@ function captureActiveSheetLayoutSnapshot_(sheet, sheetDef) {
     capturedAt: new Date(),
     baseColor: baseColor,
     theme: theme,
+<<<<<<< HEAD
+=======
+    hslLevels: {
+      level1: numberOrDefault_(globals.hslLevel1, 60),
+      level2: numberOrDefault_(globals.hslLevel2, 75),
+      level3: numberOrDefault_(globals.hslLevel3, 85),
+      level4: numberOrDefault_(globals.hslLevel4, 97)
+    },
+>>>>>>> origin/main
     borderConfig: borderConfig,
     columnRows: columnRows
   };
@@ -2740,10 +2938,17 @@ function isDateNumberFormat_(format) {
   return /[ymd]/.test(value) && value.indexOf("#") === -1;
 }
 
+<<<<<<< HEAD
 function getDefaultLayoutSnapshotBorderConfig_() {
   return {
     color: "#CCCCCC",
     style: "SOLID",
+=======
+function getDefaultLayoutSnapshotBorderConfig_(globals) {
+  return {
+    color: normalizeHex_((globals && globals.globalBorderColor) || "#CCCCCC"),
+    style: String((globals && globals.globalBorderStyle) || "SOLID").trim().toUpperCase(),
+>>>>>>> origin/main
     top: true,
     left: true,
     bottom: true,
@@ -2872,10 +3077,17 @@ function writeDashboardLayoutSnapshotSection_(dashboardSheet, snapshot) {
     normalizeSectionRowForWidth_(["Captured At", snapshot.capturedAt, snapshot.sheetType, snapshot.sheetName, "Snapshot source metadata"], width),
     normalizeSectionRowForWidth_(["Template Name", snapshot.templateName, snapshot.sheetType, snapshot.sheetName, "Recognized dashboard template"], width),
     normalizeSectionRowForWidth_(["Base Color Hex", snapshot.baseColor, snapshot.sheetType, snapshot.sheetName, "HSL source color"], width),
+<<<<<<< HEAD
     normalizeSectionRowForWidth_(["Level 1 Lightness 60", snapshot.theme.level1, snapshot.sheetType, snapshot.sheetName, "Row 3/tab accent"], width),
     normalizeSectionRowForWidth_(["Level 2 Lightness 75", snapshot.theme.level2, snapshot.sheetType, snapshot.sheetName, "Header rows"], width),
     normalizeSectionRowForWidth_(["Level 3 Lightness 85", snapshot.theme.level3, snapshot.sheetType, snapshot.sheetName, "Title rows/current tab"], width),
     normalizeSectionRowForWidth_(["Level 4 Lightness 97", level4Note, snapshot.sheetType, snapshot.sheetName, "Alternating color level"], width),
+=======
+    normalizeSectionRowForWidth_(["Level 1 Lightness " + ((snapshot.hslLevels && snapshot.hslLevels.level1) || 60), snapshot.theme.level1, snapshot.sheetType, snapshot.sheetName, "Row 3/tab accent"], width),
+    normalizeSectionRowForWidth_(["Level 2 Lightness " + ((snapshot.hslLevels && snapshot.hslLevels.level2) || 75), snapshot.theme.level2, snapshot.sheetType, snapshot.sheetName, "Header rows"], width),
+    normalizeSectionRowForWidth_(["Level 3 Lightness " + ((snapshot.hslLevels && snapshot.hslLevels.level3) || 85), snapshot.theme.level3, snapshot.sheetType, snapshot.sheetName, "Title rows/current tab"], width),
+    normalizeSectionRowForWidth_(["Level 4 Lightness " + ((snapshot.hslLevels && snapshot.hslLevels.level4) || 97), level4Note, snapshot.sheetType, snapshot.sheetName, "Alternating color level"], width),
+>>>>>>> origin/main
     normalizeSectionRowForWidth_(["Border Color", border.color, snapshot.sheetType, snapshot.sheetName, "Global border default"], width),
     normalizeSectionRowForWidth_(["Border Style", border.style, snapshot.sheetType, snapshot.sheetName, "SpreadsheetApp.BorderStyle"], width),
     normalizeSectionRowForWidth_(["Border Boundaries", [border.top, border.left, border.bottom, border.right, border.vertical, border.horizontal].join("|"), snapshot.sheetType, snapshot.sheetName, "Top|Left|Bottom|Right|Vertical|Horizontal"], width)
@@ -3004,6 +3216,7 @@ const RFF_DEFAULTS = {
 };
 
 const RFF_SHEET_TYPES = {
+<<<<<<< HEAD
   RAW_DATA: "Raw Data",
   BANNER: "Banners",
   CARE_PLAN_DUE: "CP Due Date",
@@ -3012,6 +3225,16 @@ const RFF_SHEET_TYPES = {
   MASTER_LIST: "Master List",
   MONTHLY_CHANGE: "Monthly Change",
   DISENROLLED: "Disenrolled Exclusion",
+=======
+  BANNER: "Banners",
+  CARE_PLAN_DUE: "CP Due Date",
+  UNLOCKED: "Unlock CP",
+  RAW_DATA: "Raw Data",
+  DEMO_P: "Demo P",
+  DISENROLLED: "Disenrolled Exclusion",
+  MASTER_LIST: "Master List",
+  MONTHLY_CHANGE: "Monthly Change",
+>>>>>>> origin/main
   MASTER_LIST_CHANGE_LOG: "Master List Change Log"
 };
 
@@ -3074,6 +3297,39 @@ function getRequiredFrameworkSheetTypes_() {
 
 
 function getDefaultGlobalSettingsRows_() {
+<<<<<<< HEAD
+=======
+  const optionText = {
+    "Header Row": "Numeric row number (e.g., 4)",
+    "Data Start Row": "Numeric row number (e.g., 5)",
+    "Freeze Rows": "Numeric count of frozen rows",
+    "Freeze Columns": "Numeric count of frozen columns",
+    "Row 1 Height": "Numeric pixel height",
+    "Row 2 Height": "Numeric pixel height",
+    "Row 3 Height": "Numeric pixel height",
+    "Header Row Height": "Numeric pixel height",
+    "Default Data Row Height": "Numeric pixel height",
+    "Default Column Width": "Numeric pixel width",
+    "Default Date Format": "Google Sheets number format (e.g., m/d/yy)",
+    "Default Number Format": "Google Sheets number format or General",
+    "Default Text Format": "Google Sheets number format (e.g., @)",
+    "Default Data Wrap": "CLIP, WRAP, or OVERFLOW",
+    "Default Horizontal Alignment": "left, center, or right",
+    "Default Vertical Alignment": "top, middle, or bottom",
+    "Standard Font": "Installed font family name",
+    "Standard Font Size": "Numeric point size",
+    "Standard Font Color": "Hex color (e.g., #000000)",
+    "Title Font Size": "Numeric point size",
+    "Title Info Font Size": "Numeric point size",
+    "HSL Level 1 Lightness %": "Numeric percent for row 3/tab accents",
+    "HSL Level 2 Lightness %": "Numeric percent for header rows",
+    "HSL Level 3 Lightness %": "Numeric percent for title rows/current tab",
+    "HSL Level 4 Lightness %": "Numeric percent for alternating colors",
+    "Global Border Color": "Hex color (e.g., #CCCCCC)",
+    "Global Border Style": "SOLID, SOLID_MEDIUM, DOTTED, or DASHED",
+    "Template Version": "Framework version string"
+  };
+>>>>>>> origin/main
   return [
     ["Header Row", RFF_DEFAULTS.headerRow],
     ["Data Start Row", RFF_DEFAULTS.dataStartRow],
@@ -3096,8 +3352,21 @@ function getDefaultGlobalSettingsRows_() {
     ["Standard Font Color", RFF_DEFAULTS.standardFontColor],
     ["Title Font Size", RFF_DEFAULTS.titleFontSize],
     ["Title Info Font Size", RFF_DEFAULTS.titleInfoFontSize],
+<<<<<<< HEAD
     ["Template Version", RFF_DEFAULTS.templateVersion]
   ];
+=======
+    ["HSL Level 1 Lightness %", 60],
+    ["HSL Level 2 Lightness %", 75],
+    ["HSL Level 3 Lightness %", 85],
+    ["HSL Level 4 Lightness %", 97],
+    ["Global Border Color", "#CCCCCC"],
+    ["Global Border Style", "SOLID"],
+    ["Template Version", RFF_DEFAULTS.templateVersion]
+  ].map(function(row) {
+    return [row[0], row[1], optionText[row[0]] || "Dashboard-governed setting"];
+  });
+>>>>>>> origin/main
 }
 
 function getDefaultTitleRowRows_() {
@@ -3116,7 +3385,11 @@ function getDefaultSheetDefinitionRows_() {
   ["Unlock CP", "Unlocked Care Plan Report", "Template - Unlocked Care Plan", "Unlock CP mm.yy", "#65CCC3", true, "Pulled From Spreadsheet", 500, "FIXED", 365, 135, 500, false],
   ["Raw Data", "Raw Data", "Template - Raw Data", "Raw Data mm.yy", "#657FCC", true, "Last Day of Prompt Month", 6500, "FIXED", 5937, 563, 6500, false],
   ["Demo P", "Demo P", "Template - Demo P", "Demo P", "#657FCC", true, "Last Day of Prompt Month", 2500, "FIXED", 2125, 375, 2500, false],
+<<<<<<< HEAD
   ["Disenrolled Exclusion", "Disenrolled Exclusion List", "Template - Disenrolled Exclusion", "Disenrolled", "#CC65A1", true, "Last Day of Prompt Month", 1000, "FIXED", 725, 75, 1000, false],
+=======
+  ["Disenrolled Exclusion", "Disenrolled Exclusion", "Template - Disenrolled Exclusion", "Disenrolled", "#CC65A1", true, "Last Day of Prompt Month", 1000, "FIXED", 725, 75, 1000, false],
+>>>>>>> origin/main
   ["Master List", "Master List", "Template - Master List", "Master List mm.yy", "#7665CC", true, "Last Day of Prompt Month", 500, "FIXED", 343, 157, 500, false],
   ["Monthly Change", "Monthly Change Report", "Template - Monthly Change", "Monthly Change mm.yy", "#A165CC", true, "Last Day of Prompt Month", 1000, "FIXED", 900, 100, 1000, false],
   ["Master List Change Log", "Master List Change Log", "Template - Master List Change Log", "ML Change Log", "#CC65CC", false, "Last Day Updated", 1000, "FIXED", 750, 250, 1000, false]
@@ -3142,7 +3415,11 @@ function getDefaultBehaviorRows_() {
   return [
   ["Banners", true, true, true, false, true],
   ["CP Due Date", true, true, true, false, true],
+<<<<<<< HEAD
   ["Unlocked CP", true, true, true, false, true],
+=======
+  ["Unlock CP", true, true, true, false, true],
+>>>>>>> origin/main
   ["Raw Data", true, true, true, false, true],
   ["Demo P", true, true, true, false, true],
   ["Disenrolled Exclusion", true, true, true, false, true],
@@ -3764,6 +4041,15 @@ function loadGlobalSettings_(sheet) {
     defaultDataWrap: String(settings["Default Data Wrap"] || RFF_DEFAULTS.defaultDataWrap).trim().toUpperCase(),
     defaultHorizontalAlignment: String(settings["Default Horizontal Alignment"] || RFF_DEFAULTS.defaultHorizontalAlignment).trim().toLowerCase(),
     defaultVerticalAlignment: String(settings["Default Vertical Alignment"] || RFF_DEFAULTS.defaultVerticalAlignment).trim().toLowerCase(),
+<<<<<<< HEAD
+=======
+    hslLevel1: numberOrDefault_(settings["HSL Level 1 Lightness %"], 60),
+    hslLevel2: numberOrDefault_(settings["HSL Level 2 Lightness %"], 75),
+    hslLevel3: numberOrDefault_(settings["HSL Level 3 Lightness %"], 85),
+    hslLevel4: numberOrDefault_(settings["HSL Level 4 Lightness %"], 97),
+    globalBorderColor: normalizeHex_(settings["Global Border Color"] || "#CCCCCC"),
+    globalBorderStyle: String(settings["Global Border Style"] || "SOLID").trim().toUpperCase(),
+>>>>>>> origin/main
     templateVersion: String(settings["Template Version"] || RFF_DEFAULTS.templateVersion)
   };
 }
@@ -4427,7 +4713,11 @@ function resolveTemplateRowCount_(sheetDef, globals) {
 
 function applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing) {
   const globals = dashboard.globals;
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+=======
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor, globals);
+>>>>>>> origin/main
   const headerRow = globals.headerRow;
   const dataStartRow = globals.dataStartRow;
 
@@ -4438,7 +4728,12 @@ function applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCo
     .setFontSize(globals.standardFontSize)
     .setHorizontalAlignment(globals.defaultHorizontalAlignment || "left")
     .setVerticalAlignment(globals.defaultVerticalAlignment || "middle")
+<<<<<<< HEAD
     .setWrapStrategy(toWrapStrategy_(globals.defaultDataWrap || "CLIP"));
+=======
+    .setWrapStrategy(toWrapStrategy_(globals.defaultDataWrap || "CLIP"))
+    .setBorder(true, true, true, true, true, true, globals.globalBorderColor || "#CCCCCC", getGlobalBorderStyle_(globals));
+>>>>>>> origin/main
 
 
   applyTitleRows_(sheet, dashboard, sheetDef, theme, colCount);
@@ -4470,12 +4765,15 @@ function applyTemplateBaseFormatting_(sheet, dashboard, sheetDef, headers, rowCo
   }
 
 
+<<<<<<< HEAD
   if (behavior.usesSubheaders) {
     applyMonthlyChangeSubheaderGuide_(sheet, dashboard, sheetDef, colCount);
     markFrameworkStep_(timing, "Apply Monthly Change subheader guide: " + sheetDef.templateName);
   }
 
 
+=======
+>>>>>>> origin/main
   applyTemplateRowHeights_(sheet, dashboard, sheetDef, rowCount, timing, "Apply row heights");
 }
 
@@ -4796,7 +5094,11 @@ function applyHiddenColumnSettingsInRuns_(sheet, hiddenFlags) {
 
 function applyDataRows_(sheet, dashboard, sheetDef, headers, rowCount, colCount, behavior, timing) {
   const globals = dashboard.globals;
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+=======
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor, globals);
+>>>>>>> origin/main
   const startRow = globals.dataStartRow;
   const rows = Math.max(rowCount - startRow + 1, 1);
 
@@ -4847,11 +5149,14 @@ function applyAlternatingColorRules_(sheet, range, theme) {
   }
 }
 
+<<<<<<< HEAD
 function applyMonthlyChangeSubheaderGuide_(sheet, dashboard, sheetDef, colCount) {
   // Disabled: Handled natively by the dynamic post-processing engine to prevent structural template corruption.
   return;
 }
 
+=======
+>>>>>>> origin/main
 function applyMonthlyChangeSpacerRow3Format_(sheet, spacerRow, colCount, globals) {
   if (!sheet || !spacerRow || !colCount) return;
 
@@ -4883,8 +5188,13 @@ function applyMonthlyChangeSpacerRow3Format_(sheet, spacerRow, colCount, globals
 }
 
 function formatMonthlyChangeSubsectionBlock_(sheet, titleRow, label, colCount, dashboard, sheetDef, writeLabel) {
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(sheetDef.baseColor);
   const globals = dashboard.globals;
+=======
+  const globals = dashboard.globals;
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor, globals);
+>>>>>>> origin/main
   const spacerRow = titleRow + 1;
   const headerRow = titleRow + 2;
 
@@ -4892,7 +5202,11 @@ function formatMonthlyChangeSubsectionBlock_(sheet, titleRow, label, colCount, d
   sheet.getRange(titleRow, 1, 1, colCount)
     .setBackground(theme.level3)
     .setFontFamily(globals.standardFont)
+<<<<<<< HEAD
     .setFontSize(14)
+=======
+    .setFontSize(Number(globals.titleFontSize || 14))
+>>>>>>> origin/main
     .setFontWeight("bold")
     .setFontColor(globals.standardFontColor)
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
@@ -4906,7 +5220,11 @@ function formatMonthlyChangeSubsectionBlock_(sheet, titleRow, label, colCount, d
   sheet.getRange(headerRow, 1, 1, colCount)
     .setBackground(theme.level2)
     .setFontFamily(globals.standardFont)
+<<<<<<< HEAD
     .setFontSize(8)
+=======
+    .setFontSize(Number(globals.standardFontSize || 10))
+>>>>>>> origin/main
     .setFontWeight("bold")
     .setFontColor(globals.standardFontColor)
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
@@ -5105,7 +5423,11 @@ function applyTemplateFreezeAndTabColor_(sheet, dashboard, sheetDef, colCount, t
   const globals = dashboard.globals;
   const expectedFrozenRows = globals.freezeRows;
   const expectedFrozenCols = Math.min(globals.freezeColumns, colCount);
+<<<<<<< HEAD
   const expectedTabColor = getThemeColorsFromBase_(sheetDef.baseColor).level1;
+=======
+  const expectedTabColor = getThemeColorsFromBase_(sheetDef.baseColor, globals).level1;
+>>>>>>> origin/main
 
 
   try {
@@ -5251,6 +5573,7 @@ function hideSheetIfNeeded_(sheet, timing, stepName) {
 
 
 function formatMonthlySheets() {
+<<<<<<< HEAD
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt(
     "Format Monthly Sheets",
@@ -5264,6 +5587,11 @@ function formatMonthlySheets() {
     notify_("Invalid or empty reporting month. Format Monthly Sheets was cancelled.");
     return null;
   }
+=======
+  const monthParts = promptForLockedYearReportMonth_("Format Monthly Sheets");
+  if (!monthParts) return null;
+  const parsed = buildPromptedMonthContext_(monthParts);
+>>>>>>> origin/main
 
   return runFrameworkTimed_("Format Monthly Sheets " + parsed.monthLabel, function(timing) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5290,8 +5618,11 @@ function formatMonthlySheets() {
       markFrameworkStep_(timing, "Formatted monthly import tab: " + route.code);
     });
 
+<<<<<<< HEAD
     enforceGlobalSheetSortOrder_(parsed.monthParts);
     markFrameworkStep_(timing, "Global sheet sort order enforced");
+=======
+>>>>>>> origin/main
     notify_(
       "Format Monthly Sheets complete for " + parsed.monthLabel + ".\n" +
       "Completed: " + (completed.length ? completed.join(", ") : "None") + "\n" +
@@ -5301,6 +5632,7 @@ function formatMonthlySheets() {
   });
 }
 
+<<<<<<< HEAD
 function parseFormatMonthlySheetsMonthInput_(value) {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -5337,6 +5669,12 @@ function parseFormatMonthlySheetsMonthInput_(value) {
   const monthParts = getMonthDateParts_(reportDate);
   return {
     reportDate: reportDate,
+=======
+function buildPromptedMonthContext_(monthParts) {
+  monthParts = monthParts || {};
+  return {
+    reportDate: monthParts.firstDay,
+>>>>>>> origin/main
     monthParts: monthParts,
     monthLabel: Utilities.formatDate(monthParts.firstDay, Session.getScriptTimeZone(), "MM.yy")
   };
@@ -5358,7 +5696,11 @@ function formatMonthlyBannerSheet_(rawSheet, parsedMonth, timing) {
   writeBannerReportDates_(outputSheet, reportDate);
   copyRawBannerDataToOutput_(rawSheet, outputSheet);
   archiveRawSourceAndDeleteLocal_(ss, rawSheet, rawName, outputSheet, timing);
+<<<<<<< HEAD
   hideSheetIfNeeded_(outputSheet, timing, "Hide formatted output sheet: " + outputSheet.getName());
+=======
+  showSheetIfNeeded_(outputSheet, timing, "Ensure formatted output sheet is visible: " + outputSheet.getName());
+>>>>>>> origin/main
   return outputSheet;
 }
 
@@ -5375,10 +5717,20 @@ function formatMonthlyDashboardSheetFromSource_(sourceSheet, sheetType, monthPar
     coerceToValidDate_(sourceSheet.getRange(endDateCellA1).getDisplayValue()) || monthParts.lastDay;
   const titleInfoText = collectAndClearMovedTitleInfoCells_(sourceSheet, sheetType);
   prepareCarePlanSourceSheetForDashboardFormat_(sourceSheet, sheetType, headers);
+<<<<<<< HEAD
   const rawData = getDataValues_(sourceSheet, HEADER_ROW, DATA_START_ROW);
   const outputRows = mapRowsToHeaders_(rawData.values, rawData.headers, headers);
   deleteSheetIfExists_(ss, outputName, sourceSheet.getName(), sheetDef.templateName);
   const outputSheet = createOutputSheetFromDashboardTemplate_(sheetType, outputName, outputRows, originalStartDate, originalEndDate);
+=======
+  markFrameworkStep_(timing, "Prepared monthly dashboard source: " + sourceSheet.getName());
+  const rawData = getDataValues_(sourceSheet, HEADER_ROW, DATA_START_ROW);
+  const outputRows = mapRowsToHeaders_(rawData.values, rawData.headers, headers);
+  markFrameworkStep_(timing, "Mapped monthly dashboard rows in memory: " + outputRows.length);
+  deleteSheetIfExists_(ss, outputName, sourceSheet.getName(), sheetDef.templateName);
+  const outputSheet = createOutputSheetFromDashboardTemplate_(sheetType, outputName, outputRows, originalStartDate, originalEndDate);
+  markFrameworkStep_(timing, "Created monthly dashboard fast canvas: " + outputName);
+>>>>>>> origin/main
   try {
     outputSheet.getRange("A1").setValue(sheetDef.reportTitle || sheetType);
     if (titleInfoText) outputSheet.getRange("C1").setValue(titleInfoText);
@@ -5386,8 +5738,14 @@ function formatMonthlyDashboardSheetFromSource_(sourceSheet, sheetType, monthPar
     Logger.log("Could not write " + sheetType + " title info: " + err.message);
   }
   lockFinalOutputRowHeights_(outputSheet, sheetType);
+<<<<<<< HEAD
   archiveRawSourceAndDeleteLocal_(ss, sourceSheet, rawName, outputSheet, timing);
   hideSheetIfNeeded_(outputSheet, timing, "Hide formatted output sheet: " + outputSheet.getName());
+=======
+  markFrameworkStep_(timing, "Locked monthly dashboard row heights: " + outputName);
+  archiveRawSourceAndDeleteLocal_(ss, sourceSheet, rawName, outputSheet, timing);
+  showSheetIfNeeded_(outputSheet, timing, "Ensure formatted output sheet is visible: " + outputSheet.getName());
+>>>>>>> origin/main
   clearSheetRuntimeCachesForSheet_(outputSheet);
   return outputSheet;
 }
@@ -5400,16 +5758,33 @@ function formatMonthlyRawDataSheetFromSource_(sourceSheet, monthParts, timing) {
   const sourceName = sourceSheet.getName();
   const templateHeaders = getHeadersForSheetType_(dashboard, sheetDef.sheetType);
   const rawData = getRawDataSourceDataForOutput_(sourceSheet);
+<<<<<<< HEAD
   const outputRows = mapRowsToHeaders_(rawData.values, rawData.headers, templateHeaders);
   deleteSheetIfExists_(ss, outputName, sourceName, sheetDef.templateName);
   const outputSheet = createRawDataOutputSheetFromTemplateFast_(sheetDef.sheetType, outputName, outputRows, monthParts.firstDay, monthParts.lastDay, sourceName);
   processRawDataApprovedSyncColumns_(outputSheet, monthParts);
   syncRawDataBannerColumns_(outputSheet, monthParts);
+=======
+  markFrameworkStep_(timing, "Read monthly Raw Data source rows: " + rawData.values.length);
+  const outputRows = mapRowsToHeaders_(rawData.values, rawData.headers, templateHeaders);
+  deleteSheetIfExists_(ss, outputName, sourceName, sheetDef.templateName);
+  const outputSheet = createRawDataOutputSheetFromTemplateFast_(sheetDef.sheetType, outputName, outputRows, monthParts.firstDay, monthParts.lastDay, sourceName);
+  markFrameworkStep_(timing, "Created monthly Raw Data fast canvas: " + outputName);
+  processRawDataApprovedSyncColumns_(outputSheet, monthParts);
+  markFrameworkStep_(timing, "Processed monthly Raw Data approved sync columns");
+  syncRawDataBannerColumns_(outputSheet, monthParts);
+  markFrameworkStep_(timing, "Synced monthly Raw Data banner columns");
+>>>>>>> origin/main
   if (sourceSheet.getSheetId() !== outputSheet.getSheetId() && ss.getSheets().length > 1) {
     ss.setActiveSheet(outputSheet);
     ss.deleteSheet(sourceSheet);
   }
   lockFinalOutputRowHeights_(outputSheet, "Raw Data");
+<<<<<<< HEAD
+=======
+  markFrameworkStep_(timing, "Locked monthly Raw Data row heights: " + outputName);
+  showSheetIfNeeded_(outputSheet, timing, "Ensure formatted output sheet is visible: " + outputSheet.getName());
+>>>>>>> origin/main
   clearSheetRuntimeCachesForSheet_(outputSheet);
   return outputSheet;
 }
@@ -5425,7 +5800,13 @@ function formatBannerReport() {
     }
 
 
+<<<<<<< HEAD
     const reportDate = promptForFormatterReportMonth_();
+=======
+    const monthParts = promptForLockedYearReportMonth_("Format Banner Report");
+    if (!monthParts) return null;
+    const reportDate = monthParts.firstDay;
+>>>>>>> origin/main
     const dateLabel = formatReportDateLabel_(reportDate);
     const rawName = "Raw Data - Banners " + Utilities.formatDate(reportDate, Session.getScriptTimeZone(), "MM.yy");
     const outputName = buildBannerReportOutputName_(reportDate);
@@ -5472,7 +5853,11 @@ function formatBannerReport() {
     archiveRawSourceAndDeleteLocal_(ss, rawSheet, rawName, outputSheet, timing);
 
 
+<<<<<<< HEAD
     hideSheetIfNeeded_(outputSheet, timing, "Hide formatted output sheet: " + outputSheet.getName());
+=======
+    showSheetIfNeeded_(outputSheet, timing, "Ensure formatted output sheet is visible: " + outputSheet.getName());
+>>>>>>> origin/main
     markFrameworkStep_(timing, "Banner formatter complete");
     return outputSheet;
   });
@@ -5518,6 +5903,7 @@ function archiveActiveRawDataSheet() {
   });
 }
 
+<<<<<<< HEAD
 function promptForFormatterReportMonth_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt("Report Month", RFF_FORMATTER_DATE_PROMPT, ui.ButtonSet.OK_CANCEL);
@@ -5535,6 +5921,10 @@ function promptForFormatterReportMonth_() {
 
 function parseReportMonthInput_(value) {
   const text = String(value || "").trim();
+=======
+function parseReportMonthInput_(value) {
+  const text = String(value || "").trim().toLowerCase();
+>>>>>>> origin/main
   if (!text) throw new Error("Report month is required.");
 
 
@@ -5560,8 +5950,12 @@ function parseReportMonthInput_(value) {
   };
 
 
+<<<<<<< HEAD
   const key = text.toLowerCase();
   if (monthNames[key]) return monthNames[key];
+=======
+  if (monthNames[text]) return monthNames[text];
+>>>>>>> origin/main
 
 
   throw new Error("Invalid report month: " + text + ". Enter 1-12 or a month name.");
@@ -5571,7 +5965,11 @@ function promptForLockedYearReportMonth_(processTitle) {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt(
     processTitle || "Report Month",
+<<<<<<< HEAD
     "Enter report month as MM, month name, or a date in the target month. Example: 05 or 05/01/26.",
+=======
+    "Enter report month. Examples: 05.26, July 2026, or 05/01/26.",
+>>>>>>> origin/main
     ui.ButtonSet.OK_CANCEL
   );
   if (response.getSelectedButton() !== ui.Button.OK) return null;
@@ -5587,14 +5985,31 @@ function promptForLockedYearReportMonth_(processTitle) {
       const year = new Date().getFullYear();
       reportDate = createLocalDateOnly_(year, month - 1, 1);
     } else {
+<<<<<<< HEAD
       reportDate = coerceToValidDate_(text);
+=======
+      const numeric = text.match(/^(\d{1,2})[\.\/-](\d{2}|\d{4})$/);
+      if (numeric) {
+        const month = Number(numeric[1]);
+        if (month < 1 || month > 12) throw new Error("Invalid report month: " + text + ". Enter a month from 1-12.");
+        let year = Number(numeric[2]);
+        if (year < 100) year += 2000;
+        reportDate = createLocalDateOnly_(year, month - 1, 1);
+      } else {
+        reportDate = coerceToValidDate_(text);
+      }
+>>>>>>> origin/main
     }
   } catch (err) {
     notify_(err.message);
     return null;
   }
 
+<<<<<<< HEAD
   if (!reportDate) {
+=======
+  if (!reportDate || isNaN(reportDate.getTime())) {
+>>>>>>> origin/main
     notify_("Invalid report month: " + text + ". Enter 1-12, a month name, MM.YY, or a date in the target month.");
     return null;
   }
@@ -5687,13 +6102,25 @@ function getCurrentMasterListSheet_(monthParts) {
 function applyStandardFormatting_(sheet, options) {
   if (!sheet) return sheet;
   options = options || {};
+<<<<<<< HEAD
+=======
+  const dashboard = loadDashboardConfig_();
+  const globals = dashboard.globals || {};
+  const sheetType = normalizeDashboardSheetTypeKey_(options.sheetType || getSheetTypeForOrganization_(sheet.getName()));
+  const sheetDef = getSheetDefinitionByType_(dashboard, sheetType);
+  const theme = getThemeColorsFromBase_((sheetDef && sheetDef.baseColor) || "#65A9CC", globals);
+>>>>>>> origin/main
   const lastCol = Math.max(sheet.getLastColumn(), 1);
   const lastRow = Math.max(sheet.getLastRow(), 1);
   const headerRow = Number(options.headerRow || HEADER_ROW);
   const dataStartRow = Number(options.dataStartRow || DATA_START_ROW);
   const title = String(options.title || options.sheetType || sheet.getName() || "").trim();
   try {
+<<<<<<< HEAD
     if (title) sheet.getRange(1, 1).setValue(title).setFontWeight("bold").setFontSize(14);
+=======
+    if (title) sheet.getRange(1, 1).setValue(title).setFontWeight("bold").setFontSize(Number(globals.titleFontSize || 14));
+>>>>>>> origin/main
     if (options.startDate) sheet.getRange(2, 2).setValue(options.startDate).setNumberFormat("m/d/yy");
     if (options.endDate) sheet.getRange(2, 4).setValue(options.endDate).setNumberFormat("m/d/yy");
     if (lastCol > 1) {
@@ -5704,14 +6131,22 @@ function applyStandardFormatting_(sheet, options) {
     if (lastRow >= headerRow) {
       sheet.getRange(headerRow, 1, 1, lastCol)
         .setFontWeight("bold")
+<<<<<<< HEAD
         .setBackground("#D9EAF7")
+=======
+        .setBackground(theme.level2)
+>>>>>>> origin/main
         .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
         .setVerticalAlignment("top");
     }
     if (lastRow >= dataStartRow) {
       sheet.getRange(dataStartRow, 1, lastRow - dataStartRow + 1, lastCol)
         .setFontFamily("Arial")
+<<<<<<< HEAD
         .setFontSize(10)
+=======
+        .setFontSize(Number(globals.standardFontSize || 10))
+>>>>>>> origin/main
         .setVerticalAlignment("middle");
     }
     sheet.setFrozenRows(Math.max(headerRow, 1));
@@ -5794,21 +6229,34 @@ function autoHidePreviousMonthSheetsAfterWorkflow_(monthParts) {
   });
 }
 
+<<<<<<< HEAD
 function highlightAndStrikeExpiredADPhones_(sheet, pmrFilter) {
   return;
 }
 
+=======
+>>>>>>> origin/main
 function applyIndexSheetRowFills_(sheet) {
   if (!sheet) return;
   const lastRow = sheet.getLastRow();
   const lastCol = Math.max(sheet.getLastColumn(), INDEX_HEADERS.length || 1);
   if (lastRow < 1) return;
   try {
+<<<<<<< HEAD
     sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#D9EAF7");
     if (lastRow > 1) {
       const backgrounds = [];
       for (let r = 2; r <= lastRow; r++) {
         backgrounds.push(new Array(lastCol).fill(r % 2 === 0 ? "#FFFFFF" : "#F3F7FB"));
+=======
+    const dashboard = loadDashboardConfig_();
+    const theme = getThemeColorsFromBase_("#668BCC", dashboard.globals || {});
+    sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground(theme.level2);
+    if (lastRow > 1) {
+      const backgrounds = [];
+      for (let r = 2; r <= lastRow; r++) {
+        backgrounds.push(new Array(lastCol).fill(r % 2 === 0 ? "#FFFFFF" : theme.level4));
+>>>>>>> origin/main
       }
       sheet.getRange(2, 1, backgrounds.length, lastCol).setBackgrounds(backgrounds);
     }
@@ -5819,15 +6267,30 @@ function applyIndexSheetRowFills_(sheet) {
 
 function applyCurrentVsOlderTabColors_(ss, currentMonthParts) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+<<<<<<< HEAD
+=======
+  const dashboard = loadDashboardConfig_();
+  const globals = dashboard.globals || {};
+  const indexTheme = getThemeColorsFromBase_("#668BCC", globals);
+>>>>>>> origin/main
   const currentFirst = currentMonthParts && currentMonthParts.firstDay ? currentMonthParts.firstDay : null;
   ss.getSheets().forEach(function(sheet) {
     try {
       if (sheet.getName() === INDEX_SHEET) {
+<<<<<<< HEAD
         sheet.setTabColor("#668BCC");
         return;
       }
       const sheetType = getSheetTypeForOrganization_(sheet.getName());
       const baseColor = SHEET_BASE_COLORS[sheetType] || "#999999";
+=======
+        sheet.setTabColor(indexTheme.level1);
+        return;
+      }
+      const sheetType = getSheetTypeForOrganization_(sheet.getName());
+      const sheetDef = getSheetDefinitionByType_(dashboard, sheetType);
+      const baseColor = (sheetDef && sheetDef.baseColor) || "#999999";
+>>>>>>> origin/main
       const sheetDate = extractFirstDateFromSheetName_(sheet.getName());
       sheet.setTabColor(currentFirst && sheetDate && sheetDate.getTime() < currentFirst.getTime() ? "#CCCCCC" : baseColor);
     } catch (err) {
@@ -5859,10 +6322,13 @@ function formatDateColumnsByHeader_(sheet, headerRow, dataStartRow) {
   });
 }
 
+<<<<<<< HEAD
 function formatDateColumnsOnAllSheets_() {
   return;
 }
 
+=======
+>>>>>>> origin/main
 function rowObjectFromHeaders_(headers, row) {
   const obj = {};
   (headers || []).forEach(function(header, index) {
@@ -6235,7 +6701,14 @@ function applyParticipantAlternatingColorsBySortOrder_(sheet) {
   const sortIdx = headers.indexOf("Sort Order");
   if (primarySortIdx === -1 && sortIdx === -1) return;
   const sheetType = getSheetTypeForOrganization_(sheet.getName());
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(SHEET_BASE_COLORS[sheetType] || "#7665CC");
+=======
+  const dashboard = loadDashboardConfig_();
+  const globals = dashboard.globals || {};
+  const sheetDef = getSheetDefinitionByType_(dashboard, sheetType);
+  const theme = getThemeColorsFromBase_((sheetDef && sheetDef.baseColor) || "#7665CC", globals);
+>>>>>>> origin/main
   const dataRowCount = lastRow - DATA_START_ROW + 1;
   const dataRange = sheet.getRange(DATA_START_ROW, 1, dataRowCount, lastCol);
   const primarySortValues = primarySortIdx !== -1
@@ -6486,6 +6959,7 @@ function archiveRawDataSheet_(sourceSheet, archiveName) {
 }
 
 
+<<<<<<< HEAD
 function promptForArchiveMonth_(processTitle) {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt(
@@ -6505,6 +6979,12 @@ function promptForArchiveMonth_(processTitle) {
 function archiveMonthlyImportSheets() {
   const parsed = promptForArchiveMonth_("Archive Monthly Import Sheets");
   if (!parsed) return null;
+=======
+function archiveMonthlyImportSheets() {
+  const monthParts = promptForLockedYearReportMonth_("Archive Monthly Import Sheets");
+  if (!monthParts) return null;
+  const parsed = buildPromptedMonthContext_(monthParts);
+>>>>>>> origin/main
 
   return runFrameworkTimed_("Archive Monthly Import Sheets " + parsed.monthLabel, function(timing) {
     const result = archiveMonthlySheetsBySpecs_(parsed, [
@@ -6519,8 +6999,14 @@ function archiveMonthlyImportSheets() {
 }
 
 function archiveMonthlyActiveSheets() {
+<<<<<<< HEAD
   const parsed = promptForArchiveMonth_("Archive Monthly Active Sheets");
   if (!parsed) return null;
+=======
+  const monthParts = promptForLockedYearReportMonth_("Archive Monthly Active Sheets");
+  if (!monthParts) return null;
+  const parsed = buildPromptedMonthContext_(monthParts);
+>>>>>>> origin/main
 
   return runFrameworkTimed_("Archive Monthly Active Sheets " + parsed.monthLabel, function(timing) {
     const result = archiveMonthlySheetsBySpecs_(parsed, [
@@ -6952,7 +7438,12 @@ function runFrameworkTest9MonthlyChangeSubheaders() {
     if (!sheetDef) throw new Error("Monthly Change sheet definition is missing.");
 
 
+<<<<<<< HEAD
     const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+=======
+    const globals = dashboard.globals || {};
+    const theme = getThemeColorsFromBase_(sheetDef.baseColor, globals);
+>>>>>>> origin/main
     const results = RFF_MONTHLY_CHANGE_SUBSECTIONS.map(function(label) {
       return {
         subsection: label,
@@ -6976,7 +7467,12 @@ function runFrameworkTest9MonthlyChangeSubheaders() {
 }
 
 function validateFrameworkTest9Subheaders_(sheet, dashboard, sheetDef, firstTitleRow, colCount) {
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(sheetDef.baseColor);
+=======
+  const globals = (dashboard && dashboard.globals) ? dashboard.globals : {};
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor, globals);
+>>>>>>> origin/main
   const expectedTitleColor = normalizeHex_(theme.level3);
   const expectedSpacerColor = normalizeHex_(theme.level1);
   const expectedHeaderColor = normalizeHex_(theme.level2);
@@ -7286,8 +7782,11 @@ function formatRawData() {
 
     lockFinalOutputRowHeights_(outputSheet, "Raw Data");
     markRuntimeStep_(timing, "Lock Raw Data final row heights");
+<<<<<<< HEAD
     enforceGlobalSheetSortOrder_(monthParts);
     markRuntimeStep_(timing, "Global sheet sort order enforced");
+=======
+>>>>>>> origin/main
 
     clearSheetRuntimeCachesForSheet_(outputSheet);
     writeRuntimeTimingReport_(timing);
@@ -7413,6 +7912,25 @@ function mapRowsToHeaders_(sourceRows, sourceHeaders, targetHeaders) {
   });
 }
 
+<<<<<<< HEAD
+=======
+function applyUniversalFastCanvasFormatting_(sheet, dashboard, headers) {
+  if (!sheet || !dashboard || !headers) return;
+  try {
+    applyColumnWidths_(sheet, dashboard, headers);
+    applyHiddenColumnSettings_(sheet, dashboard, headers);
+    sheet.getRange(
+      DATA_START_ROW,
+      1,
+      Math.max(sheet.getLastRow() - DATA_START_ROW + 1, 1),
+      Math.max(sheet.getLastColumn(), 1)
+    ).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  } catch (err) {
+    Logger.log("Universal canvas formatting skipped: " + err.message);
+  }
+}
+
+>>>>>>> origin/main
 function createOutputSheetFromDashboardTemplate_(sheetType, outputName, outputRows, firstDay, endDate) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const dashboard = loadDashboardConfig_();
@@ -7480,6 +7998,10 @@ function createOutputSheetFromDashboardTemplate_(sheetType, outputName, outputRo
     Logger.log("Environmental configurations skipped for " + outputName + ": " + err.message);
   }
 
+<<<<<<< HEAD
+=======
+  applyUniversalFastCanvasFormatting_(sheet, dashboard, headers);
+>>>>>>> origin/main
   clearSheetRuntimeCachesForSheet_(sheet);
   return sheet;
 }
@@ -7555,6 +8077,10 @@ function createRawDataOutputSheetFromTemplateFast_(sheetType, outputName, output
     Logger.log("Raw Data environmental configurations skipped for " + outputName + ": " + err.message);
   }
 
+<<<<<<< HEAD
+=======
+  applyUniversalFastCanvasFormatting_(sheet, dashboard, headers);
+>>>>>>> origin/main
   clearSheetRuntimeCachesForSheet_(sheet);
   return sheet;
 }
@@ -7817,13 +8343,20 @@ function formatCarePlanDueOrUnlockedFromDashboard_(sheetType, promptTitle, start
     archiveRawSourceAndDeleteLocal_(ss, rawSheet, rawName, outputSheet, timing);
 
 
+<<<<<<< HEAD
     hideSheetIfNeeded_(outputSheet, timing, "Hide formatted output sheet: " + outputSheet.getName());
+=======
+    showSheetIfNeeded_(outputSheet, timing, "Ensure formatted output sheet is visible: " + outputSheet.getName());
+>>>>>>> origin/main
 
 
     clearSheetRuntimeCachesForSheet_(outputSheet);
     markFrameworkStep_(timing, "Clear runtime caches");
+<<<<<<< HEAD
     enforceGlobalSheetSortOrder_(monthParts);
     markFrameworkStep_(timing, "Global sheet sort order enforced");
+=======
+>>>>>>> origin/main
 
 
     notify_(sheetDef.reportTitle + " formatted using template-copy pattern.\nSheet created: " + outputSheet.getName());
@@ -8102,12 +8635,15 @@ function getRawDataDisallowedWorkingColumns_() {
   ];
 }
 
+<<<<<<< HEAD
 function removeDisallowedRawDataWorkingColumns_(sheet) {
 
 
   return 0;
 }
 
+=======
+>>>>>>> origin/main
 function isOngoingOutputSheetType_(sheetType) {
   const value = String(sheetType || "").trim();
   return value === SHEET_TYPE.DEMO_P ||
@@ -8703,9 +9239,14 @@ function buildDemoPFromScratch() {
 
     const demoSheet = createActiveDemoPFromRawData_(rawSheet, DEMO_P_PREFIX, monthParts, timing).sheet;
     const flatCount = flattenDemoPContactsToPrimaryRows_(demoSheet, true);
+<<<<<<< HEAD
     markRuntimeStep_(timing, "Demo P flat-record contact compression complete | Rows retained: " + flatCount);
     enforceGlobalSheetSortOrder_(monthParts);
     markRuntimeStep_(timing, "Global sheet sort order enforced");
+=======
+    enforceDemoPPostFlattenFormatting_(demoSheet);
+    markRuntimeStep_(timing, "Demo P flat-record contact compression complete | Rows retained: " + flatCount);
+>>>>>>> origin/main
     writeRuntimeTimingReport_(timing);
     notify_("Build Demo P (Initialization) complete. Flat primary records retained: " + flatCount);
     return demoSheet;
@@ -8744,9 +9285,14 @@ function updateDemoPMonthlySync() {
       demoSheet.getRange(DATA_START_ROW, 1, finalRows.length, data.headers.length).setValues(finalRows);
     }
     const flatCount = flattenDemoPContactsToPrimaryRows_(demoSheet, false);
+<<<<<<< HEAD
     markRuntimeStep_(timing, "Demo P monthly flat-record sync written | Rows retained: " + flatCount);
     enforceGlobalSheetSortOrder_(monthParts);
     markRuntimeStep_(timing, "Global sheet sort order enforced");
+=======
+    enforceDemoPPostFlattenFormatting_(demoSheet);
+    markRuntimeStep_(timing, "Demo P monthly flat-record sync written | Rows retained: " + flatCount);
+>>>>>>> origin/main
     writeRuntimeTimingReport_(timing);
     notify_("Update Demo P (Monthly Change Sync) complete. PMRs reviewed: " + changedPMRs.size);
     return demoSheet;
@@ -8758,6 +9304,27 @@ function updateDemoPMonthlySync() {
   }
 }
 
+<<<<<<< HEAD
+=======
+function enforceDemoPPostFlattenFormatting_(demoSheet) {
+  if (!demoSheet) return;
+  const dashboard = loadDashboardConfig_();
+  const headers = getHeadersForSheetType_(dashboard, SHEET_TYPE.DEMO_P);
+  applyColumnWidths_(demoSheet, dashboard, headers);
+  applyHiddenColumnSettings_(demoSheet, dashboard, headers);
+  assignSortOrderByParticipant_(demoSheet);
+  sortBySortOrder_(demoSheet);
+  formatSortOrderDisplayValues_(demoSheet);
+  demoSheet.getRange(
+    DATA_START_ROW,
+    1,
+    Math.max(demoSheet.getLastRow() - DATA_START_ROW + 1, 1),
+    Math.max(demoSheet.getLastColumn(), 1)
+  ).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  lockFinalOutputRowHeights_(demoSheet, "Demo P");
+}
+
+>>>>>>> origin/main
 function getDemoPMonthlySyncChangedPMRs_(monthParts) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const set = new Set();
@@ -8983,8 +9550,11 @@ function processDemoP() {
 
     lockFinalOutputRowHeights_(sheet, "Demo P");
     markRuntimeStep_(timing, "Lock Demo P final row heights");
+<<<<<<< HEAD
     enforceGlobalSheetSortOrder_(monthParts);
     markRuntimeStep_(timing, "Global sheet sort order enforced");
+=======
+>>>>>>> origin/main
 
     writeRuntimeTimingReport_(timing);
 
@@ -9374,6 +9944,10 @@ function createActiveDemoPFromRawData_(rawSheet, targetName, monthParts, timing)
     Logger.log("Demo P environment settings skipped: " + err.message);
   }
 
+<<<<<<< HEAD
+=======
+  applyUniversalFastCanvasFormatting_(demoSheet, dashboard, headers);
+>>>>>>> origin/main
   clearSheetRuntimeCachesForSheet_(demoSheet);
 
   // Execute processing rules via memory arrays
@@ -9687,14 +10261,22 @@ const CARE_PLAN_DUE_SYNC_FIELDS = [
 // MONTHLY CHANGE FUNCTIONS
 // ============================================================================
 
+<<<<<<< HEAD
 function buildMonthlyChangeReportFromDemoP() {
+=======
+function buildMonthlyChangeReport() {
+>>>>>>> origin/main
   const monthParts = promptForLockedYearReportMonth_("Build Monthly Change Report");
   if (!monthParts) return;
 
   const timing = startRuntimeTiming_("Build Monthly Change Report", monthParts);
   try {
     markRuntimeStep_(timing, "Start");
+<<<<<<< HEAD
     const reportSheet = buildMonthlyChangeReportFromDemoPForMonth_(monthParts, timing);
+=======
+    const reportSheet = buildMonthlyChangeReportForMonth_(monthParts, timing);
+>>>>>>> origin/main
     markRuntimeStep_(timing, reportSheet ? "Monthly Change workflow complete" : "Monthly Change workflow stopped without report");
     writeRuntimeTimingReport_(timing);
     return reportSheet;
@@ -9705,7 +10287,11 @@ function buildMonthlyChangeReportFromDemoP() {
   }
 }
 
+<<<<<<< HEAD
 function buildMonthlyChangeReportFromDemoPForMonth_(monthParts, timing) {
+=======
+function buildMonthlyChangeReportForMonth_(monthParts, timing) {
+>>>>>>> origin/main
   if (!monthParts) return null;
 
 
@@ -10456,17 +11042,23 @@ function buildMonthlyChangeReportSectionLayout_(reportSheet, sourceSheet, header
     reportSheet.getRange(HEADER_ROW, 1, 1, lastCol).setValues([padRowToWidth_(reportHeaders, lastCol)]);
   }
 
+<<<<<<< HEAD
   applyMonthlyChangeStandardTopRows_(reportSheet, lastCol);
+=======
+>>>>>>> origin/main
   reportSheet.setFrozenRows(4);
   reportSheet.setFrozenColumns(2);
 }
 
 
+<<<<<<< HEAD
 function setupMonthlyChangeSectionLayout_(reportSheet, sourceSheet, headers, titleRow, titleText) {
   // Section layout is now compiled by populateMonthlyChangeReportSections_ in memory.
   return;
 }
 
+=======
+>>>>>>> origin/main
 function padRowToWidth_(rowValues, width) {
   const output = (rowValues || []).slice(0, width);
   while (output.length < width) output.push("");
@@ -10578,6 +11170,7 @@ function appendMonthlyChangeCompiledRow_(matrix, rowValues, backgroundColor, fon
   matrix.fontColors.push(new Array(lastCol).fill("#000000"));
 }
 
+<<<<<<< HEAD
 function appendMonthlyChangeSectionBlock_(matrix, spec, dataRows, reportHeaders, theme, lastCol) {
   const sectionTitleRow = new Array(lastCol).fill("");
   sectionTitleRow[0] = spec.title;
@@ -10585,6 +11178,18 @@ function appendMonthlyChangeSectionBlock_(matrix, spec, dataRows, reportHeaders,
   appendMonthlyChangeCompiledRow_(matrix, [], theme.level1, "normal", 10, lastCol);
   appendMonthlyChangeCompiledRow_(matrix, reportHeaders, theme.level2, "bold", 8, lastCol);
   appendMonthlyChangeCompiledRow_(matrix, [], "#FFFFFF", "normal", 10, lastCol);
+=======
+function appendMonthlyChangeSectionBlock_(matrix, spec, dataRows, reportHeaders, theme, lastCol, globals) {
+  globals = globals || {};
+  const titleFontSize = Number(globals.titleFontSize || 14);
+  const standardFontSize = Number(globals.standardFontSize || 10);
+  const sectionTitleRow = new Array(lastCol).fill("");
+  sectionTitleRow[0] = spec.title;
+  appendMonthlyChangeCompiledRow_(matrix, sectionTitleRow, theme.level3, "bold", titleFontSize, lastCol);
+  appendMonthlyChangeCompiledRow_(matrix, [], theme.level1, "normal", standardFontSize, lastCol);
+  appendMonthlyChangeCompiledRow_(matrix, reportHeaders, theme.level2, "bold", standardFontSize, lastCol);
+  appendMonthlyChangeCompiledRow_(matrix, [], "#FFFFFF", "normal", standardFontSize, lastCol);
+>>>>>>> origin/main
 
   const activeRows = dataRows && dataRows.length ? dataRows : [{ values: new Array(lastCol).fill(""), changedColumns: new Set() }];
   activeRows.forEach(function(rowInfo) {
@@ -10598,20 +11203,38 @@ function appendMonthlyChangeSectionBlock_(matrix, spec, dataRows, reportHeaders,
     matrix.values.push(row);
     matrix.backgrounds.push(backgrounds);
     matrix.fontWeights.push(new Array(lastCol).fill("normal"));
+<<<<<<< HEAD
     matrix.fontSizes.push(new Array(lastCol).fill(10));
     matrix.fontColors.push(new Array(lastCol).fill("#000000"));
   });
 
   appendMonthlyChangeCompiledRow_(matrix, [], "#FFFFFF", "normal", 10, lastCol);
+=======
+    matrix.fontSizes.push(new Array(lastCol).fill(standardFontSize));
+    matrix.fontColors.push(new Array(lastCol).fill("#000000"));
+  });
+
+  appendMonthlyChangeCompiledRow_(matrix, [], "#FFFFFF", "normal", standardFontSize, lastCol);
+>>>>>>> origin/main
 }
 
 function populateMonthlyChangeReportSections_(reportSheet, sectionData, monthParts) {
   if (!reportSheet || !sectionData || !sectionData.currentData) return;
 
+<<<<<<< HEAD
   const currentData = sectionData.currentData;
   const reportHeaders = getMonthlyChangeReportHeaders_(currentData.headers || []);
   const lastCol = Math.max(reportHeaders.length, 1);
   const theme = getThemeColorsFromBase_(SHEET_BASE_COLORS[SHEET_TYPE.MONTHLY_CHANGE] || "#A165CC");
+=======
+  const dashboard = loadDashboardConfig_();
+  const globals = dashboard.globals || {};
+  const sheetDef = getSheetDefinitionByType_(dashboard, SHEET_TYPE.MONTHLY_CHANGE);
+  const currentData = sectionData.currentData;
+  const reportHeaders = getMonthlyChangeReportHeaders_(currentData.headers || []);
+  const lastCol = Math.max(reportHeaders.length, 1);
+  const theme = getThemeColorsFromBase_((sheetDef && sheetDef.baseColor) || "#A165CC", globals);
+>>>>>>> origin/main
   const matrix = {
     values: [],
     backgrounds: [],
@@ -10629,7 +11252,11 @@ function populateMonthlyChangeReportSections_(reportSheet, sectionData, monthPar
       spec.changedColumnsByPMR,
       monthParts
     );
+<<<<<<< HEAD
     appendMonthlyChangeSectionBlock_(matrix, spec, dataRows, reportHeaders, theme, lastCol);
+=======
+    appendMonthlyChangeSectionBlock_(matrix, spec, dataRows, reportHeaders, theme, lastCol, globals);
+>>>>>>> origin/main
   });
 
   stripMonthlyChangeNativeBandings_(reportSheet);
@@ -10653,6 +11280,7 @@ function populateMonthlyChangeReportSections_(reportSheet, sectionData, monthPar
   }
 }
 
+<<<<<<< HEAD
 function insertMonthlyDisenrollmentRowsStrict_(reportSheet, currentData, pmrSet, monthParts) {
   Logger.log("Monthly Change strict disenrollment live-row insertion skipped; sections are compiled by populateMonthlyChangeReportSections_.");
 }
@@ -10662,6 +11290,8 @@ function insertMonthlyChangeSectionRows_(reportSheet, currentData, pmrSet, secti
 }
 
 
+=======
+>>>>>>> origin/main
 function findMonthlyChangeSectionTitleRow_(sheet, title) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return -1;
@@ -10924,7 +11554,11 @@ function runMonthlyUpdate() {
   const messages = [];
   messages.push("Automatic monthly-sheet hiding is disabled in v1.3.5; archive monthly sheets separately.");
   try {
+<<<<<<< HEAD
     const reportSheet = buildMonthlyChangeReportFromDemoPForMonth_(monthParts);
+=======
+    const reportSheet = buildMonthlyChangeReportForMonth_(monthParts);
+>>>>>>> origin/main
     messages.push("Monthly Change Report: " + (reportSheet ? reportSheet.getName() : "No report created"));
   } catch (err) {
     notify_("Monthly Update stopped during Monthly Change Report: " + err.message);
@@ -11009,14 +11643,20 @@ function updateMasterListForMonth_(monthParts) {
     markRuntimeStep_(timing, "Remove disenrolled PMR blocks");
     prepareMasterListSortOrderBeforeFormatting_(currentMaster);
     markRuntimeStep_(timing, "Prepare Sort Order before formatting");
+<<<<<<< HEAD
     applyMasterListTemplateModeUpdateDisplay_(currentMaster);
     markRuntimeStep_(timing, "Apply template-mode update display settings");
+=======
+>>>>>>> origin/main
     applyFinalMasterListColorAndDisplay_(currentMaster);
     markRuntimeStep_(timing, "Apply final Sort Order coloring and display lock");
     autoHidePreviousMonthSheetsAfterWorkflow_(monthParts);
     markRuntimeStep_(timing, "Auto-hide previous month sheets");
+<<<<<<< HEAD
     enforceMasterListFinalDisplay_(currentMaster);
     markRuntimeStep_(timing, "Final Master List display enforcement");
+=======
+>>>>>>> origin/main
     restorePreviouslyHiddenSheets_(hiddenSheetNamesAtStart, currentMaster);
     markRuntimeStep_(timing, "Restore previously hidden sheets");
     writeRuntimeTimingReport_(timing);
@@ -11101,12 +11741,19 @@ function createMasterList() {
     markRuntimeStep_(timing, "Batch write Care Plan sync data to Master List");
     setUniqueSheetName_(masterSheet, masterName);
     markRuntimeStep_(timing, "Set final Master List sheet name");
+<<<<<<< HEAD
     enforceMasterListFinalDisplay_(masterSheet);
     markRuntimeStep_(timing, "Final Master List display enforcement");
     lockFinalOutputRowHeights_(masterSheet, "Master List");
     markRuntimeStep_(timing, "Lock Master List final row heights");
     enforceGlobalSheetSortOrder_(monthParts);
     markRuntimeStep_(timing, "Global sheet sort order enforced");
+=======
+    lockFinalOutputRowHeights_(masterSheet, "Master List");
+    markRuntimeStep_(timing, "Lock Master List final row heights");
+    hideReportTemplates(null, timing);
+    markRuntimeStep_(timing, "Hide report templates before Master List completion");
+>>>>>>> origin/main
     writeRuntimeTimingReport_(timing);
     notify_(
       `Master List created. Copied ${copiedRowCount} Primary PMR row(s) from processed Demo P.\n\n` +
@@ -11310,11 +11957,14 @@ function createMasterListSheetFromTemplate_(ss, targetName, monthParts) {
   return sheet;
 }
 
+<<<<<<< HEAD
 function applyMasterListTemplateFormatting_(sheet) {
 
   return;
 }
 
+=======
+>>>>>>> origin/main
 function writeMasterListTitleDateBlock_(masterSheet, monthParts) {
   masterSheet.getRange("A1:D2").setValues([
     ["Master List", "", "", ""],
@@ -11381,12 +12031,15 @@ function formatMasterListSheet_(sheet) {
     firstDay: coerceToValidDate_(sheet.getRange("B2").getValue()) || new Date(),
     lastDay: coerceToValidDate_(sheet.getRange("D2").getValue()) || new Date()
   };
+<<<<<<< HEAD
   applyMasterListTemplateFormatting_(sheet, monthParts);
 }
 
 function applyMasterListTemplateModeUpdateDisplay_(sheet) {
 
   return;
+=======
+>>>>>>> origin/main
 }
 
 function getMonthPartsFromTitleRows_(sheet) {
@@ -11409,6 +12062,7 @@ function updateCopiedMasterListHeader_(sheet, monthParts) {
   sheet.getRange("D2").setValue(monthParts.lastDay);
 }
 
+<<<<<<< HEAD
 function applyMasterListTemplateHeaderFormatting_(sheet) {
 
   return;
@@ -11417,6 +12071,13 @@ function applyMasterListTemplateHeaderFormatting_(sheet) {
 
 function createIndexSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+=======
+function createIndexSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dashboard = loadDashboardConfig_();
+  const globals = dashboard.globals || {};
+  const theme = getThemeColorsFromBase_("#668BCC", globals);
+>>>>>>> origin/main
   let sheet = ss.getSheetByName(INDEX_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(INDEX_SHEET, 0);
@@ -11511,11 +12172,19 @@ function createIndexSheet() {
 
 
   sheet.getRange(1, 1, rows.length, INDEX_HEADERS.length).setValues(rows);
+<<<<<<< HEAD
   sheet.getRange(1, 1, 1, INDEX_HEADERS.length).setFontSize(14).setFontWeight("bold").setBackground("#668BCC").setFontColor("#FFFFFF");
   sheet.getRange(2, 1, 1, INDEX_HEADERS.length).setFontWeight("bold").setBackground("#D9EAF7");
   rows.forEach(function(row, idx) {
     if (idx > 1 && row[0] && !row[1]) {
       sheet.getRange(idx + 1, 1, 1, INDEX_HEADERS.length).setFontWeight("bold").setBackground("#EDEDED");
+=======
+  sheet.getRange(1, 1, 1, INDEX_HEADERS.length).setFontSize(Number(globals.titleFontSize || 14)).setFontWeight("bold").setBackground(theme.level3).setFontColor("#FFFFFF");
+  sheet.getRange(2, 1, 1, INDEX_HEADERS.length).setFontWeight("bold").setBackground(theme.level2);
+  rows.forEach(function(row, idx) {
+    if (idx > 1 && row[0] && !row[1]) {
+      sheet.getRange(idx + 1, 1, 1, INDEX_HEADERS.length).setFontWeight("bold").setBackground(theme.level1);
+>>>>>>> origin/main
     }
   });
   sheet.setColumnWidths(1, Math.min(4, INDEX_HEADERS.length), 160);
@@ -11531,6 +12200,12 @@ function generateArchiveFileIndex_() {
   return runFrameworkTimed_("Update Archive File Index", function(timing) {
     try {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
+<<<<<<< HEAD
+=======
+      const dashboard = loadDashboardConfig_();
+      const globals = dashboard.globals || {};
+      const theme = getThemeColorsFromBase_("#668BCC", globals);
+>>>>>>> origin/main
       const archiveSs = SpreadsheetApp.openById(RFF_ARCHIVE_SPREADSHEET_ID);
       markFrameworkStep_(timing, "Archive workbook opened in background");
 
@@ -11555,8 +12230,13 @@ function generateArchiveFileIndex_() {
       ].concat(archiveSheets);
 
       indexSheet.getRange(1, 1, rows.length, 4).setValues(rows);
+<<<<<<< HEAD
       indexSheet.getRange(1, 1, 1, 4).setFontSize(14).setFontWeight("bold").setBackground("#668BCC").setFontColor("#FFFFFF");
       indexSheet.getRange(3, 1, 1, 4).setFontWeight("bold").setBackground("#D9EAF7");
+=======
+      indexSheet.getRange(1, 1, 1, 4).setFontSize(Number(globals.titleFontSize || 14)).setFontWeight("bold").setBackground(theme.level3).setFontColor("#FFFFFF");
+      indexSheet.getRange(3, 1, 1, 4).setFontWeight("bold").setBackground(theme.level2);
+>>>>>>> origin/main
       indexSheet.setColumnWidths(1, 4, 160);
       applyStandardRowHeights_(indexSheet);
       enforceGlobalSheetSortOrder_();
@@ -11619,11 +12299,28 @@ function enforceGlobalSheetSortOrder_(monthParts) {
     return name_(a).localeCompare(name_(b));
   });
 
+<<<<<<< HEAD
   let position = 1;
   orderedSheets.forEach(function(sheet) {
     try {
       ss.setActiveSheet(sheet);
       ss.moveActiveSheet(position++);
+=======
+  const currentOrderNames = ss.getSheets().map(name_).join("|");
+  const desiredOrderNames = orderedSheets.map(name_).join("|");
+  if (currentOrderNames === desiredOrderNames) return 0;
+
+  let position = 1;
+  let moves = 0;
+  orderedSheets.forEach(function(sheet) {
+    try {
+      if (sheet.getIndex() !== position) {
+        ss.setActiveSheet(sheet);
+        ss.moveActiveSheet(position);
+        moves++;
+      }
+      position++;
+>>>>>>> origin/main
       if (isTemplate_(name_(sheet)) && !sheet.isSheetHidden()) {
         sheet.hideSheet();
       }
@@ -11631,7 +12328,11 @@ function enforceGlobalSheetSortOrder_(monthParts) {
       Logger.log("Global sheet sort skipped for " + name_(sheet) + ": " + err.message);
     }
   });
+<<<<<<< HEAD
   return orderedSheets.length;
+=======
+  return moves;
+>>>>>>> origin/main
 }
 
 function extractFirstDateFromSheetName_(sheetName) {
@@ -11772,7 +12473,10 @@ function assignSortOrderAndHideExtraRows() {
   formatSortOrderDisplayValues_(sheet);
   applyParticipantAlternatingColorsBySortOrder_(sheet);
   hideDecimalSortOrderRows_(sheet);
+<<<<<<< HEAD
   enforceMasterListFinalDisplay_(sheet);
+=======
+>>>>>>> origin/main
   notify_("Sort Order assigned. Primary rows remain visible and extra rows are hidden.");
 }
 
@@ -11783,7 +12487,10 @@ function applySortOrderDisplayForMasterList_(sheet) {
   formatSortOrderDisplayValues_(sheet);
   applyParticipantAlternatingColorsBySortOrder_(sheet);
   hideDecimalSortOrderRows_(sheet);
+<<<<<<< HEAD
   enforceMasterListFinalDisplay_(sheet);
+=======
+>>>>>>> origin/main
 }
 
 function assignSortOrderByParticipant_(sheet) {
@@ -12138,16 +12845,22 @@ function formatSortOrderDisplayValues_(sheet) {
 function applyFinalMasterListColorAndDisplay_(sheet) {
   sheet = sheet || SpreadsheetApp.getActiveSheet();
   sheet.showRows(DATA_START_ROW, Math.max(sheet.getLastRow() - DATA_START_ROW + 1, 1));
+<<<<<<< HEAD
   hideMasterListSourceColumns_(sheet);
   applyParticipantAlternatingColorsBySortOrder_(sheet);
   hideDecimalSortOrderRows_(sheet);
   enforceMasterListFinalDisplay_(sheet);
+=======
+  applyParticipantAlternatingColorsBySortOrder_(sheet);
+  hideDecimalSortOrderRows_(sheet);
+>>>>>>> origin/main
 }
 
 function applyMasterListDisplaySettings_(sheet) {
   applyFinalMasterListColorAndDisplay_(sheet || SpreadsheetApp.getActiveSheet());
 }
 
+<<<<<<< HEAD
 function enforceMasterListFinalDisplay_(sheet) {
 
   return;
@@ -12159,6 +12872,8 @@ function lockMasterListRowHeightsAndClip_(sheet) {
 }
 
 
+=======
+>>>>>>> origin/main
 function processMasterListFull_(masterSheet, monthParts, pmrFilter, timing) {
   ensureHeaders_(masterSheet, MASTER_LIST_ADDED_HEADERS, HEADER_ROW);
   ensureBannerSummaryOutputHeaders_(masterSheet);
@@ -12204,8 +12919,11 @@ function processMasterListSingleDataPass_(masterSheet, monthParts, pmrFilter, in
   markRuntimeStep_(timing, "Single Pass - combine Notes Summary");
   if (data.range) data.range.setValues(data.values);
   markRuntimeStep_(timing, "Single Pass - write processed Master List data");
+<<<<<<< HEAD
   lockMasterListRowHeightsAndClip_(masterSheet);
   markRuntimeStep_(timing, "Single Pass - row height/wrap lock");
+=======
+>>>>>>> origin/main
 }
 
 function populateParticipantNameData_(data, pmrFilter) {
@@ -12393,7 +13111,10 @@ function copyPreviousMasterListToCurrentMonth_(previousMaster, monthParts) {
   const values = previousMaster.getRange(1, 1, lastRow, lastCol).getValues();
   currentMaster.getRange(1, 1, lastRow, lastCol).setValues(values);
   updateCopiedMasterListHeader_(currentMaster, monthParts);
+<<<<<<< HEAD
   applyMasterListTemplateHeaderFormatting_(currentMaster, monthParts);
+=======
+>>>>>>> origin/main
   ensureHeaders_(currentMaster, MASTER_LIST_ADDED_HEADERS, HEADER_ROW);
   ensureBannerSummaryOutputHeaders_(currentMaster);
   ensureContactOutputHeaders_(currentMaster);
@@ -12650,6 +13371,7 @@ function applyMasterListUpdateMetadataToRow_(rowValues, headerMap, monthParts, s
 }
 
 
+<<<<<<< HEAD
 function hideMasterListSourceColumns_(sheet) {
 
 
@@ -12679,6 +13401,8 @@ function showCurrentMasterListSourceColumns() {
 }
 
 
+=======
+>>>>>>> origin/main
 function hideSystemSheetsNow() {
   return runFrameworkTimed_("Hide System Sheets", function(timing) {
     const count = hideSystemSheets_(timing);
@@ -13507,8 +14231,11 @@ function createDisenrolledList() {
     const result = moveDisenrolledPMRsFromDemoPToExclusion_(demoSheet, monthParts);
     markRuntimeStep_(timing, "Copy disenrolled primary rows and remove all disenrolled Demo P rows: " + result.rowsCopied + " copied, " + result.rowsRemoved + " rows removed");
     setLastRawDataDisenrolledBuildResult_(result);
+<<<<<<< HEAD
     enforceGlobalSheetSortOrder_(monthParts);
     markRuntimeStep_(timing, "Global sheet sort order enforced");
+=======
+>>>>>>> origin/main
     writeRuntimeTimingReport_(timing);
     notify_("Disenrolled List updated from ongoing Demo P.\n" + "PMRs identified: " + result.pmrsRemoved + "\n" + "Primary rows written: " + result.rowsCopied + "\n" + "Disenrolled Demo P rows removed: " + result.rowsRemoved);
     return result;
@@ -13541,11 +14268,14 @@ function processBlankContactSummariesOnDemoP_(demoSheet, timing) {
   return pmrs.size;
 }
 
+<<<<<<< HEAD
 function createDisenrollmentList() {
   return createDisenrolledList();
 }
 
 
+=======
+>>>>>>> origin/main
 function splitRawDataRowsIntoActiveAndDisenrolled_(rawData, disenrolledPMRSet) {
   const headerMap = rawData.headerMap;
   const pmrIdx = getPMRIndex_(headerMap);
@@ -13924,12 +14654,15 @@ function applyDisenrolledExclusionCreateFormattingOnly_(sheet) {
   forceStandardTitleCellAlignment_(sheet);
 }
 
+<<<<<<< HEAD
 function applyDisenrolledExclusionAlternatingColors_(sheet) {
 
   return;
 }
 
 
+=======
+>>>>>>> origin/main
 const CHANGE_SECTION_ENROLLMENTS = "Enrollments";
 
 const CHANGE_SECTION_DISENROLLMENTS = "Disenrollments";
@@ -14112,6 +14845,7 @@ function buildMonthlyChangeReportRow_(sourceRow, sourceHeaders, reportHeaders, c
 }
 
 
+<<<<<<< HEAD
 function applyMonthlyChangeSubsectionFormat_(sheet, row, lastCol) {
 
   return;
@@ -14127,6 +14861,8 @@ function applyMonthlyChangeAllSubsectionFormats_(sheet, lastCol) {
   return;
 }
 
+=======
+>>>>>>> origin/main
 function formatMonthlyChangeReportSectionSheet_(reportSheet, sourceHeaders) {
   if (!reportSheet) return;
   const dashboard = loadDashboardConfig_();
@@ -14144,6 +14880,7 @@ function formatMonthlyChangeReportSectionSheet_(reportSheet, sourceHeaders) {
 }
 
 
+<<<<<<< HEAD
 function formatMonthlyChangeDateColumns_(sheet) {
 
   return;
@@ -14152,6 +14889,8 @@ function formatMonthlyChangeDateColumns_(sheet) {
 
 
 
+=======
+>>>>>>> origin/main
 // ============================================================================
 // DASHBOARD QUALITY AND FRAMEWORK DASHBOARD FUNCTIONS
 // ============================================================================
@@ -15031,6 +15770,10 @@ function applyDashboardQualityReportColumnSettings_(sheet, options) {
 
   const lastRow = Math.max(sheet.getLastRow(), 1);
   const lastCol = RFF_DASHBOARD_QUALITY_COL_WIDTHS.length;
+<<<<<<< HEAD
+=======
+  const globals = loadDashboardConfig_().globals || {};
+>>>>>>> origin/main
 
   try {
     sheet.getRange(1, 1, lastRow, lastCol)
@@ -15038,7 +15781,11 @@ function applyDashboardQualityReportColumnSettings_(sheet, options) {
       .setFontSize(10)
       .setVerticalAlignment("top")
       .setHorizontalAlignment("left")
+<<<<<<< HEAD
       .setBorder(true, true, true, true, true, true, RFF_SYSTEM_SHEET_BORDER_COLOR, SpreadsheetApp.BorderStyle.DOTTED);
+=======
+      .setBorder(true, true, true, true, true, true, globals.globalBorderColor || "#CCCCCC", getGlobalBorderStyle_(globals));
+>>>>>>> origin/main
 
     sheet.getRange(1, 1, lastRow, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
     // OPTIMIZATION: Format columns 2 through 7 in one batch API call
@@ -16041,14 +16788,33 @@ function getRequiredMenuFunctionNames_() {
     "setupReportFormattingDashboard",
     "createOrRefreshAllReportTemplates",
     "runDashboardQualityQuick",
+<<<<<<< HEAD
     "runDashboardQualityFull",
     "buildDemoPFromScratch",
     "updateDemoPMonthlySync",
+=======
+    "runDashboardQualityStartUp",
+    "runDashboardQualityValidateTemplates",
+    "runDashboardQualityFull",
+    "createIndexSheet",
+    "formatMonthlySheets",
+    "buildDemoPFromScratch",
+    "updateDemoPMonthlySync",
+    "createDisenrolledList",
+    "createMasterList",
+    "buildMonthlyChangeReport",
+>>>>>>> origin/main
     "hideReportTemplates",
     "showReportTemplates",
     "hideSystemSheetsNow",
     "showSystemSheetsNow",
     "formatBannerReport",
+<<<<<<< HEAD
+=======
+    "formatCarePlanDueReport",
+    "formatUnlockedCarePlanReport",
+    "formatRawData",
+>>>>>>> origin/main
     "validateActiveBannerFormatterOutput",
     "archiveActiveRawDataSheet",
     "archiveMonthlyImportSheets",
@@ -16060,8 +16826,16 @@ function getRequiredMenuFunctionNames_() {
     "hideSystemSheets_",
     "showSystemSheets_",
     "clearDiagnosticsAndTimingLogs",
+<<<<<<< HEAD
     "formatDashboard",
     "saveActiveLayoutToDashboardSettings",
+=======
+    "toggleFrameworkTiming",
+    "formatDashboard",
+    "rebuildFormatDashboardDefaults",
+    "saveActiveLayoutToDashboardSettings",
+    "setupSystemSheets",
+>>>>>>> origin/main
     "runMonthlyChangeValidation"
   ];
 }
@@ -16190,6 +16964,12 @@ function verifyFrameworkConfiguration() {
 // ============================================================================
 
 function runFrameworkTimed_(processName, callback) {
+<<<<<<< HEAD
+=======
+  if (!isFrameworkTimingEnabled_()) {
+    return callback(null);
+  }
+>>>>>>> origin/main
   const timing = startFrameworkTiming_(processName);
 
   try {
@@ -16283,7 +17063,11 @@ function rebuildProductionMonthlyChangeTemplate() {
   const rawHeaders = getHeadersForSheetType_(dashboard, SHEET_TYPE.RAW_DATA);
   const reportHeaders = getMonthlyChangeReportHeaders_(rawHeaders);
   const lastCol = Math.max(reportHeaders.length, 1);
+<<<<<<< HEAD
   const theme = getThemeColorsFromBase_(SHEET_BASE_COLORS[SHEET_TYPE.MONTHLY_CHANGE] || "#A165CC");
+=======
+  const theme = getThemeColorsFromBase_(sheetDef.baseColor || "#A165CC", globals);
+>>>>>>> origin/main
 
   template = ss.insertSheet(templateName);
 
@@ -16291,9 +17075,15 @@ function rebuildProductionMonthlyChangeTemplate() {
   resizeSheetGrid_(template, 250, lastCol);
 
   template.getRange(1, 1, 250, lastCol)
+<<<<<<< HEAD
     .setFontFamily("Arial")
     .setFontSize(10)
     .setFontColor("#000000")
+=======
+    .setFontFamily(globals.standardFont || "Arial")
+    .setFontSize(Number(globals.standardFontSize || 10))
+    .setFontColor(globals.standardFontColor || "#000000")
+>>>>>>> origin/main
     .setFontWeight("normal")
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP)
     .setHorizontalAlignment("left")
@@ -16303,18 +17093,30 @@ function rebuildProductionMonthlyChangeTemplate() {
   template.getRange(1, 1, 250, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
   for (let r = 1; r <= 250; r++) safeSetRowHeights_(template, r, 1, 25, "Monthly Change Reset Row");
 
+<<<<<<< HEAD
   // 2. Clone Legacy applyMonthlyChangeStandardTopRows_ (Rows 1-4)
+=======
+  // 2. Apply dashboard-governed Monthly Change top rows (Rows 1-4)
+>>>>>>> origin/main
   template.getRange(1, 1, 1, lastCol).setBackground(theme.level3);
   template.getRange(2, 1, 1, lastCol).setBackground(theme.level3);
   template.getRange(3, 1, 1, lastCol).setBackground(theme.level1);
   template.getRange(4, 1, 1, lastCol).setBackground(theme.level2);
 
+<<<<<<< HEAD
   template.getRange("A1").setValue("Monthly Change Report").setFontSize(14).setFontWeight("bold");
+=======
+  template.getRange("A1").setValue("Monthly Change Report").setFontSize(Number(globals.titleFontSize || 14)).setFontWeight("bold");
+>>>>>>> origin/main
   template.getRange("A2").setValue("Date");
   template.getRange("C2").setValue("to").setHorizontalAlignment("center");
 
   const mainHeaderRange = template.getRange(4, 1, 1, lastCol);
+<<<<<<< HEAD
   mainHeaderRange.setFontSize(10).setFontWeight("bold").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top");
+=======
+  mainHeaderRange.setFontSize(Number(globals.standardFontSize || 10)).setFontWeight("bold").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top");
+>>>>>>> origin/main
   if (reportHeaders.length) mainHeaderRange.setValues([reportHeaders]);
 
   safeSetRowHeights_(template, 1, 1, 25, "Legacy Row 1");
@@ -16330,14 +17132,22 @@ function rebuildProductionMonthlyChangeTemplate() {
     });
   }
 
+<<<<<<< HEAD
   // 4. Clone Legacy applyMonthlyChangeSubsectionFormat_ (Row 5+)
+=======
+  // 4. Apply dashboard-governed Monthly Change subsection blocks (Row 5+)
+>>>>>>> origin/main
   const sections = ["Enrollments", "Disenrollments", "Demographic Changes", "Caseload Changes", "Contact Changes", "Banner Summary Changes"];
   let currentRow = 5;
 
   sections.forEach(function(titleText) {
     // Line 1: Title (Legacy used Level 3, Font 14, Height 25)
     template.getRange(currentRow, 1, 1, lastCol).setBackground(theme.level3).setFontWeight("bold");
+<<<<<<< HEAD
     template.getRange(currentRow, 1).setValue(titleText).setFontSize(14);
+=======
+    template.getRange(currentRow, 1).setValue(titleText).setFontSize(Number(globals.titleFontSize || 14));
+>>>>>>> origin/main
     safeSetRowHeights_(template, currentRow, 1, 25, "Legacy Title");
 
     // Line 2: Spacer (Legacy used Level 1, Height 7)
@@ -16346,7 +17156,11 @@ function rebuildProductionMonthlyChangeTemplate() {
 
     // Line 3: Table Headers (Legacy used Level 2, Font 8, Height 10)
     const line3Range = template.getRange(currentRow + 2, 1, 1, lastCol);
+<<<<<<< HEAD
     line3Range.setFontSize(8).setFontWeight("bold").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top").setBackground(theme.level2);
+=======
+    line3Range.setFontSize(Number(globals.standardFontSize || 10)).setFontWeight("bold").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top").setBackground(theme.level2);
+>>>>>>> origin/main
     if (reportHeaders.length) line3Range.setValues([reportHeaders]);
     safeSetRowHeights_(template, currentRow + 2, 1, 10, "Legacy Subheaders");
 
